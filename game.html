@@ -278,9 +278,9 @@ canvas{touch-action:none;}
 
       <div class="mode-select">
         <div class="mode-pills">
-          <div class="mode-pill" onclick="setMode(this, 'NORMAL')">ノーマル</div>
-          <div class="mode-pill active" onclick="setMode(this, 'WAIT')">まちモード</div>
-          <div class="mode-pill" onclick="setMode(this, 'TAP')">タップモード</div>
+          <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+          <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>
+          <div class="mode-pill" data-mode="TAP" onclick="setMode(this, 'TAP')">タップモード</div>
         </div>
       </div>
       
@@ -355,17 +355,6 @@ let gameEndAt = 0;
 let score = 0;
 let groups = [];
 let stars = [];
-const STAR_CAP = 90; // パフォーマンス上限（軽量化） // パフォーマンス上限
-function burstStars(n, x, y, waves=1, waveDelay=120){
-  const make = ()=>{
-    const add = Math.min(n, STAR_CAP);
-    for(let i=0;i<add;i++) stars.push(new Star(x,y));
-    if(stars.length > STAR_CAP) stars.splice(0, stars.length-STAR_CAP);
-  };
-  make();
-  for(let w=1; w<waves; w++) setTimeout(make, waveDelay*w);
-}
-
 let lastSpawn = 0;
 let scrollSpeed = 3.5;
 let baseScrollSpeed = 3.5;
@@ -373,58 +362,6 @@ let gameMode = 'practice';
 let isSongMode = false;
 let waitHold = false;
 let waitTargetGroup = null;
-let comboStreak = 0;
-let speedLevel = 0;
-  updateComboUI();
-  const big=document.getElementById('comboBig'); if(big) big.style.display='none';
-let currentScrollSpeed = 3.5;
-const SPEED_UP_EVERY = 5;    // 5連続で加速
-
-let _fxTimer = 0;
-const CHEER_PHRASES = ['その調子！','いいぞ！','ノってる！','キター！','最高！','つづけ！','いける！'];
-function flashScreen(){
-  const f = document.getElementById('screenFlash');
-  if(!f) return;
-  f.classList.remove('flash');
-  void f.offsetWidth;
-  f.classList.add('flash');
-}
-
-function updateComboUI(){ /* disabled */ }
-function showFx(text, kind, opts = {}){
-  const el = document.getElementById('fxMsg');
-  if(!el) return;
-  el.textContent = text;
-  el.classList.remove('hit','miss','speed','mega','show');
-  el.style.display = 'block';
-  if(kind) el.classList.add(kind);
-  if(opts.mega) el.classList.add('mega');
-  // restart animation
-  void el.offsetWidth;
-  el.classList.add('show');
-  clearTimeout(_fxTimer);
-  _fxTimer = setTimeout(()=>{
-    el.classList.remove('show','hit','miss','speed','mega');
-    el.style.display = 'none';
-  }, opts.durationMs || 980);
-}
-
-function resetSpeedState(){
-    speedLevel = 0;
-    hitStreak  = 0;
-    currentScrollSpeed = baseScrollSpeed;
-    scrollSpeed = currentScrollSpeed;
-  }
-}
-function applySpeed(){
-    // 5HITごとに 1.5倍（段階的）。上限は base×SPEED_MAX_MULT。
-    const maxSpeed = baseScrollSpeed * SPEED_MAX_MULT;
-    currentScrollSpeed = Math.min(baseScrollSpeed * Math.pow(SPEED_MULT, speedLevel), maxSpeed);
-    // 実際のスクロール速度にも反映（MENUでも次回開始時に効くように常に更新）
-    scrollSpeed = currentScrollSpeed;
-  }
-}
-
 
 // データ
 const NUT_X = 180;
@@ -463,7 +400,7 @@ const SONG_DATA = [
 
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
 let currentLevelChords = [];
-let spawnInterval = 2800; // ← 間隔（ms）: 全メニュー共通
+let spawnInterval = 1800;
 let lastStartParams = null; // リトライ用
 
 // --- UI操作 ---
@@ -475,9 +412,7 @@ function setMode(el, mode){
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
-  
-  try{ resetSpeedState(); }catch(e){}
-if(rafId) cancelAnimationFrame(rafId);
+  if(rafId) cancelAnimationFrame(rafId);
   gameState = 'MENU';
   
   // UIリセット
@@ -493,8 +428,6 @@ if(rafId) cancelAnimationFrame(rafId);
   
   // キャンバスクリア
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  resetSpeedState();
-  const fx=document.getElementById('fxMsg'); if(fx){ fx.style.display='none'; fx.className=''; }
 }
 
 document.getElementById('stopBtn').onclick = () => {
@@ -511,9 +444,7 @@ function resumeGame(){
 
 // --- ゲーム開始フロー ---
 async function prepGame(type){
-  
-  try{ resetSpeedState(); }catch(e){}
-// タップモードならマイク不要
+  // タップモードならマイク不要
   if(playMode === 'TAP'){ startGameByType(type); return; }
 
   // マイク準備
@@ -591,14 +522,12 @@ function initGame(mode, levelData, opts){
   score=0; groups=[]; stars=[];
   waitHold=false; waitTargetGroup=null;
   baseScrollSpeed = opts.speedBase || 3.5;
-  currentScrollSpeed = baseScrollSpeed;
-  scrollSpeed = currentScrollSpeed;
-  resetSpeedState();
+  scrollSpeed = baseScrollSpeed;
   gameMode = mode;
   isSongMode = (mode==='song');
   currentLevelChords = levelData || [];
   practiceIndex=0; scaleIndex=0; songIndex=0;
-  spawnInterval = 2800; // 全モード共通（ドレミファも曲も）
+  spawnInterval = (mode==='scale') ? 2000 : 1800;
 
   document.getElementById('score').innerText="0";
   document.getElementById('lyrics-area').innerText="";
@@ -634,7 +563,7 @@ function gameLoop(time){
     let cnt=0, maxX=-9999;
     for(let g of groups) { if(g.active){ cnt++; if(g.x>maxX) maxX=g.x; } }
     
-    if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
+    if(cnt<6 && (maxX < canvas.width+120 - 260)){
       if(isSongMode){
         const d = SONG_DATA[songIndex % SONG_DATA.length];
         groups.push(new ChordGroup(d.lib[d.key], d.lyrics));
@@ -659,14 +588,9 @@ function gameLoop(time){
     const d = Math.abs(g.x - NUT_X);
     if(d < bestDist && d < 620 + 100){ bestDist=d; target=g; }
   }
-  if(target){
-    if(gameMode!=='scale'){
-      document.getElementById('chordHud').style.display='block';
-      document.getElementById('chordHud').innerText = target.chord.name||'';
-    } else {
-      document.getElementById('chordHud').style.display='none';
-    }
-    // show faint support (also in scale mode)
+  if(target && gameMode!=='scale'){
+    document.getElementById('chordHud').style.display='block';
+    document.getElementById('chordHud').innerText = target.chord.name||"";
     target.isTarget=true;
   } else {
     document.getElementById('chordHud').style.display='none';
@@ -680,7 +604,6 @@ function gameLoop(time){
   // エフェクト
   stars.forEach(s=>{ s.update(); s.draw(); });
   stars = stars.filter(s=>s.life>0);
-  if(stars.length > STAR_CAP) stars.splice(0, stars.length-STAR_CAP);
 
   // マイク判定
   processMicInput();
@@ -734,59 +657,19 @@ function handleAction(){
   }
 
   if(target){
-    const win = 110;
+    const win = (playMode==='TAP') ? 220 : 110;
     if(best < win){
       // HIT
       target.active=false;
       if(waitHold){
-        waitHold=false; scrollSpeed=currentScrollSpeed; waitTargetGroup=null; lastSpawn=performance.now();
+        waitHold=false; scrollSpeed=baseScrollSpeed; waitTargetGroup=null; lastSpawn=performance.now();
       }
       score += (best<50 ? 15 : 10);
       document.getElementById('score').innerText=score;
-      burstStars(18, NUT_X, canvas.height/2, 1);
-      // combo / speed up
-comboStreak++;
-
-const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
-const isMilestone5  = (comboStreak === 5);
-const isMilestone10 = (comboStreak === 10);
-const isMilestone = isMilestone5 || isMilestone10;
-
-// speed up every 5
-if(comboStreak % SPEED_UP_EVERY === 0){
-  speedLevel++;
-  applySpeed();
-
-  if(isMilestone){
-    flashScreen();
-    showFx(`💥 ${comboStreak} COMBO!! 💥\nSUPER!!`, 'speed', { mega:true, durationMs: 1200 });
-    // 5/10だけ派手：波状に出して“数”は抑え、カクつきを減らす
-    burstStars(isMilestone10 ? 55 : 45, canvas.width/2, canvas.height/2, 2, 140);
-  } else {
-    showFx(`🚀 スピードUP!\n${comboStreak}連続`, 'speed', { mega:true, durationMs: 1050 });
-    burstStars(26, canvas.width/2, canvas.height/2, 1);
-  }
-
-} else {
-  const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
-
-  if(isMilestone){
-    flashScreen();
-    showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:true, durationMs: 1150 });
-    burstStars(isMilestone10 ? 50 : 40, canvas.width/2, canvas.height/2, 2, 140);
-  } else {
-    showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 950 });
-    burstStars(14, canvas.width/2, canvas.height/2, 1);
-  }
-}
-
-    } else if(playMode==='WAIT' || playMode==='TAP'){
+      for(let i=0;i<15;i++) stars.push(new Star(NUT_X, canvas.height/2));
+    } else if(playMode==='WAIT'){
       // MISS in WAIT mode
       if(!waitHold){
-                comboStreak = 0;
-        updateComboUI();
-        const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
-        showFx(missMsg, 'miss');
         waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
       }
     }
@@ -839,13 +722,13 @@ function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   ctx.fillStyle = (txt==='薬')?'#5271ff':(txt==='中'?'#ff66c4':(txt==='人'?'#ff914d':'#888'));
   ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
   ctx.filter="none"; ctx.fillStyle="#fff"; ctx.font=`bold ${size*0.75}px sans-serif`;
-  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt, 0, 0);
+  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,0,2);
   ctx.restore();
 }
 class Star {
   constructor(x,y){ this.x=x;this.y=y;this.vx=(Math.random()-.5)*20;this.vy=(Math.random()-.5)*20;this.life=1; }
   update(){ this.x+=this.vx;this.y+=this.vy;this.vy+=0.5;this.life-=0.03; }
-  draw(){ ctx.save();ctx.globalAlpha=this.life;ctx.fillStyle="#ffeb3b";ctx.beginPath();ctx.arc(this.x,this.y,6,0,Math.PI*2);ctx.fill();ctx.restore(); }
+  draw(){ ctx.save();ctx.globalAlpha=this.life;ctx.fillStyle="#ffeb3b";ctx.beginPath();ctx.arc(this.x,this.y,8,0,Math.PI*2);ctx.fill();ctx.restore(); }
 }
 
 function drawFretboard(){
@@ -867,37 +750,22 @@ function drawFretboard(){
   }
 }
 
-function applyViewportSize(){
-  const vv = window.visualViewport;
-  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
-  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  // expose CSS vh unit (iPhone Safari 100vh issue)
-  document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
-  canvas.width  = Math.floor(w);
-  canvas.height = Math.floor(h);
-}
-applyViewportSize();
-if (window.visualViewport){
-  window.visualViewport.addEventListener('resize', applyViewportSize);
-}
-window.addEventListener('resize', applyViewportSize);
-window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
+function handleResize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize', handleResize); handleResize();
+
 // タップ操作
 canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(playMode==='TAP') handleAction(); }, {passive:false});
 canvas.addEventListener('mousedown', ()=>{ if(playMode==='TAP') handleAction(); });
 
-// UIBAR FIX PATCH (disabled on iOS)
+// UIBAR FIX PATCH
 (function(){
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (isIOS) return;
-function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){ try{ window.scrollTo(0, 1); }catch(e){} }, 50); }
+  function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){ try{ window.scrollTo(0, 1); }catch(e){} }, 50); }
   window.addEventListener('touchstart', nudge, {passive:true});
   window.addEventListener('touchend',   nudge, {passive:true});
   window.addEventListener('click',      nudge, {passive:true});
   window.addEventListener('orientationchange', function(){ setTimeout(nudge, 250); }, {passive:true});
   window.addEventListener('pageshow', function(){ setTimeout(nudge, 250); }, {passive:true});
   setTimeout(nudge, 300);
-
 })();
 </script>
 

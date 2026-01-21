@@ -240,7 +240,25 @@
     /* comboBig disabled (show combo only in FX) */
     #comboBig{ display:none !important; }
   
-  .verBadge{ position:fixed; left: calc(12px + var(--ui-left, 0px) + env(safe-area-inset-left)); right:auto; bottom: calc(12px + var(--ui-bottom, 0px) + env(safe-area-inset-bottom)); padding:8px 12px; border-radius:12px; background:rgba(0,0,0,0.65); color:#fff; font-weight:800; font-size:13px; letter-spacing:0.4px; z-index:120; user-select:none; }
+  .verBadge{
+  position:fixed;
+  top:calc(8px + env(safe-area-inset-top));
+  left:calc(8px + env(safe-area-inset-left));
+  right:auto;
+  bottom:auto;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(0,0,0,0.45);
+  color:#fff;
+  font-weight:800;
+  font-size:12px;
+  letter-spacing:.3px;
+  z-index:9999;
+  pointer-events:none;
+  user-select:none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
 </style>
 </head>
 <body>
@@ -912,7 +930,20 @@ class ChordGroup {
       ctx.font="bold 50px sans-serif";
       ctx.textAlign="center";
       ctx.textBaseline="top";
-      const labelY = (canvas.height/2) - 150 + 10; // neck top + margin
+      const neckTop = (canvas.height/2) - 150;
+      const neckBottom = (canvas.height/2) + 150;
+      const laneY = cy + (tf.s-2.5)*75;
+      const circleR = 40;
+      const fontSize = 50;
+      // まずは「指◯の上」に出す。上が足りなければ下へ（1A対策）
+      let labelY = laneY - circleR - (fontSize + 8);
+      if(labelY < neckTop + 8){
+        labelY = laneY + circleR + 8;
+      }
+      // どこまで行ってもネック外に出ないように軽くクランプ
+      if(labelY > neckBottom - (fontSize + 8)){
+        labelY = neckBottom - (fontSize + 8);
+      }
       ctx.fillText(this.chord.name||"", nx, labelY);
       ctx.restore();
     }

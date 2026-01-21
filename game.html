@@ -243,6 +243,11 @@
   /* タップしやすさ */
   button, .menuBtn, .bigBtn { touch-action: manipulation; }
 
+
+/* ensure stop clickable */
+#stopBtn{z-index:60;pointer-events:auto;}
+#topHUD,#rightHUD,.badge,.versionBadge,#fxMsg{pointer-events:none;}
+canvas{touch-action:none;}
 </style>
 </head>
 <body>
@@ -374,8 +379,6 @@ let speedLevel = 0;
   const big=document.getElementById('comboBig'); if(big) big.style.display='none';
 let currentScrollSpeed = 3.5;
 const SPEED_UP_EVERY = 5;    // 5連続で加速
-const SPEED_STEP = 0.375;   // 1段階の加速量（×1.5）
-const SPEED_MAX_ADD = 2.25; // 上限（×1.5）
 
 let _fxTimer = 0;
 const CHEER_PHRASES = ['その調子！','いいぞ！','ノってる！','キター！','最高！','つづけ！','いける！'];
@@ -407,17 +410,17 @@ function showFx(text, kind, opts = {}){
 }
 
 function resetSpeedState(){
-  comboStreak = 0;
-  speedLevel = 0;
-  currentScrollSpeed = baseScrollSpeed;
-  if(gameState === 'PLAY' && !waitHold){
+    speedLevel = 0;
+    hitStreak  = 0;
+    currentScrollSpeed = baseScrollSpeed;
     scrollSpeed = currentScrollSpeed;
   }
 }
 function applySpeed(){
-  const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD;
-  currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
-  if(gameState === 'PLAY' && !waitHold){
+    // 5HITごとに 1.5倍（段階的）。上限は base×SPEED_MAX_MULT。
+    const maxSpeed = baseScrollSpeed * SPEED_MAX_MULT;
+    currentScrollSpeed = Math.min(baseScrollSpeed * Math.pow(SPEED_MULT, speedLevel), maxSpeed);
+    // 実際のスクロール速度にも反映（MENUでも次回開始時に効くように常に更新）
     scrollSpeed = currentScrollSpeed;
   }
 }
@@ -836,7 +839,7 @@ function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   ctx.fillStyle = (txt==='薬')?'#5271ff':(txt==='中'?'#ff66c4':(txt==='人'?'#ff914d':'#888'));
   ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
   ctx.filter="none"; ctx.fillStyle="#fff"; ctx.font=`bold ${size*0.75}px sans-serif`;
-  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,0,6);
+  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt, 0, 0);
   ctx.restore();
 }
 class Star {

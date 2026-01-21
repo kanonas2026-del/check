@@ -234,12 +234,32 @@
 .diag-mini-title{font-weight:700;}
 .diag-personality{margin-top:16px; font-size:32px; font-weight:900; color:#3a2a1a; text-align:center;}
 
+
+
+
+/* version mark: show only on start overlay to avoid covering tuning UI */
+#start-overlay .verMark{
+  position:absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.85);
+  color:#111;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  pointer-events: none;
+  user-select: none;
+}
 </style>
 </head>
 <body>
 
   <div id="start-overlay">
     <button class="start-btn" onclick="startEverything()">🎵 チューニングをはじめましょう！</button>
+    <div class="verMark" aria-hidden="true">v12</div>
   </div>
 
   <div class="nav-back"><a href="index.html">🏝️ TOPへ</a></div>
@@ -1590,11 +1610,5 @@ window.onresize(); draw();
 })();
 
 </script>
-<!-- version badge (safe, non-interactive) -->
-<div id="verBadge" style="position:fixed; top: calc(env(safe-area-inset-top) + 6px); right: calc(env(safe-area-inset-right) + 6px);
-  z-index: 9999; padding: 4px 8px; border-radius: 12px; background: rgba(255,255,255,0.88); color: #111;
-  font-size: 12px; font-weight: 900; letter-spacing: 0.2px; pointer-events: none; user-select: none;">
-  v12
-</div>
 </body>
 </html>

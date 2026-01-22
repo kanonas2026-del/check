@@ -9,6 +9,8 @@
     body { margin: 0; background: #4a3728; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
 
     :root{
+      --vh: 1vh;
+
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-right: env(safe-area-inset-right, 0px);
@@ -69,7 +71,7 @@
       padding: clamp(16px, 4.8vw, 25px) clamp(28px, 7vw, 50px);
     }
     #diagnosis-card{
-      max-height: calc(100vh - var(--safe-top) - var(--safe-bottom) - 40px);
+      max-height: calc((var(--vh) * 100) - var(--safe-top) - var(--safe-bottom) - 40px);
       overflow: auto;
       -webkit-overflow-scrolling: touch;
     }
@@ -80,7 +82,7 @@
       .ui-panel{ bottom: calc(var(--safe-bottom) + 10px); }
     }
 
-    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: 100vh; position: relative; }
+    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative; }
     canvas { display: block; width: 100%; height: 100%; }
     #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
     .start-btn { background: #ff914d; color: white; border: none; padding: 25px 50px; font-size: 24px; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #d97b41; }
@@ -182,7 +184,7 @@
 
 
     /* ===== iPhone landscape fix (横画面でボタンがネックに被る対策) ===== */
-    @media (orientation: landscape) and (max-height: 520px){
+    @media (orientation: landscape){
       /* 上のガイドは1行に寄せて省スペース */
       #guide-msg{
         top: calc(var(--safe-top) + 6px);
@@ -234,55 +236,22 @@
 .diag-mini-title{font-weight:700;}
 .diag-personality{margin-top:16px; font-size:32px; font-weight:900; color:#3a2a1a; text-align:center;}
 
-/* === KIDS UI THEME vK1 (tuning) === */
-body{
-  font-family: "Hiragino Maru Gothic ProN","Hiragino Sans","Arial Rounded MT Bold",system-ui,-apple-system,sans-serif !important;
+</style>
+<style id="kidsThemeSafe">
+
+/* === kids UI theme (SAFE) : visual only / no layout change === */
+:root{
+  --kidsFont: "Hiragino Maru Gothic ProN","Hiragino Sans","M PLUS Rounded 1c","Rounded Mplus 1c","Arial Rounded MT Bold",system-ui,sans-serif;
 }
-/* Make key texts look like stickers without changing layout */
-#guide-msg{
-  color:#4a3728 !important;
-  background: rgba(255,255,255,0.92) !important;
-  border: 3px solid #ffcc00 !important;
-  border-radius: 18px !important;
-  box-shadow: 3px 3px 0 rgba(0,0,0,0.18) !important;
-  padding: 8px 12px !important;
+html, body{ font-family: var(--kidsFont); }
+button, input, select{ font-family: inherit; }
+
+/* keep all original positions / vh hacks. only add gentle readability */
+#tuner-nav button, #btn-top, #btnTop, #btn-menu, #btnMenu{
+  border: 2px solid rgba(255,255,255,0.85);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.12);
 }
-#tuner-nav{
-  color:#ff7a3d !important;
-  -webkit-text-stroke: 3px rgba(255,255,255,0.95);
-  text-shadow: 3px 3px 0 #2c1e14;
-}
-.status-msg{
-  color:#fff !important;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.25);
-}
-/* Buttons: fun but same size */
-.string-btn{
-  border-color: rgba(255,255,255,0.9) !important;
-  box-shadow: 0 6px 0 rgba(0,0,0,0.18) !important;
-}
-.string-btn:active{
-  transform: translateY(4px) !important;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.18) !important;
-}
-.start-btn{
-  border: 4px solid #fff !important;
-  border-radius: 999px !important;
-  background: linear-gradient(to bottom, #ff9a44, #fc6076) !important;
-  box-shadow: 0 10px 0 rgba(0,0,0,0.18), 0 18px 28px rgba(0,0,0,0.25) !important;
-  font-weight: 900 !important;
-}
-.start-btn:active{
-  transform: translateY(6px) !important;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.18), 0 6px 10px rgba(0,0,0,0.18) !important;
-}
-.nav-back a{
-  border: 3px solid rgba(255,255,255,0.95) !important;
-  border-radius: 999px !important;
-  background: linear-gradient(to bottom, #4facfe, #00f2fe) !important;
-  color: #fff !important;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.20);
-}
+
 </style>
 </head>
 <body>
@@ -291,7 +260,7 @@ body{
     <button class="start-btn" onclick="startEverything()">🎵 チューニングをはじめましょう！</button>
   </div>
 
-  <div class="nav-back"><a href="index.html">🏝️ さいしょへ</a></div>
+  <div class="nav-back"><a href="index.html">🏝️ TOPへ</a></div>
 
   <section id="screen-tuning">
     <div id="guide-msg">1げんを ひいてみよう</div>
@@ -1608,8 +1577,22 @@ function doDiagnosis() {
 
   btn.addEventListener('click', showResult);
 }
-window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-window.onresize(); draw();
+function applyViewportSize(){
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+  // expose CSS vh unit (for iPhone Safari 100vh issue)
+  document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+  canvas.width = Math.floor(w);
+  canvas.height = Math.floor(h);
+}
+applyViewportSize();
+if (window.visualViewport){
+  window.visualViewport.addEventListener('resize', () => { applyViewportSize(); draw(); });
+}
+window.addEventListener('resize', () => { applyViewportSize(); draw(); });
+window.addEventListener('orientationchange', () => { setTimeout(() => { applyViewportSize(); draw(); }, 250); });
+draw();
 
 // ===== FINAL FACE OVERRIDE (text-based, no emoji prefix) =====
 (function(){
@@ -1639,5 +1622,9 @@ window.onresize(); draw();
 })();
 
 </script>
+
+<div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
+tuning_fix_v1
+</div>
 </body>
 </html>

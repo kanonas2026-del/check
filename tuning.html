@@ -234,63 +234,64 @@
 .diag-mini-title{font-weight:700;}
 .diag-personality{margin-top:16px; font-size:32px; font-weight:900; color:#3a2a1a; text-align:center;}
 
-
-/* === v12 viewport fixes (iOS landscape safe) === */
-:root{ --vh: 1vh; }
-
-/* Use visual viewport height (set by JS) instead of 100vh to prevent cut-off */
-#screen-tuning{ height: calc(var(--vh) * 100) !important; }
-#start-overlay{ height: calc(var(--vh) * 100) !important; }
-
-/* Prevent header overlap on short landscape heights */
+/* === KIDS UI THEME vK1 (tuning) === */
+body{
+  font-family: "Hiragino Maru Gothic ProN","Hiragino Sans","Arial Rounded MT Bold",system-ui,-apple-system,sans-serif !important;
+}
+/* Make key texts look like stickers without changing layout */
 #guide-msg{
-  top: calc(var(--safe-top) + 10px) !important;
-  font-size: clamp(16px, 4.4vw, 22px) !important;
-  line-height: 1.15 !important;
-  padding: 0 10px !important;
+  color:#4a3728 !important;
+  background: rgba(255,255,255,0.92) !important;
+  border: 3px solid #ffcc00 !important;
+  border-radius: 18px !important;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.18) !important;
+  padding: 8px 12px !important;
 }
 #tuner-nav{
-  top: calc(var(--safe-top) + 46px) !important;
-  font-size: clamp(44px, 10vw, 72px) !important;
-  height: auto !important;
+  color:#ff7a3d !important;
+  -webkit-text-stroke: 3px rgba(255,255,255,0.95);
+  text-shadow: 3px 3px 0 #2c1e14;
 }
 .status-msg{
-  font-size: clamp(14px, 4.0vw, 22px) !important;
-  margin-top: 2px !important;
+  color:#fff !important;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.25);
 }
-
-/* Keep string buttons inside visible area */
-.ui-panel{
-  bottom: calc(var(--safe-bottom) + 12px) !important;
+/* Buttons: fun but same size */
+.string-btn{
+  border-color: rgba(255,255,255,0.9) !important;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.18) !important;
 }
-
-/* Overlay badge */
-#verBadgeOverlay{
-  position: absolute;
-  top: calc(var(--safe-top) + 10px);
-  right: calc(var(--safe-right) + 10px);
-  z-index: 2100;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.9);
-  color: #111;
-  font-weight: 900;
-  font-size: 12px;
-  letter-spacing: 0.3px;
-  pointer-events: none;
-  user-select: none;
-}</style>
+.string-btn:active{
+  transform: translateY(4px) !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.18) !important;
+}
+.start-btn{
+  border: 4px solid #fff !important;
+  border-radius: 999px !important;
+  background: linear-gradient(to bottom, #ff9a44, #fc6076) !important;
+  box-shadow: 0 10px 0 rgba(0,0,0,0.18), 0 18px 28px rgba(0,0,0,0.25) !important;
+  font-weight: 900 !important;
+}
+.start-btn:active{
+  transform: translateY(6px) !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.18), 0 6px 10px rgba(0,0,0,0.18) !important;
+}
+.nav-back a{
+  border: 3px solid rgba(255,255,255,0.95) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(to bottom, #4facfe, #00f2fe) !important;
+  color: #fff !important;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.20);
+}
+</style>
 </head>
 <body>
 
   <div id="start-overlay">
     <button class="start-btn" onclick="startEverything()">🎵 チューニングをはじめましょう！</button>
-<!-- version badge (menu/overlay only, never overlaps play UI) -->
-<div id="verBadgeOverlay">v12</div>
-
   </div>
 
-  <div class="nav-back"><a href="index.html">🏝️ TOPへ</a></div>
+  <div class="nav-back"><a href="index.html">🏝️ さいしょへ</a></div>
 
   <section id="screen-tuning">
     <div id="guide-msg">1げんを ひいてみよう</div>
@@ -1607,37 +1608,9 @@ function doDiagnosis() {
 
   btn.addEventListener('click', showResult);
 }
-function __updateViewportAndCanvas(){
-  try{
-    const vv = window.visualViewport;
-    const vh = Math.round((vv && vv.height) ? vv.height : window.innerHeight);
-    document.documentElement.style.setProperty('--vh', (vh * 0.01) + 'px');
-  }catch(e){}
+window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+window.onresize(); draw();
 
-  // Size canvas to the actual tuning screen box (prevents stretch/ellipse and bottom cut-off)
-  const host = document.getElementById('screen-tuning');
-  if (host){
-    const r = host.getBoundingClientRect();
-    const w = Math.max(1, Math.round(r.width));
-    const h = Math.max(1, Math.round(r.height));
-    if (canvas.width !== w || canvas.height !== h){
-      canvas.width = w;
-      canvas.height = h;
-    }
-  }else{
-    // fallback
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-}
-
-window.addEventListener('resize', __updateViewportAndCanvas);
-if (window.visualViewport){
-  window.visualViewport.addEventListener('resize', __updateViewportAndCanvas);
-  window.visualViewport.addEventListener('scroll', __updateViewportAndCanvas);
-}
-__updateViewportAndCanvas();
-draw();
 // ===== FINAL FACE OVERRIDE (text-based, no emoji prefix) =====
 (function(){
   function keyFromPersonalityText(t){

@@ -50,8 +50,8 @@
       margin-top: 2px;
       line-height: 1.2;
     }
-    .ui-panel{ display:none; /* hide right buttons: use left labels instead */
-
+    .ui-panel{
+      display:none; /* hide right buttons: use left labels instead */
       bottom: calc(var(--safe-bottom) + 14px);
       gap: clamp(10px, 3vw, 15px);
     }
@@ -69,7 +69,7 @@
       padding: clamp(16px, 4.8vw, 25px) clamp(28px, 7vw, 50px);
     }
     #diagnosis-card{
-      max-height: calc(100vh - var(--safe-top) - var(--safe-bottom) - 40px);
+      max-height: calc((var(--vh, 1vh) * 100) - var(--safe-top) - var(--safe-bottom) - 40px);
       overflow: auto;
       -webkit-overflow-scrolling: touch;
     }
@@ -80,7 +80,7 @@
       .ui-panel{ bottom: calc(var(--safe-bottom) + 10px); }
     }
 
-    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: 100vh; position: relative; }
+    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: calc(var(--vh, 1vh) * 100); position: relative; }
     canvas { display: block; width: 100%; height: 100%; }
     #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
     .start-btn { background: #ff914d; color: white; border: none; padding: 25px 50px; font-size: 24px; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #d97b41; }
@@ -299,9 +299,21 @@ button:active, .btn:active, .topBtn:active, #btnTop:active, #backToTop:active, .
   -webkit-user-select:none;
 }
 </style>
+<script>
+// viewport-height helper (layout only): iOS Safari 100vh 対策
+(function(){
+  function setVh(){
+    var h = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+  }
+  setVh();
+  window.addEventListener('resize', setVh, {passive:true});
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', setVh, {passive:true});
+})();
+</script>
 </head>
 <body>
-  <div id="kBadge" aria-hidden="true">vK4</div>
+  <div id="kBadge" aria-hidden="true">vK5</div>
 
 
   <div id="start-overlay">

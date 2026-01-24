@@ -31,6 +31,53 @@
     #app { position: fixed; inset: 0; width: 100%; height: 100dvh; height: calc(var(--vh) * 100); overflow: hidden; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
     canvas { display:block; width:100%; height:100%; touch-action:none; }
 
+    /* ==== Index button theme for Game menu ==== */
+    .menu-card{ position: relative; z-index: 2; }
+    .menu-btn{
+      font-size: clamp(16px, 2.2vw, 22px);
+      padding: 16px 14px;
+      border-radius: 22px;
+      border: none;
+      cursor: pointer;
+      font-weight: 1000;
+      color: #fff;
+      background: #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      box-shadow: 0 10px 0 rgba(0,0,0,0.16), 0 18px 30px rgba(0,0,0,0.14);
+      transform: translateY(0);
+      transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
+      -webkit-tap-highlight-color: transparent;
+      text-align: left;
+    }
+    .menu-btn:active{
+      transform: translateY(6px);
+      box-shadow: 0 4px 0 rgba(0,0,0,0.16), 0 10px 18px rgba(0,0,0,0.12);
+      filter: brightness(0.98);
+    }
+    .menu-btn .badge{
+      flex: 0 0 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.18);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+      font-size: 22px;
+      color:#fff;
+    }
+    .menu-btn.mode1{ background: linear-gradient(135deg, #ff6a6a 0%, #ffb84d 100%); }
+    .menu-btn.mode2{ background: linear-gradient(135deg, #25b7ff 0%, #55e7ff 100%); }
+    .menu-btn.mode3{ background: linear-gradient(135deg, #23d57b 0%, #74f3b5 100%); }
+    .menu-btn.mode4{ background: linear-gradient(135deg, #b56dff 0%, #ff7fd1 100%); }
+
+    .menu-text .title{ font-size: 16px; font-weight: 1000; margin-bottom: 2px; }
+    .menu-text small{ font-size: 12px; opacity: .88; }
+
+    /* Keep overlay above background */
+    #menu-overlay{ z-index: 100; }
+
+
     /* メニューオーバーレイ */
     #menu-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.32);
@@ -67,7 +114,7 @@
     .mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
     .mode-pill {
       border: 2px solid rgba(0,0,0,0.1); background: #fff; border-radius: 20px;
-      padding: 6px 12px; font-weight: 800; font-size: 12px; cursor: pointer;
+      padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
     }
     .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
 
@@ -77,7 +124,7 @@
       padding: 6px 12px; border-radius: 14px; font-weight: 900; font-size: 18px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none;
     }
-    #score-panel { top: calc(60px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
+    #score-panel { top: calc(60px + var(--ui-top, 0px) + env(safe-area-inset-top)); right: calc(12px + var(--ui-right, 0px) + env(safe-area-inset-right)); }
     #timer-panel { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); font-size: 16px; }
 
     #stopBtn {
@@ -129,7 +176,7 @@
       .menu-btn { padding: 8px; }
     }
   
-    /* FX message (HIT / MISS / SPEED) - comic style (center / bigger) */
+    /* FX message (HIT / MISS / SPEED) - optimized (reduce lag) */
 #fxMsg{
   position: fixed;
   left: 50%;
@@ -141,47 +188,42 @@
   padding: 14px 20px 16px;
   border-radius: 18px;
   background: rgba(255,255,255,0.96);
-  border: 4px solid #111;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
+  border: 3px solid rgba(17,17,17,0.95);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.22);
   font-weight: 1000;
-  font-size: 48px;
+  font-size: 46px;
   text-align: center;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   white-space: pre-line;
-  line-height: 1.02;
+  line-height: 1.03;
   color: #ff3d00;
-  text-shadow:
-    0 3px 0 #111,
-    2px 2px 0 #111,
-    -2px 2px 0 #111,
-    2px -2px 0 #111,
-    -2px -2px 0 #111,
-    0 10px 20px rgba(0,0,0,0.22);
+  /* text-shadow is expensive; keep it minimal */
+  text-shadow: 0 2px 0 rgba(17,17,17,0.95), 0 8px 16px rgba(0,0,0,0.18);
+  will-change: transform, opacity;
 }
 #fxMsg.hit{ color: #ff3d00; }
 #fxMsg.miss{ color: #2563eb; background: rgba(207,232,255,0.96); }
 #fxMsg.speed{ color: #0a7f4f; background: rgba(186,247,214,0.96); }
-#fxMsg.mega{
-  font-size: 68px;
-  transform: translate(-50%, -50%) rotate(-6deg) scale(1);
-}
-@keyframes fxComicPop {
-  0%   { transform: translate(-50%, -50%) rotate(-4deg) scale(0.72); opacity: 0; }
-  20%  { transform: translate(-50%, -50%) rotate(-6deg) scale(1.22); opacity: 1; }
-  55%  { transform: translate(-50%, -50%) rotate(-2deg) scale(1.02); opacity: 1; }
+#fxMsg.mega{ font-size: 64px; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
+
+@keyframes fxPopLite {
+  0%   { transform: translate(-50%, -50%) rotate(-4deg) scale(0.82); opacity: 0; }
+  22%  { transform: translate(-50%, -50%) rotate(-6deg) scale(1.10); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) rotate(-2deg) scale(1.02); opacity: 1; }
   100% { transform: translate(-50%, -50%) rotate(1deg)  scale(1.00); opacity: 0; }
 }
-@keyframes fxShake {
-  0% { }
-  20%{ transform: translate(-50%, -50%) rotate(-7deg) translateX(-2px); }
-  40%{ transform: translate(-50%, -50%) rotate(-3deg) translateX(3px); }
-  60%{ transform: translate(-50%, -50%) rotate(-8deg) translateX(-3px); }
-  80%{ transform: translate(-50%, -50%) rotate(-2deg) translateX(2px); }
-  100%{ }
+@keyframes fxShakeLite {
+  0%,100%{ transform: translate(-50%, -50%) rotate(-4deg) translateX(0px); }
+  25%{ transform: translate(-50%, -50%) rotate(-6deg) translateX(-2px); }
+  50%{ transform: translate(-50%, -50%) rotate(-3deg) translateX(2px); }
+  75%{ transform: translate(-50%, -50%) rotate(-7deg) translateX(-1px); }
 }
 #fxMsg.show{
   display: block;
-  animation: fxComicPop 0.98s ease-out forwards, fxShake 0.5s ease-out;
+  animation: fxPopLite 0.92s ease-out forwards;
+}
+#fxMsg.shake{
+  animation: fxPopLite 0.92s ease-out forwards, fxShakeLite 0.42s ease-out;
 }
 
 /* BIG COMBO (neck center) */
@@ -239,21 +281,69 @@
 
     /* comboBig disabled (show combo only in FX) */
     #comboBig{ display:none !important; }
-  </style>
-<style id="kidsThemeSafe">
-
-/* === kids UI theme (SAFE) : visual only / no layout change === */
-:root{
-  --kidsFont: "Hiragino Maru Gothic ProN","Hiragino Sans","M PLUS Rounded 1c","Rounded Mplus 1c","Arial Rounded MT Bold",system-ui,sans-serif;
+  
+  .verBadge{
+  position:fixed;
+  top:calc(8px + env(safe-area-inset-top));
+  left:calc(8px + env(safe-area-inset-left));
+  right:auto;
+  bottom:auto;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(0,0,0,0.45);
+  color:#fff;
+  font-weight:800;
+  font-size:12px;
+  letter-spacing:.3px;
+  z-index:9999;
+  pointer-events:none;
+  user-select:none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
-html, body{ font-family: var(--kidsFont); }
-button, input, select{ font-family: inherit; }
 
-/* keep gameplay layers untouched. only style buttons slightly */
-#btn-stop, #btnStop, #btn-menu, #btnMenu, #btn-top, #btnTop{
-  border: 2px solid rgba(255,255,255,0.85);
-  text-shadow: 0 1px 0 rgba(0,0,0,0.12);
+  body:not(.isMenu) .verBadge{ display:none; }
+
+/* ==== DDR6: Override menu buttons to match index.html ==== */
+#menu-overlay .menu-btn{
+  font-size: clamp(16px, 2.2vw, 22px);
+  padding: 16px 14px;
+  border-radius: 22px;
+  border: none;
+  cursor: pointer;
+  font-weight: 1000;
+  color: #fff;
+  background: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  box-shadow: 0 10px 0 rgba(0,0,0,0.16), 0 18px 30px rgba(0,0,0,0.14);
+  transform: translateY(0);
+  transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
 }
+#menu-overlay .menu-btn:active{
+  transform: translateY(6px);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.16), 0 10px 18px rgba(0,0,0,0.12);
+  filter: brightness(0.98);
+}
+#menu-overlay .menu-btn .badge{
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.18);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+  font-size: 22px;
+  color:#fff;
+}
+#menu-overlay .menu-btn.mode1{ background: linear-gradient(135deg, #ff6a6a 0%, #ffb84d 100%); }
+#menu-overlay .menu-btn.mode2{ background: linear-gradient(135deg, #25b7ff 0%, #55e7ff 100%); }
+#menu-overlay .menu-btn.mode3{ background: linear-gradient(135deg, #23d57b 0%, #74f3b5 100%); }
+#menu-overlay .menu-btn.mode4{ background: linear-gradient(135deg, #b56dff 0%, #ff7fd1 100%); }
+#menu-overlay .menu-text .title{ font-size: 16px; font-weight: 1000; margin-bottom: 2px; }
+#menu-overlay .menu-text small{ font-size: 12px; opacity: .88; }
 
 </style>
 </head>
@@ -285,9 +375,9 @@ button, input, select{ font-family: inherit; }
 
       <div class="mode-select">
         <div class="mode-pills">
-          <div class="mode-pill" onclick="setMode(this, 'NORMAL')">ノーマル</div>
-          <div class="mode-pill active" onclick="setMode(this, 'WAIT')">まちモード</div>
-          <div class="mode-pill" onclick="setMode(this, 'TAP')">タップモード</div>
+          <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+          <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>
+          <div class="mode-pill" data-mode="TAP" onclick="setMode(this, 'TAP')">タップモード</div>
         </div>
       </div>
       
@@ -342,6 +432,34 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// --- UI safe-area for browser bars (no install required) ---
+function updateUiVars(){
+  const vv = window.visualViewport;
+  if(vv){
+    const top = Math.max(0, vv.offsetTop||0);
+    const left = Math.max(0, vv.offsetLeft||0);
+    const right = Math.max(0, (window.innerWidth - vv.width - left));
+    const bottom = Math.max(0, (window.innerHeight - vv.height - top));
+    document.documentElement.style.setProperty('--ui-top', Math.round(top)+'px');
+    document.documentElement.style.setProperty('--ui-left', Math.round(left)+'px');
+    document.documentElement.style.setProperty('--ui-right', Math.round(right)+'px');
+    document.documentElement.style.setProperty('--ui-bottom', Math.round(bottom)+'px');
+  } else {
+    document.documentElement.style.setProperty('--ui-top','0px');
+    document.documentElement.style.setProperty('--ui-left','0px');
+    document.documentElement.style.setProperty('--ui-right','0px');
+    document.documentElement.style.setProperty('--ui-bottom','0px');
+  }
+}
+updateUiVars();
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', updateUiVars);
+  window.visualViewport.addEventListener('scroll', updateUiVars);
+}
+window.addEventListener('resize', updateUiVars);
+window.addEventListener('orientationchange', ()=>setTimeout(updateUiVars, 250));
+
+
 let gameState = 'MENU';
 let playMode = 'WAIT';
 
@@ -349,6 +467,59 @@ let playMode = 'WAIT';
 let audioCtx = null;
 let micStream = null;
 let micAnalyser = null;
+
+// ---- チューニング結果（判定閾値）を読む ----
+const THRESH_KEY = 'uk_game_thresholds_v1';
+const THRESH_MAX_AGE_H = 24; // 24時間
+function loadGameThresholds(){
+  try{
+    const raw = localStorage.getItem(THRESH_KEY);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    if(!o || typeof o !== 'object') return null;
+    if(!o.updatedAt) return null;
+    const ageH = (Date.now() - Number(o.updatedAt)) / 3600000;
+    if(!(ageH >= 0) || ageH > THRESH_MAX_AGE_H) return null;
+    return o;
+  }catch(e){ return null; }
+}
+async function measureNoiseRms(durationMs=900, stepMs=90){
+  if(!micAnalyser) return 0;
+  const buf = new Float32Array(micAnalyser.fftSize);
+  const samples = [];
+  const end = performance.now() + durationMs;
+  while(performance.now() < end){
+    micAnalyser.getFloatTimeDomainData(buf);
+    let s=0; for(let i=0;i<buf.length;i++) s += buf[i]*buf[i];
+    samples.push(Math.sqrt(s/buf.length));
+    await new Promise(r=>setTimeout(r, stepMs));
+  }
+  samples.sort((a,b)=>a-b);
+  const idx = Math.max(0, Math.min(samples.length-1, Math.floor(samples.length*0.85)));
+  return samples[idx] ?? (samples[samples.length-1] ?? 0);
+}
+function applyThresholdsFrom(noise, stored){
+  let rise = 0, high = 0;
+  if(stored && typeof stored.pluckRiseRms === 'number' && typeof stored.pluckHighRms === 'number'){
+    const baseNoise = (typeof stored.noiseRms==='number' && stored.noiseRms>0) ? stored.noiseRms : noise;
+    const k = baseNoise>0 ? (noise/baseNoise) : 1;
+    rise = stored.pluckRiseRms * k;
+    high = stored.pluckHighRms * k;
+  }
+  // 最低ライン（端末別）
+  if(IS_IOS){
+    rise = Math.max(rise||0, 0.0016, noise*2.0);
+    high = Math.max(high||0, 0.0020, noise*3.0);
+  } else {
+    rise = Math.max(rise||0, 0.010,  noise*2.0);
+    high = Math.max(high||0, 0.012,  noise*3.0);
+  }
+  if(high < noise*2.4) high = noise*2.4;
+  if(rise > high*0.9) rise = high*0.6;
+  PLUCK_RISE_RMS = rise;
+  PLUCK_HIGH_RMS = high;
+}
+
 let prevRms = 0;
 let pluckHoldCount = 0;
 let ignorePluckUntil = 0;
@@ -362,7 +533,7 @@ let gameEndAt = 0;
 let score = 0;
 let groups = [];
 let stars = [];
-const STAR_CAP = 90; // パフォーマンス上限（軽量化） // パフォーマンス上限
+const STAR_CAP = 70; // パフォーマンス上限（軽量化） // パフォーマンス上限（軽量化） // パフォーマンス上限
 function burstStars(n, x, y, waves=1, waveDelay=120){
   const make = ()=>{
     const add = Math.min(n, STAR_CAP);
@@ -403,19 +574,25 @@ function updateComboUI(){ /* disabled */ }
 function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
+
   el.textContent = text;
-  el.classList.remove('hit','miss','speed','mega','show');
-  el.style.display = 'block';
+
+  // reset classes without forcing layout (avoid offsetWidth)
+  el.className = '';
   if(kind) el.classList.add(kind);
   if(opts.mega) el.classList.add('mega');
-  // restart animation
-  void el.offsetWidth;
-  el.classList.add('show');
+  // shake only when mega (lighter)
+  if(opts.shake || opts.mega) el.classList.add('shake');
+
+  el.style.display = 'block';
+  // start animation on next frame (no sync reflow)
+  requestAnimationFrame(()=>{ el.classList.add('show'); });
+
   clearTimeout(_fxTimer);
   _fxTimer = setTimeout(()=>{
-    el.classList.remove('show','hit','miss','speed','mega');
+    el.className = '';
     el.style.display = 'none';
-  }, opts.durationMs || 980);
+  }, opts.durationMs || 920);
 }
 
 function resetSpeedState(){
@@ -450,14 +627,14 @@ const CHORD_LIB = {
   'D7': { name: 'D7', targetIdx: 0, fingers: [{s: 2, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}, {s: 4, f: 2, txt: '人'}] }
 };
 const SOLO_LIB = {
-  'do':  { name:'', targetIdx:0, fingers:[{s:3,f:0,txt:'0'}]},
-  're':  { name:'', targetIdx:0, fingers:[{s:3,f:2,txt:'中'}]},
-  'mi':  { name:'', targetIdx:0, fingers:[{s:2,f:0,txt:'0'}]},
-  'fa':  { name:'', targetIdx:0, fingers:[{s:2,f:1,txt:'人'}]},
-  'so':  { name:'', targetIdx:0, fingers:[{s:2,f:3,txt:'薬'}]},
-  'la':  { name:'', targetIdx:0, fingers:[{s:1,f:0,txt:'0'}]},
-  'si':  { name:'', targetIdx:0, fingers:[{s:1,f:2,txt:'中'}]},
-  'do2': { name:'', targetIdx:0, fingers:[{s:1,f:3,txt:'薬'}]}
+  'do':  { name:'ド', targetIdx:0, fingers:[{s:3,f:0,txt:'0'}]},
+  're':  { name:'レ', targetIdx:0, fingers:[{s:3,f:2,txt:'中'}]},
+  'mi':  { name:'ミ', targetIdx:0, fingers:[{s:2,f:0,txt:'0'}]},
+  'fa':  { name:'ファ', targetIdx:0, fingers:[{s:2,f:1,txt:'人'}]},
+  'so':  { name:'ソ', targetIdx:0, fingers:[{s:2,f:3,txt:'薬'}]},
+  'la':  { name:'ラ', targetIdx:0, fingers:[{s:1,f:0,txt:'0'}]},
+  'si':  { name:'シ', targetIdx:0, fingers:[{s:1,f:2,txt:'中'}]},
+  'do2': { name:'ド', targetIdx:0, fingers:[{s:1,f:3,txt:'薬'}]}
 };
 const SONG_DATA = [
   {lib:CHORD_LIB,key:'C',lyrics:"きら"},{lib:SOLO_LIB,key:'do',lyrics:""},
@@ -478,14 +655,29 @@ let lastStartParams = null; // リトライ用
 // --- UI操作 ---
 function setMode(el, mode){
   playMode = mode;
-  document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
+  document.querySelectorAll('.mode-pill').forEach(b => {
+    const m = b.getAttribute('data-mode') || '';
+    b.classList.toggle('active', m === mode);
+  });
 }
+
+// URLパラメータ mode=TAP/NORMAL/WAIT を反映
+(function applyModeFromQuery(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const m = (p.get('mode')||'').toUpperCase();
+    if(m==='TAP' || m==='NORMAL' || m==='WAIT'){
+      setMode(null, m);
+    }
+  }catch(e){}
+})();
+
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
   if(rafId) cancelAnimationFrame(rafId);
   gameState = 'MENU';
+  try{ document.body.classList.add('isMenu'); }catch(e){}
   
   // UIリセット
   document.getElementById('menu-overlay').style.display = 'flex';
@@ -512,6 +704,7 @@ document.getElementById('stopBtn').onclick = () => {
 };
 function resumeGame(){
   gameState='PLAY';
+  try{ document.body.classList.remove('isMenu'); }catch(e){}
   document.getElementById('pause-overlay').style.display='none';
   lastFrameT=0; rafId=requestAnimationFrame(gameLoop);
 }
@@ -538,23 +731,16 @@ async function prepGame(type){
       micAnalyser.fftSize = IS_IOS ? 4096 : 2048;
       src.connect(gain).connect(micAnalyser);
     }
-    
-    // ノイズ計測 (1秒)
-    await new Promise(r => setTimeout(r, 1000));
-    // 簡易キャリブレーション（現在値をノイズ床とする）
-    const buf = new Float32Array(micAnalyser.fftSize);
-    micAnalyser.getFloatTimeDomainData(buf);
-    let rms=0; for(let i=0;i<buf.length;i++) rms+=buf[i]*buf[i];
-    NOISE_RMS = Math.sqrt(rms/buf.length);
-    
-    // 閾値設定
-    if(IS_IOS){
-      PLUCK_RISE_RMS = Math.max(0.0016, NOISE_RMS * 2.0);
-      PLUCK_HIGH_RMS = Math.max(0.0020, NOISE_RMS * 3.0);
-    } else {
-      PLUCK_RISE_RMS = Math.max(0.010, NOISE_RMS * 2.0);
-      PLUCK_HIGH_RMS = Math.max(0.012, NOISE_RMS * 3.0);
-    }
+
+    // チューニング結果（あれば）
+    const stored = loadGameThresholds();
+
+    // ノイズ計測（約1秒）
+    await new Promise(r => setTimeout(r, 200)); // 立ち上がり待ち
+    NOISE_RMS = await measureNoiseRms(950, 95);
+
+    // 閾値：チューニング結果を基本に、今のノイズ床で補正
+    applyThresholdsFrom(NOISE_RMS, stored);
 
     document.getElementById('loading-overlay').style.display = 'none';
     startGameByType(type);
@@ -569,7 +755,7 @@ async function prepGame(type){
 
 function startGameByType(type){
   lastStartParams = type;
-  if(type==='scale') initGame('scale', null, {speedBase:3.4, interval:2000});
+  if(type==='scale') initGame('scale', null, {speedBase:3.4});
   else if(type==='easy') initGame('practice', ['C','F','G7','Am'], {speedBase:3.2});
   else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7'], {speedBase:3.35});
   else if(type==='song') initGame('song', 'きらきら星', {speedBase:3.45});
@@ -766,7 +952,7 @@ if(comboStreak % SPEED_UP_EVERY === 0){
     flashScreen();
     showFx(`💥 ${comboStreak} COMBO!! 💥\nSUPER!!`, 'speed', { mega:true, durationMs: 1200 });
     // 5/10だけ派手：波状に出して“数”は抑え、カクつきを減らす
-    burstStars(isMilestone10 ? 55 : 45, canvas.width/2, canvas.height/2, 2, 140);
+    burstStars(isMilestone10 ? 44 : 36, canvas.width/2, canvas.height/2, 2, 140);
   } else {
     showFx(`🚀 スピードUP!\n${comboStreak}連続`, 'speed', { mega:true, durationMs: 1050 });
     burstStars(26, canvas.width/2, canvas.height/2, 1);
@@ -778,7 +964,7 @@ if(comboStreak % SPEED_UP_EVERY === 0){
   if(isMilestone){
     flashScreen();
     showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:true, durationMs: 1150 });
-    burstStars(isMilestone10 ? 50 : 40, canvas.width/2, canvas.height/2, 2, 140);
+    burstStars(isMilestone10 ? 40 : 32, canvas.width/2, canvas.height/2, 2, 140);
   } else {
     showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 950 });
     burstStars(14, canvas.width/2, canvas.height/2, 1);
@@ -831,10 +1017,31 @@ class ChordGroup {
     if(gameMode==='scale'){
       const tf = this.chord.fingers[0];
       const nx = tf.f===0 ? this.x : this.x+(tf.f*fw)-(fw/2);
-      ctx.fillStyle="#fff"; ctx.font="bold 50px sans-serif"; ctx.textAlign="center";
-      ctx.fillText(this.chord.name||"", nx, cy-180);
+
+      // iPhone横でも上で切れないよう、ネック内（上端から少し下）に固定
+      ctx.save();
+      ctx.fillStyle="#fff";
+      ctx.font="bold 50px sans-serif";
+      ctx.textAlign="center";
+      ctx.textBaseline="top";
+      const neckTop = (canvas.height/2) - 150;
+      const neckBottom = (canvas.height/2) + 150;
+      const laneY = cy + (tf.s-2.5)*75;
+      const circleR = 40;
+      const fontSize = 50;
+      // まずは「指◯の上」に出す。上が足りなければ下へ（1A対策）
+      let labelY = laneY - circleR - (fontSize + 8);
+      if(labelY < neckTop + 8){
+        labelY = laneY + circleR + 8;
+      }
+      // どこまで行ってもネック外に出ないように軽くクランプ
+      if(labelY > neckBottom - (fontSize + 8)){
+        labelY = neckBottom - (fontSize + 8);
+      }
+      ctx.fillText(this.chord.name||"", nx, labelY);
+      ctx.restore();
     }
-  }
+}
 }
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   ctx.save(); ctx.globalAlpha=alpha;
@@ -904,10 +1111,10 @@ function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){
   setTimeout(nudge, 300);
 
 })();
-</script>
 
-<div style="position:fixed;left:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.92);color:#111;font-size:12px;font-weight:900;">
-game_iphone_fix_v11
-</div>
+// __setMenuClassInit
+try{ document.body.classList.add('isMenu'); }catch(e){}
+</script>
+<div class="verBadge">v2</div>
 </body>
 </html>

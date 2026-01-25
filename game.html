@@ -312,25 +312,8 @@
 }
 
   body:not(.isMenu) .verBadge{ display:none; }
-
-  /* DDR6: menu TOP button always visible */
-  .menu-card{ position: relative; }
-  .menuTopBtn{
-    position:absolute;
-    top: calc(12px + env(safe-area-inset-top));
-    right: calc(12px + env(safe-area-inset-right));
-    border:0;
-    padding:10px 14px;
-    border-radius:16px;
-    font-weight:900;
-    cursor:pointer;
-    background: linear-gradient(135deg, rgba(255,122,61,0.95), rgba(255,184,122,0.95));
-    color:#fff;
-    box-shadow: 0 12px 26px rgba(0,0,0,.18);
-  }
-  .menuTopBtn:active{ transform: translateY(1px); }
-
 </style>
+
 <!-- DDR6: Background Theme A (lite, safe - UI unchanged) -->
 <style id="bg-theme-a-lite">
   body{
@@ -343,6 +326,36 @@
   }
 </style>
 
+
+<!-- DDR6 FIX: menu UX safe (no top-left button in MENU) + visible TOP in menu overlay -->
+<style id="ddr6-game-fix-menu-top">
+  /* Default: hide back/menu button; show only in PLAY via JS */
+  #back-btn{ display:none; }
+
+  /* When menu overlay is shown, ensure any back/menu button is hidden */
+  body.isMenu #back-btn{ display:none !important; }
+
+  /* Always-visible TOP button inside the menu overlay (no scroll dependency) */
+  #menuTopBtn{
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    z-index: 101;
+    border: 0;
+    border-radius: 16px;
+    padding: 12px 14px;
+    font-weight: 900;
+    font-size: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, #ff7a4a, #ffb45e);
+    box-shadow: 0 10px 22px rgba(0,0,0,.22);
+    cursor: pointer;
+  }
+  /* Only show when menu overlay is visible */
+  #menuTopBtn{ display:none; }
+  body.isMenu #menuTopBtn{ display:inline-flex; align-items:center; gap:8px; }
+</style>
+
 </head>
 <body>
 
@@ -350,7 +363,6 @@
   <div id="menu-overlay">
     <div class="menu-card">
       <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
-      <button class="menuTopBtn" onclick="location.href='index.html'">🏝️ TOPへ</button>
       <div class="menu-note">※Safariで下のバーが出る場合は、<b>共有 → ホーム画面に追加</b> でフルスクリーン推奨</div>
       
       <div class="menu-list">
@@ -1185,5 +1197,9 @@ canvas.addEventListener('mousedown', ()=>{ if(playMode==='TAP') handleAction(); 
 // __setMenuClassInit
 try{ document.body.classList.add('isMenu'); }catch(e){}</script>
 <div class="verBadge">vI</div>
+
+  <!-- DDR6 FIX: Visible TOP button for menu overlay -->
+  <button id="menuTopBtn" type="button" onclick="location.href='index.html'">🏝️ TOPへ</button>
+
 </body>
 </html>

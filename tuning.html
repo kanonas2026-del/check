@@ -345,6 +345,80 @@ canvas#tuningCanvas{ position:absolute; inset:0; z-index:1; }
   .version-badge, .versionBadge, .verBadge, #versionBadge, #version-badge{ display:none !important; }
 </style>
 
+
+<!-- DDR6 FIX4: tuning align to GAME (nutX/midY) + kill debug chips -->
+<style id="ddr6-tuning-fix4">
+  #screen-tuning{ background: transparent !important; }
+  /* Hide any debug chips/badges */
+  .version-badge, .versionBadge, .verBadge, #versionBadge, #version-badge,
+  .debug-badge, .debugBadge, #debugErr, #debugOverlay { display:none !important; }
+</style>
+<script>
+  // Remove accidental overlay chips showing "tuning_fix..." etc.
+  (function(){
+    try{
+      const bad = [];
+      document.querySelectorAll('body *').forEach(el=>{
+        const t = (el.textContent||'').trim();
+        if(!t) return;
+        if(/^tuning[_ ]?fix/i.test(t) || /^game[_ ]?fix/i.test(t) || /^v\d+/i.test(t)){
+          const r = el.getBoundingClientRect();
+          if(r.width < 260 && r.height < 110) bad.push(el);
+        }
+      });
+      bad.forEach(el=>el.remove());
+    }catch(e){}
+  })();
+</script>
+
+
+<!-- DDR6 FIX: hide dev badges in tuning -->
+<style id="ddr6-hide-tuning-badges">
+  .versionBadge, .version-badge, #versionBadge, #verBadge, .verBadge { display:none !important; }
+</style>
+
+
+<!-- DDR6 FIX7: overlay tuning UI so it does NOT push canvas down (match GAME layout) -->
+<style id="ddr6-tuning-layout-match-game">
+  /* make tuning screen a full-height stage like GAME */
+  #screen-tuning{
+    position: relative;
+    height: 100%;
+    min-height: 100vh;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden;
+  }
+  /* canvas becomes the stage */
+  #tuningCanvas{
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    display:block;
+  }
+  /* overlay texts (do not consume layout space) */
+  #guide-msg{
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 22px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    margin: 0 !important;
+    pointer-events: none;
+    text-align: center;
+  }
+  #tuner-nav{
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 78px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    margin: 0 !important;
+    pointer-events: none;
+  }
+</style>
+
 </head>
 <body>
 
@@ -400,8 +474,61 @@ canvas#tuningCanvas{ position:absolute; inset:0; z-index:1; }
 <script>
 const canvas = document.getElementById('tuningCanvas');
 const ctx = canvas.getContext('2d');
+
+// ===== DDR6 SHARED GEOMETRY (match GAME exactly) =====
+const GEOM = {
+  NUT_X: 180,
+  NECK_HALF_H: 150,
+  LANE_DY: 75,
+  CIRCLE_X: 125,
+  CIRCLE_R: 24,
+  FRET_COUNT: 12,
+  FRET_RIGHT_PAD: 60, // GAME uses 60
+  NECK_H: 300
+};
+function drawFretboardBase(){
+  const cy = canvas.height/2;
+  const nutX = GEOM.NUT_X;
+  const fw = (canvas.width - nutX - GEOM.FRET_RIGHT_PAD) / GEOM.FRET_COUNT;
+  // neck
+  ctx.fillStyle="#6d4c41";
+  ctx.fillRect(nutX, cy-GEOM.NECK_HALF_H, canvas.width, GEOM.NECK_H);
+  // frets
+  for(let i=0;i<=GEOM.FRET_COUNT;i++){
+    const x = nutX + i*fw;
+    ctx.strokeStyle = (i===0) ? "#eee" : "#a1887f";
+    ctx.lineWidth   = (i===0) ? 10 : 3;
+    ctx.beginPath();
+    ctx.moveTo(x, cy-GEOM.NECK_HALF_H);
+    ctx.lineTo(x, cy+GEOM.NECK_HALF_H);
+    ctx.stroke();
+  }
+  // strings + left labels
+  const labs=['1A','2E','3C','4G'];
+  for(let i=0;i<4;i++){
+    const y = cy + (i-1.5)*GEOM.LANE_DY;
+    ctx.beginPath();
+    ctx.fillStyle = COLORS[i];
+    ctx.globalAlpha = 1.0;
+    ctx.arc(GEOM.CIRCLE_X, y, GEOM.CIRCLE_R, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle="#fff";
+    ctx.font="bold 16px sans-serif";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText(labs[i], GEOM.CIRCLE_X, y);
+    ctx.strokeStyle = COLORS[i];
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(nutX, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  return { cy, nutX, fw };
+}
+
 const FREQS = [440.00, 329.63, 261.63, 392.00]; 
-const COLORS = ["#ff5757", "#ffde59", "#7ed957", "#5ce1e6"];
+const COLORS = ['#ff5757', '#ffde59', '#7ed957', '#5ce1e6'];
 
 // ===== Noise calibration / adaptive thresholds =====
 let NOISE_RMS = 0;
@@ -1040,8 +1167,9 @@ function autoCorrelate(buf, sampleRate) {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const isLand = (canvas.width > canvas.height);
-  const midY = isLand ? (canvas.height * 0.44) : (canvas.height / 2);
-  const nutX = 160;
+  // Match GAME layout: always center vertically & same nut X
+  const midY = (canvas.height / 2);
+  const nutX = 180;
   ctx.fillStyle = "#6d4c41"; ctx.fillRect(nutX, midY - 150, canvas.width, 300);
   const fretW = (canvas.width - nutX - 100) / 12;
   for (let i = 0; i <= 12; i++) {
@@ -1670,14 +1798,26 @@ function doDiagnosis() {
 
   btn.addEventListener('click', showResult);
 }
+
 function applyViewportSize(){
+  const container = document.getElementById('screen-tuning');
   const vv = window.visualViewport;
-  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
-  // expose CSS vh unit (for iPhone Safari 100vh issue)
+  let w, h;
+  if(container){
+    const r = container.getBoundingClientRect();
+    w = r.width;
+    h = r.height;
+  }else{
+    w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+    h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  }
   document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
-  canvas.width = Math.floor(w);
-  canvas.height = Math.floor(h);
+  const c = document.getElementById('tuningCanvas');
+  if(!c) return;
+  c.style.width  = Math.floor(w) + 'px';
+  c.style.height = Math.floor(h) + 'px';
+  c.width  = Math.floor(w);
+  c.height = Math.floor(h);
 }
 applyViewportSize();
 if (window.visualViewport){

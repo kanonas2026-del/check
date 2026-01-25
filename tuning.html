@@ -268,7 +268,7 @@
 
       /* ネック表示エリアを少し下げて上の文字と干渉させない */
       #neck-area{
-        margin-top: 12px;
+        margin-top: 0px;
       }
     }
 
@@ -324,6 +324,24 @@
       radial-gradient(900px 650px  at 60% 85%, rgba(233,255,233,0.385), transparent 60%),
       linear-gradient(180deg, #fff5e6, #ffffff) !important;
     background-attachment: fixed;
+  }
+</style>
+
+
+<!-- DDR6 FIX2: visible version marker (to verify cache) -->
+<style id="ddr6-ver-badge">
+  #ddr6VerBadge{
+    position: fixed;
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    z-index: 9999;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.45);
+    color: #fff;
+    pointer-events: none;
   }
 </style>
 
@@ -1700,5 +1718,7 @@ draw();
 <div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
 tuning_fix_v1
 </div>
+
+<div id="ddr6VerBadge">tuning_fix_v2</div>
 </body>
 </html>

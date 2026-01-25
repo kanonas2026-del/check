@@ -356,6 +356,24 @@
   body.isMenu #menuTopBtn{ display:inline-flex; align-items:center; gap:8px; }
 </style>
 
+
+<!-- DDR6 FIX2: visible version marker (to verify cache) -->
+<style id="ddr6-ver-badge">
+  #ddr6VerBadge{
+    position: fixed;
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    z-index: 9999;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.45);
+    color: #fff;
+    pointer-events: none;
+  }
+</style>
+
 </head>
 <body>
 
@@ -1201,5 +1219,7 @@ try{ document.body.classList.add('isMenu'); }catch(e){}</script>
   <!-- DDR6 FIX: Visible TOP button for menu overlay -->
   <button id="menuTopBtn" type="button" onclick="location.href='index.html'">🏝️ TOPへ</button>
 
+
+<div id="ddr6VerBadge">game_fix_v2</div>
 </body>
 </html>

@@ -2,85 +2,400 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>おとのじゅんび - 🐼</title>
-  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ウクレレ診断 - チューニング</title>
   <style>
-    body { margin: 0; background: #88cfd3; font-family: "M PLUS Rounded 1c", sans-serif; overflow: hidden; touch-action: none; }
-    
-    /* Gameと同じ背景・レイアウト基準 */
-    #screen-tuning { 
-      background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); 
-      width: 100vw; height: 100dvh; position: relative; overflow: hidden;
-    }
-    canvas { display: block; width: 100%; height: 100%; }
+    /* スタイルは前回の「グレーアウト」と「弦の色」を維持 */
+    body { margin: 0; background: #4a3728; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
 
-    #guide-msg {
-      position: absolute; top: env(safe-area-inset-top, 20px); width: 100%; text-align: center;
-      font-size: clamp(20px, 5vw, 32px); font-weight: 900; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); z-index: 10;
-      pointer-events: none;
+    :root{
+      --vh: 1vh;
+
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
     }
-    .nav-back {
-      position: fixed; top: calc(env(safe-area-inset-top) + 15px); right: 15px; z-index: 100;
-      background: #fff; border-radius: 20px; padding: 10px 15px; text-decoration: none; color: #4a3728; font-weight: 800;
-      box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+
+    /* ===== TOPへ戻るボタン (新規追加) ===== */
+    .nav-back { 
+      position:fixed; top:15px; right:15px; z-index:1000; 
+      top: calc(var(--safe-top) + 15px); right: calc(var(--safe-right) + 15px);
     }
-    #start-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-    .start-btn { background: #ff914d; color: white; border: none; padding: 20px 40px; font-size: 22px; font-weight: bold; border-radius: 50px; box-shadow: 0 6px 0 #d97b41; cursor: pointer; }
-    
-    /* 診断UI */
-    #diagnosis-splash { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 3000; }
-    #diagnosis-card { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); opacity:0; width: 85%; max-width: 420px; background: #fff; padding: 25px; border-radius: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 3001; transition: 0.4s; pointer-events: none; }
-    #diagnosis-card.show { transform: translate(-50%, -50%) scale(1); opacity:1; pointer-events: auto; }
-    .splash-inner { background: #fff; padding: 30px; border-radius: 20px; text-align: center; }
-    .splash.show { display: flex; }
-    
-    /* Gameと同じ位置調整用 */
-    #tuner-nav {
-      position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
-      text-align: center; font-size: 60px; font-weight: 900; z-index: 5; pointer-events: none;
-      color: #fff; text-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    .nav-back a{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      font-weight: 1000;
+      color:#fff;
+      background: linear-gradient(135deg, #ff6a6a 0%, #ffb84d 100%);
+      box-shadow: 0 8px 0 rgba(0,0,0,0.14), 0 14px 22px rgba(0,0,0,0.12);
+      transform: translateY(0);
+      transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
+      -webkit-tap-highlight-color: transparent;
     }
-    .status-msg { font-size: 24px; display: block; margin-top: -5px; }
+    .nav-back a:active{
+      transform: translateY(5px);
+      box-shadow: 0 3px 0 rgba(0,0,0,0.14), 0 10px 16px rgba(0,0,0,0.10);
+      filter: brightness(0.98);
+    }
+    .nav-back a:active { transform: scale(0.95); }
+
+    /* ===== iPhone / small screen responsive fixes (UI崩れ対策) ===== */
+    #guide-msg{
+      top: calc(var(--safe-top) + 12px);
+      padding: 0 12px;
+      font-size: clamp(16px, 4.8vw, 26px);
+      line-height: 1.2;
+      white-space: normal;
+      word-break: keep-all;
+    }
+    #tuner-nav{
+      top: calc(var(--safe-top) + 54px);
+      height: auto;
+      min-height: 92px;
+      font-size: clamp(46px, 12vw, 80px);
+    }
+
+    .status-msg{
+      font-size: clamp(14px, 4.2vw, 24px);
+      margin-top: 2px;
+      line-height: 1.2;
+    }
+    .ui-panel{ display:none; /* hide right buttons: use left labels instead */
+
+      bottom: calc(var(--safe-bottom) + 14px);
+      gap: clamp(10px, 3vw, 15px);
+    }
+    .string-btn{
+      width: clamp(54px, 14vw, 75px);
+      height: clamp(54px, 14vw, 75px);
+      font-size: clamp(14px, 4.2vw, 20px);
+      border-width: clamp(3px, 1vw, 4px);
+    }
+    .string-btn.active{
+      border-width: clamp(6px, 1.6vw, 8px);
+    }
+    .start-btn{
+      font-size: clamp(18px, 5vw, 24px);
+      padding: clamp(16px, 4.8vw, 24px) clamp(22px, 7vw, 44px);
+    }
     
-    /* Gameと同じ弦ラベル位置 */
-    .string-label { font-weight: 900; font-size: 20px; text-anchor: middle; dominant-baseline: middle; fill: #fff; }
+    /* ★修正: 診断カードの位置と表示崩れ対策 */
+    #diagnosis-card{
+      position: fixed; /* absolute -> fixed に変更 */
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%) scale(0); 
+      width: 85%; 
+      max-width: 450px; 
+      max-height: 85vh; /* 画面からはみ出ないように制限 */
+      background: white; 
+      color: #333; 
+      padding: 25px; 
+      border-radius: 30px; 
+      text-align: center; 
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3); 
+      z-index: 1000; 
+      transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+      overflow-y: auto; /* はみ出たらスクロール */
+      -webkit-overflow-scrolling: touch;
+    }
+    #diagnosis-card.show{ transform: translate(-50%, -50%) scale(1); }
+
+    @media (max-height: 700px){
+      #guide-msg{ top: calc(var(--safe-top) + 6px); }
+      #tuner-nav{ top: calc(var(--safe-top) + 44px); }
+      .ui-panel{ bottom: calc(var(--safe-bottom) + 10px); }
+    }
+
+    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative; }
+
+    /* ==== Index button theme (match index.html) ==== */
+    .btnIndex{
+      font-size: clamp(18px, 5vw, 24px);
+      padding: clamp(16px, 4.8vw, 24px) clamp(22px, 7vw, 44px);
+      border-radius: 22px;
+      border: none;
+      cursor: pointer;
+      font-weight: 1000;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 10px 0 rgba(0,0,0,0.16), 0 18px 30px rgba(0,0,0,0.14);
+      transform: translateY(0);
+      transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btnIndex:active{
+      transform: translateY(6px);
+      box-shadow: 0 4px 0 rgba(0,0,0,0.16), 0 10px 18px rgba(0,0,0,0.12);
+      filter: brightness(0.98);
+    }
+    .btnIndex .btnIcon{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width: 40px; height: 40px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.18);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
+      font-size: 22px;
+    }
+    .btnTuningGrad{ background: linear-gradient(135deg, #25b7ff 0%, #55e7ff 100%); }
+    .btnResultGrad{ background: linear-gradient(135deg, #23d57b 0%, #74f3b5 100%); }
+
+    /* Place main layers */
+    #screen-tuning > *{ position: relative; z-index: 1; }
+
+    canvas { display: block; width: 100%; height: 100%; }
+    #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    .start-btn { background: #ff914d; color: white; border: none; padding: 25px 50px; font-size: 24px; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #d97b41; }
+    #guide-msg { position: absolute; top: 6%; width: 100%; text-align: center; font-size: 26px; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); z-index: 5; }
+    #tuner-nav { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); text-align: center; font-size: 80px; font-weight: 900; z-index: 5; height: 120px;}
+    .arrow-up { color: #ff5757; text-shadow: 0 0 20px #fff; }
+    .arrow-down { color: #5ce1e6; text-shadow: 0 0 20px #fff; }
+    .status-msg { font-size: 22px; display:block; margin-top: 8px; line-height: 1.2; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .ui-panel { position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 10; }
+    .string-btn { width: 75px; height: 75px; border-radius: 50%; border: 4px solid #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; color: white; opacity: 0.8; }
+    .string-btn.played { background: #888 !important; color: #ccc !important; border-color: #666 !important; transform: scale(0.9); opacity: 0.5; }
+    .string-btn.active { border-width: 8px; transform: scale(1.1); box-shadow: 0 0 20px rgba(255,255,255,0.8); z-index: 11; opacity: 1; }
     
-    /* UI Panel (Invisible logic buttons) */
-    .ui-panel { display: none; }
-  </style>
+    .diag-item { margin: 15px 0; padding: 10px; border-radius: 15px; background: #f9f9f9; }
+    .diag-label { font-size: 14px; color: #888; margin-bottom: 4px; font-weight: bold; }
+    .diag-value { font-size: 18px; color: #4a3728; font-weight: 900; }
+  
+/* ===== Diagnosis splash ===== */
+.splash{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.splash.show{ display:flex; }
+.splash-inner{
+  width: min(560px, 92vw);
+  background: #fff;
+  border-radius: 22px;
+  padding: 28px 20px 22px;
+  box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+  text-align: center;
+}
+.splash-pop{
+  font-weight: 900;
+  font-size: 28px;
+  letter-spacing: 0.5px;
+  color: #ff7a3d;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.06);
+  transform: scale(0.6);
+  opacity: 0;
+}
+.splash.show .splash-pop{
+  animation: popIn 520ms cubic-bezier(.2,1.35,.35,1) forwards;
+}
+@keyframes popIn{
+  0% { transform: scale(0.6) rotate(-2deg); opacity: 0; }
+  70% { transform: scale(1.08) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1.0) rotate(0deg); opacity: 1; }
+}
+.splash-btn{
+  margin-top: 18px;
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 22px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  background: #3fc26b;
+  box-shadow: 0 8px 0 rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.splash-btn:active{ transform: translateY(2px); }
+
+/* ===== Diagnosis extra lines ===== */
+.diag-meaning{
+  margin-top: 6px;
+  font-size: 14px;
+  color: #7a7a7a;
+  font-weight: 700;
+}
+.diag-scoreline{
+  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #ff7a3d;
+}
+
+
+/* ===== Drumroll ===== */
+.splash-pop.blink{
+  animation: blinkRoll 120ms steps(1,end) infinite;
+}
+@keyframes blinkRoll{
+  0%{ opacity: 1; }
+  50%{ opacity: 0.25; }
+  100%{ opacity: 1; }
+}
+.splash-btn[disabled]{
+  opacity: 0.6;
+  cursor: default;
+  filter: grayscale(0.1);
+}
+
+
+    /* ===== iPhone landscape fix (横画面でボタンがネックに被る対策) ===== */
+    @media (orientation: landscape){
+      /* 上のガイドは1行に寄せて省スペース */
+      #guide-msg{
+        top: calc(var(--safe-top) + 6px);
+        font-size: clamp(14px, 3.6vw, 20px);
+        line-height: 1.05;
+      }
+      #tuner-nav{
+        top: calc(var(--safe-top) + 34px);
+        min-height: 64px;
+        font-size: clamp(34px, 8vw, 56px);
+      }
+
+      /* 弦ボタンを右側に縦並びで退避（ネックに被らない） */
+      .ui-panel{
+        left: auto !important;
+        right: calc(var(--safe-right) + 10px);
+        bottom: auto !important;
+        top: 54%;
+        transform: translateY(-50%);
+        flex-direction: column-reverse;
+        gap: 10px;
+      }
+      .string-btn{
+        width: clamp(48px, 9vw, 60px);
+        height: clamp(48px, 9vw, 60px);
+        font-size: clamp(13px, 2.8vw, 16px);
+      }
+
+      /* ネック表示エリアを少し下げて上の文字と干渉させない */
+      #neck-area{
+        margin-top: 12px;
+      }
+    }
+
+
+/* FINAL OVERRIDE: hide right string buttons */
+.ui-panel{display:none !important;}
+
+/* DDR4: emoji rendering */
+#diag-face, #diag-personality, #diag-ukulele {
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+               "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* DDR4: face image */
+#diag-face-img { width: 110px; height: 110px; }
+
+.diag-subline{margin-top:6px; font-size:18px; font-weight:700; color:#333; text-align:center;}
+.diag-mini-title{font-weight:700;}
+.diag-personality{margin-top:16px; font-size:32px; font-weight:900; color:#3a2a1a; text-align:center;}
+
+
+  /* iPhone横で、見出しと状態が重ならないように */
+  @media (orientation: landscape) and (max-height: 430px){
+    #guide-msg{ top: calc(env(safe-area-inset-top) + 8px) !important; font-size: 26px !important; padding: 10px 14px !important; }
+    #tuner-nav{ top: calc(env(safe-area-inset-top) + 64px) !important; }
+  }
+
+
+/* === DDR6 shared stage alignment patch (tuning) === */
+#screen-tuning{
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: calc(var(--vh, 1vh) * 100) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+#tuningCanvas{
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100% !important;
+  display: block !important;
+}
+/* prevent layout elements from pushing the canvas */
+#screen-tuning > *{ position: relative; z-index: 2; }
+#screen-tuning #tuningCanvas{ z-index: 1; }
+/* top/back button overlay only */
+#backToTopTuning{
+  position: fixed !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 50 !important;
+}
+/* remove debug badges if exist */
+.version-badge, .debug-badge, .badge, [data-badge], .tuning-badge { display:none !important; }
+
+</style>
 </head>
 <body>
-  <div id="start-overlay"><button class="start-btn" onclick="startEverything()">🐼 おとを きかせてね！</button></div>
-  <div id="guide-msg">1げんを ひいてみよう 🪕</div>
-  <div id="tuner-nav"><div id="nav-arrow"></div><div id="nav-text" class="status-msg"></div></div>
-  <a href="index.html" class="nav-back">🏠 もどる</a>
-  
-  <div id="screen-tuning">
-    <canvas id="tuningCanvas"></canvas>
+
+  <div id="start-overlay">
+    <button class="btnIndex btnTuningGrad" onclick="startEverything()"><span class="btnIcon" aria-hidden="true">🎵</span><span>チューニングをはじめましょう！</span></button>
   </div>
 
+  <div class="nav-back"><a href="index.html">🏝️ TOPへ</a></div>
+
+  <section id="screen-tuning">
+    <div id="guide-msg">1げんを ひいてみよう</div>
+    <div id="tuner-nav">
+      <div id="nav-arrow"></div>
+      <div id="nav-text" class="status-msg"></div>
+    </div>
+    <canvas id="tuningCanvas"></canvas>
+    
   <div id="diagnosis-splash" class="splash">
     <div class="splash-inner">
-      <h2 style="color:#ff7a3d; margin:0 0 15px;">診断完了！</h2>
-      <button class="start-btn" id="btn-show-result" style="font-size:18px; padding:12px 24px; background:#3fc26b;">結果を見る</button>
+      <div class="splash-pop" id="splash-pop">今日のウクレレ診断結果！！</div>
+      <button id="btn-show-result" class="btnIndex btnResultGrad splash-btn"><span class="btnIcon" aria-hidden="true">📋</span><span>結果を見る</span></button>
     </div>
   </div>
 
-  <div id="diagnosis-card">
-    <div id="diag-face" style="margin-bottom:10px;"><img id="diag-face-img" style="width:100px; height:100px;"></div>
-    <h2 style="color: #ff914d; margin:0;">今日のウクレレ診断</h2>
-    <div id="diag-scoreline" style="font-size:18px; font-weight:900; color:#ff7a3d; margin:5px 0;"></div>
-    <div id="diag-personality" style="font-size:24px; font-weight:900; margin:10px 0; color:#4a3728;"></div>
-    <div id="diag-meaning" style="font-size:14px; color:#666; margin-bottom:10px;"></div>
-    <div id="detail-panel" style="text-align:left; background:#f9f9f9; padding:10px; border-radius:10px; margin-bottom:15px; font-size:14px; color:#444;">
-      <div style="font-weight:bold; color:#888; font-size:12px;">アドバイス</div>
-      <div id="diag-advice"></div>
+<div id="diagnosis-card">
+      <div id="diag-face" style="margin-bottom:10px; display:flex; justify-content:center;"><img id="diag-face-img" alt="face" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2248%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2248%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M40%2070%20Q60%2088%2080%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E" style="width:120px; height:120px;"/></div>
+      <h2 style="color: #ff914d;">今日のウクレレ診断</h2>
+      <div id="diag-title" style="font-size:18px; font-weight:900; color:#ff7a3d; margin-top:6px;"></div>
+      <div id="diag-personality" style="font-size:28px; font-weight:900; margin:10px 0 6px; color:#4a3728;"></div>
+      <div id="diag-ukulele" style="font-size:18px; font-weight:900; margin:4px 0 10px; color:#333;"></div>
+      <div id="diag-scoreline" class="diag-scoreline"></div>
+      <div id="diag-meaning" class="diag-meaning"></div>
+<button id="btn-details" style="margin:10px auto 0; display:block; background:#fff; border:2px solid #ddd; border-radius:12px; padding:8px 14px; font-weight:900; cursor:pointer;">くわしく</button>
+<div id="detail-panel" style="display:none; margin-top:12px;">
+        
+      <div class="diag-item"><div class="diag-label">アドバイス</div><div id="diag-advice" class="diag-value"></div></div>
+      <div class="diag-item"><div class="diag-label">性格の理由</div><div id="diag-personality-reason" class="diag-value"></div></div>
+      <div class="diag-item"><div class="diag-label">げんのようす（原因のヒント）</div><div id="diag-string-state" class="diag-value"></div></div>
+<div class="diag-item"><div class="diag-label">コンディション</div><div id="diag-cond" class="diag-value"></div></div>
+      <div class="diag-item"><div class="diag-label">メンテナンス</div><div id="diag-maint" class="diag-value"></div></div>
+      </div>
+      <button onclick="resetAll()" style="background:#7ed957; border:none; padding:12px 25px; border-radius:15px; color:white; font-weight:bold; cursor:pointer;">もういちど</button>
     </div>
-    <button onclick="resetAll()" style="background:#7ed957; border:none; padding:10px 20px; border-radius:15px; color:white; font-weight:bold; cursor:pointer;">もういちど</button>
-    <button onclick="location.href='game.html'" style="margin-left:10px; background:#ff914d; border:none; padding:10px 20px; border-radius:15px; color:white; font-weight:bold; cursor:pointer;">🪕 ゲームへ</button>
-  </div>
+
+    <div class="ui-panel">
+      <div class="string-btn" id="btn3" style="background:#5ce1e6" onclick="manualSelect(3)">4 G</div>
+      <div class="string-btn" id="btn2" style="background:#7ed957" onclick="manualSelect(2)">3 C</div>
+      <div class="string-btn" id="btn1" style="background:#ffde59; color:#4a3728" onclick="manualSelect(1)">2 E</div>
+      <div class="string-btn active" id="btn0" style="background:#ff5757" onclick="manualSelect(0)">1 A</div>
+    </div>
+  </section>
 
 <script>
 // ==========================================
@@ -331,16 +646,17 @@ function manualSelect(idx) {
 }
 
 // ==========================================
-//  Visual Logic (Game-Matched)
+//  Visual Logic (Game-Matched & Fixed)
 // ==========================================
 function draw() {
-  const w = canvas.width = window.innerWidth;
-  const h = canvas.height = window.innerHeight;
+  const w = canvas.width;
+  const h = canvas.height;
   ctx.clearRect(0,0,w,h);
 
   // Background (shared logic)
   const cy = h / 2;
-  // Game.html logic: const fw = (canvas.width - NUT_X - 100) / 12;
+  // ★修正: game.htmlと完全に一致するフレット間隔計算
+  // canvas.widthを変数wとして使用
   const fw = (w - NUT_X - 60) / 12;
 
   // Neck
@@ -392,28 +708,19 @@ function draw() {
     ctx.stroke();
   }
 
-  // Panda Helper
-  if(isMonitoring){
-    ctx.font = "60px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("🐼", w - 40, h - 40);
-  }
-
   requestAnimationFrame(draw);
 }
-draw();
-window.addEventListener('resize', draw);
 
 // ==========================================
 //  Diagnosis & Face Logic (Full Data)
 // ==========================================
 // Face SVG Data (Complete, no truncation)
 const faceMapSvg = {
-  "😃": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
-  "😁": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
-  "🤩": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%3Cpath%20d%3D%22M18%2026%20L22%2036%20L12%2032%20L22%2032%20L18%2036%20Z%22%20fill%3D%22%237a5cff%22/%3E%0A%20%20%3Cpath%20d%3D%22M102%2028%20L106%2038%20L96%2034%20L106%2034%20L102%2038%20Z%22%20fill%3D%22%2300b3ff%22/%3E%0A%20%20%3Cpath%20d%3D%22M20%2092%20L24%20102%20L14%2098%20L24%2098%20L20%20102%20Z%22%20fill%3D%22%23ff5ca8%22/%3E%0A%20%20%3Cpath%20d%3D%22M100%2092%20L104%20102%20L94%2098%20L104%2098%20L100%20102%20Z%22%20fill%3D%22%237dff5c%22/%3E%0A%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Cpath%20d%3D%22M36%2044%20L41%2058%20L26%2049%20L46%2049%20L31%2058%20Z%22%20fill%3D%22%237a5cff%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%222%22/%3E%3Cpath%20d%3D%22M76%2044%20L81%2058%20L66%2049%20L86%2049%20L71%2058%20Z%22%20fill%3D%22%237a5cff%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%222%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+  "😃": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+  "😁": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+  "🤩": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%3Cpath%20d%3D%22M18%2026%20L22%2036%20L12%2032%20L22%2032%20L18%2036%20Z%22%20fill%3D%22%237a5cff%22/%3E%0A%20%20%3Cpath%20d%3D%22M102%2028%20L106%2038%20L96%2034%20L106%2034%20L102%2038%20Z%22%20fill%3D%22%2300b3ff%22/%3E%0A%20%20%3Cpath%20d%3D%22M20%2092%20L24%20102%20L14%2098%20L24%2098%20L20%20102%20Z%22%20fill%3D%22%23ff5ca8%22/%3E%0A%20%20%3Cpath%20d%3D%22M100%2092%20L104%20102%20L94%2098%20L104%2098%20L100%20102%20Z%22%20fill%3D%22%237dff5c%22/%3E%0A%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Cpath%20d%3D%22M36%2044%20L41%2058%20L26%2049%20L46%2049%20L31%2058%20Z%22%20fill%3D%22%237a5cff%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%222%22/%3E%3Cpath%20d%3D%22M76%2044%20L81%2058%20L66%2049%20L86%2049%20L71%2058%20Z%22%20fill%3D%22%237a5cff%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%222%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
   "🥳": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%3Cpath%20d%3D%22M18%2026%20L22%2036%20L12%2032%20L22%2032%20L18%2036%20Z%22%20fill%3D%22%237a5cff%22/%3E%0A%20%20%3Cpath%20d%3D%22M102%2028%20L106%2038%20L96%2034%20L106%2034%20L102%2038%20Z%22%20fill%3D%22%2300b3ff%22/%3E%0A%20%20%3Cpath%20d%3D%22M20%2092%20L24%20102%20L14%2098%20L24%2098%20L20%20102%20Z%22%20fill%3D%22%23ff5ca8%22/%3E%0A%20%20%3Cpath%20d%3D%22M100%2092%20L104%20102%20L94%2098%20L104%2098%20L100%20102%20Z%22%20fill%3D%22%237dff5c%22/%3E%0A%0A%20%20%3Cpath%20d%3D%22M60%2010%20L92%2042%20L28%2042%20Z%22%20fill%3D%22%237ad7ff%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%223%22/%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2210%22%20r%3D%226%22%20fill%3D%22%23ff6b7a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2228%22%20r%3D%224%22%20fill%3D%22%23ffd34d%22/%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2228%22%20r%3D%224%22%20fill%3D%22%23a6ff8a%22/%3E%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M35%2070%20Q60%2098%2085%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
-  "😜": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Cpath%20d%3D%22M70%2050%20Q78%2046%2086%2050%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M40%2072%20Q60%2092%2080%2072%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M54%2078%20Q60%2094%2066%2078%22%20fill%3D%22%23ff6b7a%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+  "😜": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%3Ccircle%20cx%3D%2290%22%20cy%3D%2264%22%20r%3D%227%22%20fill%3D%22%23ff8aa0%22%20opacity%3D%220.6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Cpath%20d%3D%22M70%2050%20Q78%2046%2086%2050%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%20%20%3Cpath%20d%3D%22M40%2072%20Q60%2092%2080%2072%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M54%2078%20Q60%2094%2066%2078%22%20fill%3D%22%23ff6b7a%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
   "🙂": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22140%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2262%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2250%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M40%2072%20Q60%2090%2080%2072%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
 };
 
@@ -534,6 +841,95 @@ function playTaDa(){
   window.addEventListener('pageshow', function(){ setTimeout(nudge, 250); }, {passive:true});
   setTimeout(nudge, 300);
 })();
+
+// === Main Drawing & Resizing Logic (Matched with Game) ===
+function applyViewportSize(){
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+
+  document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+
+  const screen = document.getElementById('screen-tuning');
+  if (screen){
+    screen.style.height = 'calc(var(--vh, 1vh) * 100)';
+    screen.style.width  = '100vw';
+  }
+
+  // IMPORTANT: Game matches logic
+  canvas.style.width  = '100vw';
+  canvas.style.height = '100%';
+  canvas.width  = Math.floor(w);
+  canvas.height = Math.floor(h);
+}
+
+function draw() {
+  // Use canvas dimensions directly (set by applyViewportSize)
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const cy = h / 2;
+  // ★ Gameと同じフレット幅計算
+  const fw = (w - NUT_X - 60) / 12;
+
+  // Neck
+  ctx.fillStyle="#6d4c41"; 
+  ctx.fillRect(NUT_X, cy-150, w, 300);
+
+  // Frets
+  for(let i=0;i<=12;i++){
+    const x = NUT_X + i*fw;
+    ctx.strokeStyle=(i===0)?"#eee":"#a1887f"; 
+    ctx.lineWidth=(i===0)?12:3;
+    ctx.beginPath(); ctx.moveTo(x,cy-150); ctx.lineTo(x,cy+150); ctx.stroke();
+  }
+
+  // Strings
+  const labels=['1A','2E','3C','4G'];
+  for(let i=0;i<4;i++){
+    const y = cy + (i-1.5)*75;
+    const isActive = (i === currentTargetIdx);
+    
+    // Label Circle (x=125)
+    ctx.beginPath(); 
+    ctx.fillStyle=STRING_COLORS[i]; 
+    const r = isActive ? 28 : 24;
+    ctx.globalAlpha = isActive ? 1.0 : 0.8;
+    ctx.arc(MARK_CX, y, r, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // Text
+    ctx.fillStyle="#fff"; 
+    ctx.font="bold 16px sans-serif"; 
+    ctx.textAlign="center"; 
+    ctx.textBaseline="middle"; 
+    ctx.fillText(labels[i], MARK_CX, y);
+
+    // String Line
+    const vib = Math.sin(Date.now()*0.2)*vibrations[i];
+    vibrations[i] *= 0.92;
+
+    ctx.strokeStyle=STRING_COLORS[i]; 
+    ctx.lineWidth= (isActive) ? 8 : 5;
+    ctx.beginPath(); 
+    ctx.moveTo(NUT_X, y); 
+    ctx.quadraticCurveTo(NUT_X + (w-NUT_X)/2, y+vib, w, y);
+    ctx.stroke();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+applyViewportSize();
+if (window.visualViewport){
+  window.visualViewport.addEventListener('resize', () => { applyViewportSize(); });
+}
+window.addEventListener('resize', () => { applyViewportSize(); });
+window.addEventListener('orientationchange', () => { setTimeout(() => { applyViewportSize(); }, 250); });
+draw();
+
 </script>
 </body>
 </html>

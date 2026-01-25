@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#88cfd3" />
+  <title>ウクレレ・ゲーム</title>
+  <style>/* iphone-viewport-fix */
+
+    :root{
+      --vh: 1vh;
+
+      --primary: #ff7a3d;
+      --card: rgba(255,255,255,0.92);
+      --shadow: rgba(0,0,0,0.18);
+    }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%);
+      color: #4a3728;
+      font-family: system-ui, -apple-system, sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #app { position: fixed; inset: 0; width: 100%; height: 100dvh; height: calc(var(--vh) * 100); overflow: hidden; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+    canvas { display:block; width:100%; height:100%; touch-action:none; }
+
+    /* メニューオーバーレイ */
+    #menu-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.32);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; backdrop-filter: blur(2px);
+    }
+    .menu-card {
+      background: var(--card); width: min(560px, 96vw);
+      max-height: calc(100dvh - 24px); overflow: hidden;
+      border-radius: 18px; padding: 22px;
+      box-shadow: 0 12px 0 rgba(122,177,204,0.35), 0 18px 36px var(--shadow);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .menu-card h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
+    
+    .menu-btn {
+      background: rgba(255,255,255,0.98); color: #4a3728;
+      border: none; border-radius: 16px; padding: 14px;
+      cursor: pointer; display: flex; gap: 12px; align-items: center;
+      box-shadow: 0 4px 0 rgba(122,177,204,0.32);
+      transition: transform 0.08s; text-align: left;
+    }
+    .menu-btn:active { transform: translateY(2px); box-shadow: none; }
+    .badge { flex: 0 0 38px; height: 38px; border-radius: 12px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
+    .menu-btn.mode2 .badge{ background: #ffde59; color:#4a3728; }
+    .menu-btn.mode3 .badge{ background: #7ed957; }
+    .menu-btn.mode4 .badge{ background: #5ce1e6; color: #133; }
+    
+    .menu-text .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
+    .menu-text small { font-size: 11px; opacity: 0.8; }
+
+    /* モード選択 */
+    .mode-select { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); }
+    .mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .mode-pill {
+      border: 2px solid rgba(0,0,0,0.1); background: #fff; border-radius: 20px;
+      padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
+    }
+    .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
+
+    /* ゲームUI */
+    #score-panel, #timer-panel {
+      position: fixed; z-index: 90; background: rgba(255,255,255,0.85);
+      padding: 6px 12px; border-radius: 14px; font-weight: 900; font-size: 18px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none;
+    }
+    #score-panel { top: calc(60px + var(--ui-top, 0px) + env(safe-area-inset-top)); right: calc(12px + var(--ui-right, 0px) + env(safe-area-inset-right)); }
+    #timer-panel { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); font-size: 16px; }
+
+    #stopBtn {
+      position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 180; display: none;
+      border: none; border-radius: 16px; padding: 12px 18px;
+      background: rgba(255,255,255,0.92); font-weight: 900; font-size: 16px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15); cursor: pointer;
+    }
+    
+    #back-btn {
+      position: fixed; top: 12px; left: 12px; z-index: 180;
+    }
+    #back-btn button {
+      border: none; background: rgba(255,255,255,0.6); color: #0d2b3b;
+      font-weight: 800; font-size: 12px; padding: 8px 12px; border-radius: 10px; cursor: pointer;
+    }
+
+    #chordHud {
+      position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 85; display: none; pointer-events: none;
+      background: rgba(255,255,255,0.86); border-radius: 18px; padding: 6px 16px;
+      font-weight: 900; font-size: 32px; box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+    #lyrics-area {
+      position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 90%;
+      text-align: center; font-size: 28px; font-weight: 900; color: #4a3728;
+      text-shadow: 0 2px 8px rgba(255,255,255,0.8); pointer-events: none; z-index: 50;
+    }
+
+    /* オーバーレイ共通 */
+    .overlay-card {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      z-index: 120; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    }
+    .card-content {
+      background: #fff; width: min(480px, 90vw); border-radius: 20px; padding: 24px;
+      text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.3); position: relative;
+    }
+    .result-score { font-size: 32px; font-weight: 900; margin: 10px 0; color: var(--primary); }
+    .action-btn {
+      width: 100%; border: none; border-radius: 14px; padding: 14px; font-size: 16px; font-weight: 900;
+      cursor: pointer; margin-top: 10px;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: #eee; color: #555; }
+
+    @media (orientation: landscape) and (max-height: 460px) {
+      .menu-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .menu-btn { padding: 10px; }
+    }
+  
+    /* FX message (HIT / MISS / SPEED) - comic style (center / bigger) */
+#fxMsg{
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-4deg) scale(1);
+  z-index: 95;
+  display: none;
+  pointer-events: none;
+  padding: 14px 20px 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.96);
+  border: 4px solid #111;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
+  font-weight: 1000;
+  font-size: 48px;
+  text-align: center;
+  letter-spacing: 0.8px;
+  white-space: pre-line;
+  line-height: 1.02;
+  color: #ff3d00;
+  text-shadow:
+    0 3px 0 #111,
+    2px 2px 0 #111,
+    -2px 2px 0 #111,
+    2px -2px 0 #111,
+    -2px -2px 0 #111,
+    0 10px 20px rgba(0,0,0,0.22);
+}
+#fxMsg.hit{ color: #ff3d00; }
+#fxMsg.miss{ color: #2563eb; background: rgba(207,232,255,0.96); }
+#fxMsg.speed{ color: #0a7f4f; background: rgba(186,247,214,0.96); }
+#fxMsg.mega{
+  font-size: 68px;
+  transform: translate(-50%, -50%) rotate(-6deg) scale(1);
+}
+@keyframes fxComicPop {
+  0%   { transform: translate(-50%, -50%) rotate(-4deg) scale(0.72); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) rotate(-6deg) scale(1.22); opacity: 1; }
+  55%  { transform: translate(-50%, -50%) rotate(-2deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(1deg)  scale(1.00); opacity: 0; }
+}
+@keyframes fxShake {
+  0% { }
+  20%{ transform: translate(-50%, -50%) rotate(-7deg) translateX(-2px); }
+  40%{ transform: translate(-50%, -50%) rotate(-3deg) translateX(3px); }
+  60%{ transform: translate(-50%, -50%) rotate(-8deg) translateX(-3px); }
+  80%{ transform: translate(-50%, -50%) rotate(-2deg) translateX(2px); }
+  100%{ }
+}
+#fxMsg.show{
+  display: block;
+  animation: fxComicPop 0.98s ease-out forwards, fxShake 0.5s ease-out;
+}
+
+/* BIG COMBO (neck center) */
+#comboBig{
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 66px);
+  transform: translate(-50%, -50%) rotate(-2deg);
+  z-index: 94;
+  display: none;
+  pointer-events: none;
+  font-weight: 1000;
+  font-size: 54px;
+  color: rgba(255,255,255,0.92);
+  text-shadow:
+    0 4px 0 #111,
+    2px 2px 0 #111,
+    -2px 2px 0 #111,
+    2px -2px 0 #111,
+    -2px -2px 0 #111,
+    0 14px 26px rgba(0,0,0,0.25);
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+#comboBig.pulse{
+  animation: comboPulse 0.38s ease-out;
+}
+@keyframes comboPulse{
+  0%{ transform: translate(-50%, -50%) rotate(-2deg) scale(0.95); opacity: 0.0; }
+  40%{ transform: translate(-50%, -50%) rotate(-2deg) scale(1.18); opacity: 1.0; }
+  100%{ transform: translate(-50%, -50%) rotate(-2deg) scale(1.0); opacity: 0.95; }
+}
+
+/* SCREEN FLASH (milestone) */
+#screenFlash{
+  position: fixed;
+  inset: 0;
+  z-index: 93;
+  display: none;
+  pointer-events: none;
+  background: rgba(255,255,255,0.0);
+}
+#screenFlash.flash{
+  display: block;
+  animation: flashPop 0.34s ease-out forwards;
+}
+@keyframes flashPop{
+  0%{ background: rgba(255,255,255,0.0); }
+  15%{ background: rgba(255,255,255,0.55); }
+  100%{ background: rgba(255,255,255,0.0); }
+}
+
+/* COMBO panel (keep but hide: replaced by comboBig) */
+#combo-panel{ display:none !important; }
+
+    /* comboBig disabled (show combo only in FX) */
+    #comboBig{ display:none !important; }
+  
+  .verBadge{
+  position:fixed;
+  top:calc(8px + env(safe-area-inset-top));
+  left:calc(8px + env(safe-area-inset-left));
+  right:auto;
+  bottom:auto;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(0,0,0,0.45);
+  color:#fff;
+  font-weight:800;
+  font-size:12px;
+  letter-spacing:.3px;
+  z-index:9999;
+  pointer-events:none;
+  user-select:none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+  body:not(.isMenu) .verBadge{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="menu-overlay">
+    <div class="menu-card">
+      <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
+      
+      <div class="menu-list" style="display:flex; flex-direction:column; gap:14px;">
+        <button class="menu-btn mode1" onclick="prepGame('scale')">
+          <div class="badge">🐤</div>
+          <div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
+        </button>
+        <button class="menu-btn mode2" onclick="prepGame('easy')">
+          <div class="badge">🐱</div>
+          <div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
+        </button>
+        <button class="menu-btn mode3" onclick="prepGame('hard')">
+          <div class="badge">🐼</div>
+          <div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
+        </button>
+        <button class="menu-btn mode4" onclick="prepGame('song')">
+          <div class="badge">🦁</div>
+          <div class="menu-text"><div class="title">曲：きらきら星</div><small>メロディ＋コード</small></div>
+        </button>
+      </div>
+
+      <div class="mode-select">
+        <div class="mode-pills">
+          <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+          <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>
+          <div class="mode-pill" data-mode="TAP" onclick="setMode(this, 'TAP')">タップモード</div>
+        </div>
+      </div>
+      
+      <button class="action-btn btn-secondary" onclick="location.href='index.html'" style="margin-top:10px;">🏝️ TOPへもどる</button>
+    </div>
+  </div>
+
+  <div id="screenFlash"></div>
+  <div id="fxMsg"></div>
+  <div id="comboBig"></div>
+
+  <div id="lyrics-area"></div>
+  <div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
+  <div id="score-panel">⭐ <span id="score">0</span></div>
+  <div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
+  <div id="chordHud" aria-hidden="true"></div>
+  
+  <div id="back-btn"><button onclick="goMenu()">🏝️ メニュー</button></div>
+  <button id="stopBtn" type="button">ストップ</button>
+
+  <div id="loading-overlay" class="overlay-card">
+    <div class="card-content">
+      <h2>マイクじゅんび中...</h2>
+      <p id="loading-msg">静かにしてね（ノイズをはかっています）</p>
+    </div>
+  </div>
+
+  <div id="pause-overlay" class="overlay-card">
+    <div class="card-content">
+      <h2>ストップ中</h2>
+      <button class="action-btn btn-primary" onclick="resumeGame()">つづける</button>
+      <button class="action-btn btn-secondary" onclick="goMenu()">メニューへ</button>
+    </div>
+  </div>
+
+  <div id="result-overlay" class="overlay-card">
+    <div class="card-content">
+      <h2>Finish!</h2>
+      <div class="result-score">⭐ <span id="result-score">0</span> pts</div>
+      <p id="result-msg">Good Job!</p>
+      <button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
+      <button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+// ===== 基本設定 =====
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- UI safe-area for browser bars (no install required) ---
+function updateUiVars(){
+  const vv = window.visualViewport;
+  if(vv){
+    const top = Math.max(0, vv.offsetTop||0);
+    const left = Math.max(0, vv.offsetLeft||0);
+    const right = Math.max(0, (window.innerWidth - vv.width - left));
+    const bottom = Math.max(0, (window.innerHeight - vv.height - top));
+    document.documentElement.style.setProperty('--ui-top', Math.round(top)+'px');
+    document.documentElement.style.setProperty('--ui-left', Math.round(left)+'px');
+    document.documentElement.style.setProperty('--ui-right', Math.round(right)+'px');
+    document.documentElement.style.setProperty('--ui-bottom', Math.round(bottom)+'px');
+  } else {
+    document.documentElement.style.setProperty('--ui-top','0px');
+    document.documentElement.style.setProperty('--ui-left','0px');
+    document.documentElement.style.setProperty('--ui-right','0px');
+    document.documentElement.style.setProperty('--ui-bottom','0px');
+  }
+}
+updateUiVars();
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', updateUiVars);
+  window.visualViewport.addEventListener('scroll', updateUiVars);
+}
+window.addEventListener('resize', updateUiVars);
+window.addEventListener('orientationchange', ()=>setTimeout(updateUiVars, 250));
+
+
+let gameState = 'MENU';
+let playMode = 'WAIT';
+
+// マイク関連
+let audioCtx = null;
+let micStream = null;
+let micAnalyser = null;
+
+// ---- チューニング結果（判定閾値）を読む ----
+const THRESH_KEY = 'uk_game_thresholds_v1';
+const THRESH_MAX_AGE_H = 24; // 24時間
+function loadGameThresholds(){
+  try{
+    const raw = localStorage.getItem(THRESH_KEY);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    if(!o || typeof o !== 'object') return null;
+    if(!o.updatedAt) return null;
+    const ageH = (Date.now() - Number(o.updatedAt)) / 3600000;
+    if(!(ageH >= 0) || ageH > THRESH_MAX_AGE_H) return null;
+    return o;
+  }catch(e){ return null; }
+}
+async function measureNoiseRms(durationMs=900, stepMs=90){
+  if(!micAnalyser) return 0;
+  const buf = new Float32Array(micAnalyser.fftSize);
+  const samples = [];
+  const end = performance.now() + durationMs;
+  while(performance.now() < end){
+    micAnalyser.getFloatTimeDomainData(buf);
+    let s=0; for(let i=0;i<buf.length;i++) s += buf[i]*buf[i];
+    samples.push(Math.sqrt(s/buf.length));
+    await new Promise(r=>setTimeout(r, stepMs));
+  }
+  samples.sort((a,b)=>a-b);
+  const idx = Math.max(0, Math.min(samples.length-1, Math.floor(samples.length*0.85)));
+  return samples[idx] ?? (samples[samples.length-1] ?? 0);
+}
+function applyThresholdsFrom(noise, stored){
+  let rise = 0, high = 0;
+  if(stored && typeof stored.pluckRiseRms === 'number' && typeof stored.pluckHighRms === 'number'){
+    const baseNoise = (typeof stored.noiseRms==='number' && stored.noiseRms>0) ? stored.noiseRms : noise;
+    const k = baseNoise>0 ? (noise/baseNoise) : 1;
+    rise = stored.pluckRiseRms * k;
+    high = stored.pluckHighRms * k;
+  }
+  // 最低ライン（端末別）
+  if(IS_IOS){
+    rise = Math.max(rise||0, 0.0016, noise*2.0);
+    high = Math.max(high||0, 0.0020, noise*3.0);
+  } else {
+    rise = Math.max(rise||0, 0.010,  noise*2.0);
+    high = Math.max(high||0, 0.012,  noise*3.0);
+  }
+  if(high < noise*2.4) high = noise*2.4;
+  if(rise > high*0.9) rise = high*0.6;
+  PLUCK_RISE_RMS = rise;
+  PLUCK_HIGH_RMS = high;
+}
+
+let prevRms = 0;
+let pluckHoldCount = 0;
+let ignorePluckUntil = 0;
+let NOISE_RMS = 0;
+let PLUCK_HIGH_RMS = 0.012; 
+let PLUCK_RISE_RMS = 0.010;
+
+// ゲーム変数
+let rafId = 0;
+let gameEndAt = 0;
+let score = 0;
+let groups = [];
+let stars = [];
+const STAR_CAP = 90; // パフォーマンス上限（軽量化） // パフォーマンス上限
+function burstStars(n, x, y, waves=1, waveDelay=120){
+  const make = ()=>{
+    const add = Math.min(n, STAR_CAP);
+    for(let i=0;i<add;i++) stars.push(new Star(x,y));
+    if(stars.length > STAR_CAP) stars.splice(0, stars.length-STAR_CAP);
+  };
+  make();
+  for(let w=1; w<waves; w++) setTimeout(make, waveDelay*w);
+}
+
+let lastSpawn = 0;
+let scrollSpeed = 3.5;
+let baseScrollSpeed = 3.5;
+let gameMode = 'practice';
+let isSongMode = false;
+let waitHold = false;
+let waitTargetGroup = null;
+let comboStreak = 0;
+let speedLevel = 0;
+
+// スケール（ドレミファ）専用: 8音ノーミスで 1.7倍
+let scalePhrasePos = 0;      // 0..7
+let scaleBoosted = false;    // 1.7x 状態
+let scaleStreak = 0;     // 連続ノーミスカウント（8で加速）
+const SCALE_SEQ = ['do','re','mi','fa','so','la','si','do2'];
+  updateComboUI();
+  const big=document.getElementById('comboBig'); if(big) big.style.display='none';
+let currentScrollSpeed = 3.5;
+const SPEED_UP_EVERY = 5;    // 5連続で加速
+const SPEED_STEP = 0.375;   // 1段階の加速量（×1.5）
+const SPEED_MAX_ADD = 2.25; // 上限（×1.5）
+
+let _fxTimer = 0;
+const CHEER_PHRASES = ['その調子！','いいぞ！','ノってる！','キター！','最高！','つづけ！','いける！'];
+function flashScreen(){
+  const f = document.getElementById('screenFlash');
+  if(!f) return;
+  f.classList.remove('flash');
+  void f.offsetWidth;
+  f.classList.add('flash');
+}
+
+function updateComboUI(){ /* disabled */ }
+function showFx(text, kind, opts = {}){
+  const el = document.getElementById('fxMsg');
+  if(!el) return;
+  el.textContent = text;
+  el.classList.remove('hit','miss','speed','mega','show');
+  el.style.display = 'block';
+  if(kind) el.classList.add(kind);
+  if(opts.mega) el.classList.add('mega');
+  // restart animation
+  void el.offsetWidth;
+  el.classList.add('show');
+  clearTimeout(_fxTimer);
+  _fxTimer = setTimeout(()=>{
+    el.classList.remove('show','hit','miss','speed','mega');
+    el.style.display = 'none';
+  }, opts.durationMs || 980);
+}
+
+function resetSpeedState(){
+  comboStreak = 0;
+  speedLevel = 0;
+
+  // scale専用
+  scalePhrasePos = 0;
+  scaleBoosted = false;
+  scaleStreak = 0;
+
+  currentScrollSpeed = baseScrollSpeed;
+  if(gameState === 'PLAY' && !waitHold){
+    scrollSpeed = currentScrollSpeed;
+  }
+}
+function applySpeed(){
+  if(gameMode === 'scale'){
+    currentScrollSpeed = baseScrollSpeed * (scaleBoosted ? 1.7 : 1.0);
+  } else {
+    const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD;
+    currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
+  }
+  if(gameState === 'PLAY' && !waitHold){
+    scrollSpeed = currentScrollSpeed;
+  }
+}
+
+
+// データ
+const NUT_X = 180;
+const HIT_WIN = 110; // 判定ウィンドウ（px）
+const STRING_COLORS = ['#ff5757', '#ffde59', '#7ed957', '#5ce1e6'];
+const CHORD_LIB = {
+  'C':  { name: 'C',  targetIdx: 0, fingers: [{s: 1, f: 3, txt: '薬'}] },
+  'F':  { name: 'F',  targetIdx: 0, fingers: [{s: 2, f: 1, txt: '人'}, {s: 4, f: 2, txt: '中'}] },
+  'G7': { name: 'G7', targetIdx: 0, fingers: [{s: 2, f: 1, txt: '人'}, {s: 1, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}] },
+  'Am': { name: 'Am', targetIdx: 0, fingers: [{s: 3, f: 2, txt: '中'}] },
+  'G':  { name: 'G',  targetIdx: 0, fingers: [{s: 3, f: 2, txt: '人'}, {s: 2, f: 3, txt: '薬'}, {s: 1, f: 2, txt: '中'}] },
+  'A7': { name: 'A7', targetIdx: 0, fingers: [{s: 3, f: 1, txt: '人'}] },
+  'Dm': { name: 'Dm', targetIdx: 0, fingers: [{s: 4, f: 2, txt: '中'}, {s: 3, f: 1, txt: '人'}, {s: 2, f: 1, txt: '人'}] },
+  'Em': { name: 'Em', targetIdx: 0, fingers: [{s: 3, f: 4, txt: '小'}, {s: 2, f: 3, txt: '薬'}, {s: 1, f: 2, txt: '中'}] },
+  'D7': { name: 'D7', targetIdx: 0, fingers: [{s: 2, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}, {s: 4, f: 2, txt: '人'}] }
+};
+const SOLO_LIB = {
+  'do':  { name:'ド', targetIdx:0, fingers:[{s:3,f:0,txt:'0'}]},
+  're':  { name:'レ', targetIdx:0, fingers:[{s:3,f:2,txt:'中'}]},
+  'mi':  { name:'ミ', targetIdx:0, fingers:[{s:2,f:0,txt:'0'}]},
+  'fa':  { name:'ファ', targetIdx:0, fingers:[{s:2,f:1,txt:'人'}]},
+  'so':  { name:'ソ', targetIdx:0, fingers:[{s:2,f:3,txt:'薬'}]},
+  'la':  { name:'ラ', targetIdx:0, fingers:[{s:1,f:0,txt:'0'}]},
+  'si':  { name:'シ', targetIdx:0, fingers:[{s:1,f:2,txt:'中'}]},
+  'do2': { name:'ド', targetIdx:0, fingers:[{s:1,f:3,txt:'薬'}]}
+};
+const SONG_DATA = [
+  {lib:CHORD_LIB,key:'C',lyrics:"きら"},{lib:SOLO_LIB,key:'do',lyrics:""},
+  {lib:CHORD_LIB,key:'C',lyrics:"きら"},{lib:SOLO_LIB,key:'so',lyrics:""},
+  {lib:CHORD_LIB,key:'F',lyrics:"ひか"},{lib:SOLO_LIB,key:'la',lyrics:""},
+  {lib:CHORD_LIB,key:'C',lyrics:"るー"},{lib:SOLO_LIB,key:'so',lyrics:""},
+  {lib:CHORD_LIB,key:'G7',lyrics:"おそ"},{lib:SOLO_LIB,key:'fa',lyrics:""},
+  {lib:CHORD_LIB,key:'C',lyrics:"らの"},{lib:SOLO_LIB,key:'mi',lyrics:""},
+  {lib:CHORD_LIB,key:'G7',lyrics:"ほし"},{lib:SOLO_LIB,key:'re',lyrics:""},
+  {lib:CHORD_LIB,key:'C',lyrics:"よー"},{lib:SOLO_LIB,key:'do',lyrics:""}
+];
+
+let songIndex=0; let practiceIndex=0; let scaleIndex=0;
+let currentLevelChords = [];
+let spawnInterval = 2800; // ← 間隔（ms）: 全メニュー共通
+let lastStartParams = null; // リトライ用
+
+// --- UI操作 ---
+function setMode(el, mode){
+  playMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(b => {
+    const m = b.getAttribute('data-mode') || '';
+    b.classList.toggle('active', m === mode);
+  });
+}
+
+// URLパラメータ mode=TAP/NORMAL/WAIT を反映
+(function applyModeFromQuery(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const m = (p.get('mode')||'').toUpperCase();
+    if(m==='TAP' || m==='NORMAL' || m==='WAIT'){
+      setMode(null, m);
+    }
+  }catch(e){}
+})();
+
+
+// ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
+function goMenu(){
+  if(rafId) cancelAnimationFrame(rafId);
+  gameState = 'MENU';
+  try{ document.body.classList.add('isMenu'); }catch(e){}
+  
+  // UIリセット
+  document.getElementById('menu-overlay').style.display = 'flex';
+  document.getElementById('score-panel').style.display = 'none';
+  document.getElementById('timer-panel').style.display = 'none';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('pause-overlay').style.display = 'none';
+  document.getElementById('result-overlay').style.display = 'none';
+  document.getElementById('back-btn').style.display = 'none';
+  document.getElementById('chordHud').style.display = 'none';
+  document.getElementById('lyrics-area').innerText = '';
+  
+  // キャンバスクリア
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  resetSpeedState();
+  const fx=document.getElementById('fxMsg'); if(fx){ fx.style.display='none'; fx.className=''; }
+}
+
+document.getElementById('stopBtn').onclick = () => {
+  if(gameState==='PLAY') {
+    gameState='PAUSE';
+    document.getElementById('pause-overlay').style.display='flex';
+  }
+};
+function resumeGame(){
+  gameState='PLAY';
+  try{ document.body.classList.remove('isMenu'); }catch(e){}
+  document.getElementById('pause-overlay').style.display='none';
+  lastFrameT=0; rafId=requestAnimationFrame(gameLoop);
+}
+
+// --- ゲーム開始フロー ---
+async function prepGame(type){
+  // タップモードならマイク不要
+  if(playMode === 'TAP'){ startGameByType(type); return; }
+
+  // マイク準備
+  document.getElementById('loading-overlay').style.display = 'flex';
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+
+    if(!micStream){
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: IS_IOS ? { echoCancellation:false, noiseSuppression:false, autoGainControl:false } : true
+      });
+      const src = audioCtx.createMediaStreamSource(micStream);
+      micAnalyser = audioCtx.createAnalyser();
+      const gain = audioCtx.createGain();
+      gain.gain.value = IS_IOS ? 3.9 : 1.0;
+      micAnalyser.fftSize = IS_IOS ? 4096 : 2048;
+      src.connect(gain).connect(micAnalyser);
+    }
+
+    // チューニング結果（あれば）
+    const stored = loadGameThresholds();
+
+    // ノイズ計測（約1秒）
+    await new Promise(r => setTimeout(r, 200)); // 立ち上がり待ち
+    NOISE_RMS = await measureNoiseRms(950, 95);
+
+    // 閾値：チューニング結果を基本に、今のノイズ床で補正
+    applyThresholdsFrom(NOISE_RMS, stored);
+
+    document.getElementById('loading-overlay').style.display = 'none';
+    startGameByType(type);
+
+  } catch(e) {
+    alert('マイクが使えません。タップモードで開始します。');
+    playMode = 'TAP';
+    document.getElementById('loading-overlay').style.display = 'none';
+    startGameByType(type);
+  }
+}
+
+function startGameByType(type){
+  lastStartParams = type;
+  if(type==='scale') initGame('scale', null, {speedBase:3.4});
+  else if(type==='easy') initGame('practice', ['C','F','G7','Am'], {speedBase:3.2});
+  else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7'], {speedBase:3.35});
+  else if(type==='song') initGame('song', 'きらきら星', {speedBase:3.45});
+}
+
+function restartLast(){
+  document.getElementById('result-overlay').style.display='none';
+  startGameByType(lastStartParams || 'easy');
+}
+
+function initGame(mode, levelData, opts){
+  if(rafId) cancelAnimationFrame(rafId);
+  gameState='PLAY';
+  
+  // UIリセット
+  document.getElementById('menu-overlay').style.display='none';
+  document.getElementById('result-overlay').style.display='none';
+  document.getElementById('score-panel').style.display='block';
+  document.getElementById('timer-panel').style.display='block';
+  document.getElementById('stopBtn').style.display='block';
+  document.getElementById('back-btn').style.display='none'; // ゲーム中は邪魔なので消す
+
+  // 変数リセット
+  score=0; groups=[]; stars=[];
+  waitHold=false; waitTargetGroup=null;
+  baseScrollSpeed = (opts.speedBase || 3.5) * 1.5; // ベース速度を1.5倍
+
+  currentScrollSpeed = baseScrollSpeed;
+  scrollSpeed = currentScrollSpeed;
+  resetSpeedState();
+  gameMode = mode;
+  isSongMode = (mode==='song');
+  currentLevelChords = levelData || [];
+  practiceIndex=0; scaleIndex=0; songIndex=0;
+  spawnInterval = 2800; // 全モード共通（ドレミファも曲も）
+
+  document.getElementById('score').innerText="0";
+  document.getElementById('lyrics-area').innerText="";
+  gameEndAt = performance.now() + 60000;
+
+  // 感度リセット
+  prevRms = NOISE_RMS;
+  pluckHoldCount=0; ignorePluckUntil=Date.now()+500;
+
+  rafId = requestAnimationFrame(gameLoop);
+}
+
+// --- メインループ ---
+let lastFrameT=0;
+function gameLoop(time){
+  if(gameState!=='PLAY') return;
+  if(!lastFrameT) lastFrameT=time;
+  lastFrameT=time;
+
+  // タイマー
+  if(!waitHold){
+    const rem = Math.max(0, gameEndAt - performance.now());
+    document.getElementById('timer').innerText = Math.ceil(rem/1000);
+    if(rem<=0) { endGame(); return; }
+  }
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawFretboard();
+
+  // スポーン
+  if(!waitHold && (time - lastSpawn > spawnInterval)){
+    // 画面が詰まらないようにチェック
+    let cnt=0, maxX=-9999;
+    for(let g of groups) { if(g.active){ cnt++; if(g.x>maxX) maxX=g.x; } }
+    
+    if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
+      let didSpawn = false;
+if(isSongMode){
+  const d = SONG_DATA[songIndex % SONG_DATA.length];
+  groups.push(new ChordGroup(d.lib[d.key], d.lyrics, d.key));
+  songIndex++;
+  didSpawn = true;
+} else if(gameMode==='scale'){
+  // スケールは常に「1つだけ」流す（順番ズレ防止）
+  const hasActive = groups.some(g=>g.active);
+  if(!hasActive){
+    const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
+    groups.push(new ChordGroup(SOLO_LIB[k], "", k));
+    scaleIndex++;
+    didSpawn = true;
+  } else {
+    // 既に流れている音がある間は次を出さない（即出せるように lastSpawn は更新しない）
+  }
+} else {
+  const k = currentLevelChords[practiceIndex % currentLevelChords.length];
+  groups.push(new ChordGroup(CHORD_LIB[k], "", k));
+  practiceIndex++;
+  didSpawn = true;
+}
+if(didSpawn) lastSpawn=time;
+    }
+  }
+
+  // HUD & Draw
+  let target=null, bestDist=Infinity;
+  for(let g of groups){
+    if(!g.active) continue;
+    const d = Math.abs(g.x - NUT_X);
+    if(d < bestDist && d < 620 + 100){ bestDist=d; target=g; }
+  }
+  if(target){
+    if(gameMode!=='scale'){
+      document.getElementById('chordHud').style.display='block';
+      document.getElementById('chordHud').innerText = target.chord.name||'';
+    } else {
+      document.getElementById('chordHud').style.display='none';
+    }
+    // show faint support (also in scale mode)
+    target.isTarget=true;
+  } else {
+    document.getElementById('chordHud').style.display='none';
+  }
+
+  for(let i=groups.length-1; i>=0; i--){
+    groups[i].update();
+
+    // スケール（ドレミファ）は「判定位置を過ぎたらMISS」
+    if(gameMode==='scale' && !waitHold && groups[i].active && groups[i].x < (NUT_X - HIT_WIN)){
+      triggerHoldMiss(groups[i]);
+    }
+
+    groups[i].draw();
+    if(groups[i].x < -300) groups.splice(i,1);
+  }
+
+  // エフェクト
+  stars.forEach(s=>{ s.update(); s.draw(); });
+  stars = stars.filter(s=>s.life>0);
+  if(stars.length > STAR_CAP) stars.splice(0, stars.length-STAR_CAP);
+
+  // マイク判定
+  processMicInput();
+
+  rafId = requestAnimationFrame(gameLoop);
+}
+
+function endGame(){
+  gameState='RESULT';
+  cancelAnimationFrame(rafId);
+  document.getElementById('result-score').innerText = score;
+  document.getElementById('result-msg').innerText = score>300 ? "Amazing!!" : "Good Job!";
+  document.getElementById('result-overlay').style.display='flex';
+}
+
+// --- 入力判定 ---
+function processMicInput(){
+  if(playMode==='TAP' || !micAnalyser) return;
+  const buf = new Float32Array(micAnalyser.fftSize);
+  micAnalyser.getFloatTimeDomainData(buf);
+  let rms=0; for(let i=0; i<buf.length; i++) rms+=buf[i]*buf[i];
+  const val = Math.sqrt(rms/buf.length);
+
+  const rise = val - prevRms;
+  const now = Date.now();
+  if(now >= ignorePluckUntil && val > PLUCK_HIGH_RMS && rise > PLUCK_RISE_RMS){
+    pluckHoldCount++;
+  } else {
+    pluckHoldCount = Math.max(0, pluckHoldCount-1);
+  }
+  prevRms = val;
+
+  if(pluckHoldCount>=2){
+    pluckHoldCount=0; ignorePluckUntil=now+250;
+    handleAction();
+  }
+}
+
+function handleAction(){
+  if(gameState!=='PLAY') return;
+  // ターゲット探索
+  let target=null, best=Infinity;
+  if(waitHold && waitTargetGroup && waitTargetGroup.active){
+    target = waitTargetGroup; best = Math.abs(target.x - NUT_X);
+  } else {
+    for(let g of groups){
+      if(!g.active) continue;
+      const d = Math.abs(g.x - NUT_X);
+      if(d < 620 && d > -220){ if(d<best){ best=d; target=g; } }
+    }
+  }
+
+  if(target){
+    const win = HIT_WIN;
+    if(best < win){
+      // HIT
+      target.active=false;
+      if(waitHold){
+        waitHold=false; scrollSpeed=currentScrollSpeed; waitTargetGroup=null; lastSpawn=performance.now();
+      }
+      score += (best<50 ? 15 : 10);
+      document.getElementById('score').innerText=score;
+      burstStars(18, NUT_X, canvas.height/2, 1);
+      // combo / speed up
+      if(gameMode === 'scale'){
+        // スケールは「8音連続ノーミスで 1.7倍」（MISSで 1.0 に戻る）
+        scaleStreak++;
+        const label = (best<50) ? 'PERFECT' : 'NICE';
+        // 軽量表示（通常）
+        showFx(`${label}  ${scaleStreak}/8`, 'hit', { mega:false, durationMs: 420 });
+
+        if(!scaleBoosted && scaleStreak >= 8){
+          scaleBoosted = true;
+          applySpeed();
+          flashScreen();
+          showFx('🚀 1.7× SPEED!', 'speed', { mega:true, durationMs: 900 });
+          burstStars(50, canvas.width/2, canvas.height/2, 2, 160);
+        }
+      } else {
+        // 通常（コード等）は 5連続で加速
+        comboStreak++;
+
+        const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
+        const isMilestone5  = (comboStreak === 5);
+        const isMilestone10 = (comboStreak === 10);
+        const isMilestone = isMilestone5 || isMilestone10;
+
+        // speed up every 5
+        if(comboStreak % SPEED_UP_EVERY === 0){
+          speedLevel++;
+          applySpeed();
+
+          if(isMilestone){
+            flashScreen();
+            showFx(`💥 ${comboStreak} COMBO!! 💥\nSUPER!!`, 'speed', { mega:true, durationMs: 1200 });
+            // 5/10だけ派手：波状に出して“数”は抑え、カクつきを減らす
+            burstStars(isMilestone10 ? 55 : 45, canvas.width/2, canvas.height/2, 2, 140);
+          } else {
+            showFx(`🚀 スピードUP!\n${comboStreak}連続`, 'speed', { mega:true, durationMs: 1050 });
+            burstStars(26, canvas.width/2, canvas.height/2, 1);
+          }
+
+        } else {
+          const label2 = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
+
+          if(isMilestone){
+            flashScreen();
+            showFx(`${label2}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:true, durationMs: 1150 });
+            burstStars(isMilestone10 ? 50 : 40, canvas.width/2, canvas.height/2, 2, 140);
+          } else {
+            showFx(`${label2}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 950 });
+            burstStars(14, canvas.width/2, canvas.height/2, 1);
+          }
+        }
+      }
+    } else if(playMode==='WAIT' || playMode==='TAP'){
+      // MISS in WAIT mode
+      if(!waitHold){
+                resetSpeedState();
+        applySpeed();
+        updateComboUI();
+        const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
+        flashScreen();
+        showFx(missMsg, 'miss');
+        waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
+      }
+    }
+  }
+}
+
+
+
+
+function triggerHoldMiss(target){
+  if(!target || !target.active) return;
+  if(waitHold) return;
+
+  // 通常MISSと同じ挙動（おちついて＋点滅＋正解位置で止めて弾き直し）
+  resetSpeedState();
+  applySpeed();
+  updateComboUI();
+  const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
+  flashScreen();
+  showFx(missMsg, 'miss');
+
+  waitHold=true; scrollSpeed=0; waitTargetGroup=target; 
+  target.x=NUT_X;
+}
+// --- MISS（自動判定） ---
+function registerMiss(group, msg='MISS'){
+  if(!group || !group.active) return;
+  group.active = false;
+  // 速度・カウントをリセット（スケールは1.0に戻る）
+  resetSpeedState();
+  applySpeed();
+  flashScreen();
+  showFx(msg, 'miss', { mega:false, durationMs: 650 });
+}
+
+// --- 描画クラス ---
+class ChordGroup {
+  constructor(chord, lyrics, key=null){
+    this.chord=chord; this.lyrics=lyrics; this.key=key;
+    this.x = canvas.width+120; this.active=true; this.ticked=false; this.isTarget=false;
+  }
+  update(){ this.x -= scrollSpeed; if(!this.ticked && this.x<=NUT_X){ if(this.lyrics) document.getElementById('lyrics-area').innerText=this.lyrics; this.ticked=true; } }
+  draw(){
+    if(!this.active) return;
+    const cy = canvas.height/2;
+    const fw = (canvas.width - NUT_X - 60)/12;
+    
+    // ガイド（ターゲット時）
+    if(this.isTarget && Math.abs(this.x-NUT_X)<620){
+      const t = Math.max(0, 1 - Math.abs(this.x-NUT_X)/620);
+      this.chord.fingers.forEach(f=>{
+        const fx = f.f===0 ? NUT_X : NUT_X+(f.f*fw)-(fw/2);
+        const fy = cy + (f.s-2.5)*75;
+        drawCircle(fx, fy, f.txt, 32+t*10, 0.2+t*0.6, true);
+      });
+      this.isTarget=false;
+    }
+    // 本体
+    const blink = (waitHold && waitTargetGroup===this) ? (0.5+0.5*Math.sin(performance.now()/100)) : 1.0;
+    this.chord.fingers.forEach(f=>{
+      const fx = f.f===0 ? this.x : this.x+(f.f*fw)-(fw/2);
+      const fy = cy + (f.s-2.5)*75;
+      drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
+    });
+    // スケール名
+    if(gameMode==='scale'){
+      const tf = this.chord.fingers[0];
+      const nx = tf.f===0 ? this.x : this.x+(tf.f*fw)-(fw/2);
+
+      // iPhone横でも上で切れないよう、ネック内（上端から少し下）に固定
+      ctx.save();
+      ctx.fillStyle="#fff";
+      ctx.font="bold 50px sans-serif";
+      ctx.textAlign="center";
+      ctx.textBaseline="top";
+      const neckTop = (canvas.height/2) - 150;
+      const neckBottom = (canvas.height/2) + 150;
+      const laneY = cy + (tf.s-2.5)*75;
+      const circleR = 40;
+      const fontSize = 50;
+      // まずは「指◯の上」に出す。上が足りなければ下へ（1A対策）
+      let labelY = laneY - circleR - (fontSize + 8);
+      if(labelY < neckTop + 8){
+        labelY = laneY + circleR + 8;
+      }
+      // どこまで行ってもネック外に出ないように軽くクランプ
+      if(labelY > neckBottom - (fontSize + 8)){
+        labelY = neckBottom - (fontSize + 8);
+      }
+      ctx.fillText(this.chord.name||"", nx, labelY);
+      ctx.restore();
+    }
+}
+}
+function drawCircle(x,y,txt,size,alpha,blur,scale=1){
+  ctx.save(); ctx.globalAlpha=alpha;
+  if(blur) ctx.filter="blur(2px)";
+  ctx.translate(x,y); ctx.scale(scale,scale);
+  ctx.beginPath(); ctx.arc(0,0,size,0,Math.PI*2);
+  ctx.fillStyle = (txt==='薬')?'#5271ff':(txt==='中'?'#ff66c4':(txt==='人'?'#ff914d':'#888'));
+  ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
+  ctx.filter="none"; ctx.fillStyle="#fff"; ctx.font=`bold ${size*0.75}px sans-serif`;
+  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,0,2);
+  ctx.restore();
+}
+class Star {
+  constructor(x,y){ this.x=x;this.y=y;this.vx=(Math.random()-.5)*20;this.vy=(Math.random()-.5)*20;this.life=1; }
+  update(){ this.x+=this.vx;this.y+=this.vy;this.vy+=0.5;this.life-=0.03; }
+  draw(){ ctx.save();ctx.globalAlpha=this.life;ctx.fillStyle="#ffeb3b";ctx.beginPath();ctx.arc(this.x,this.y,6,0,Math.PI*2);ctx.fill();ctx.restore(); }
+}
+
+function drawFretboard(){
+  const cy = canvas.height/2;
+  const fw = (canvas.width - NUT_X - 60)/12;
+  ctx.fillStyle="#6d4c41"; ctx.fillRect(NUT_X, cy-150, canvas.width, 300);
+  for(let i=0;i<=12;i++){
+    const x = NUT_X + i*fw;
+    ctx.strokeStyle=(i===0)?"#eee":"#a1887f"; ctx.lineWidth=(i===0)?10:3;
+    ctx.beginPath(); ctx.moveTo(x,cy-150); ctx.lineTo(x,cy+150); ctx.stroke();
+  }
+  const labs=['1A','2E','3C','4G'];
+  for(let i=0;i<4;i++){
+    const y = cy + (i-1.5)*75;
+    ctx.beginPath(); ctx.fillStyle=STRING_COLORS[i]; ctx.arc(125, y, 24, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="bold 16px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(labs[i], 125, y);
+    ctx.strokeStyle=STRING_COLORS[i]; ctx.lineWidth=6;
+    ctx.beginPath(); ctx.moveTo(NUT_X, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+}
+
+function applyViewportSize(){
+  const vv = window.visualViewport;
+  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  // expose CSS vh unit (iPhone Safari 100vh issue)
+  document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+  canvas.width  = Math.floor(w);
+  canvas.height = Math.floor(h);
+}
+applyViewportSize();
+if (window.visualViewport){
+  window.visualViewport.addEventListener('resize', applyViewportSize);
+}
+window.addEventListener('resize', applyViewportSize);
+window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
+
+// iOS Safari: hard lock scroll (no scrollTo hacks)
+(function(){
+  // Lock the page in place so Safari UI bars don't pop in/out due to tiny scrolls.
+  const root = document.documentElement;
+  const body = document.body;
+  // Ensure no page scroll
+  root.style.overflow = 'hidden';
+  body.style.overflow = 'hidden';
+  body.style.position = 'fixed';
+  body.style.inset = '0';
+  body.style.width = '100%';
+  // Prevent rubber-band
+  window.addEventListener('touchmove', (e)=>{ e.preventDefault(); }, {passive:false});
+})();
+
+// タップ操作
+canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(playMode==='TAP') handleAction(); }, {passive:false});
+canvas.addEventListener('mousedown', ()=>{ if(playMode==='TAP') handleAction(); });
+
+// UIBAR FIX PATCH (disabled on iOS)
+(function(){
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isIOS) return;
+function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){ try{ window.scrollTo(0, 1); }catch(e){} }, 50); }
+  window.addEventListener('touchstart', nudge, {passive:true});
+  window.addEventListener('touchend',   nudge, {passive:true});
+  window.addEventListener('click',      nudge, {passive:true});
+  window.addEventListener('orientationchange', function(){ setTimeout(nudge, 250); }, {passive:true});
+  window.addEventListener('pageshow', function(){ setTimeout(nudge, 250); }, {passive:true});
+  setTimeout(nudge, 300);
+
+})();
+
+// __setMenuClassInit
+try{ document.body.classList.add('isMenu'); }catch(e){}</script>
+<div class="verBadge">v2</div>
+</body>
+</html>

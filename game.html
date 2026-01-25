@@ -312,8 +312,25 @@
 }
 
   body:not(.isMenu) .verBadge{ display:none; }
-</style>
 
+  /* DDR6: menu TOP button always visible */
+  .menu-card{ position: relative; }
+  .menuTopBtn{
+    position:absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    border:0;
+    padding:10px 14px;
+    border-radius:16px;
+    font-weight:900;
+    cursor:pointer;
+    background: linear-gradient(135deg, rgba(255,122,61,0.95), rgba(255,184,122,0.95));
+    color:#fff;
+    box-shadow: 0 12px 26px rgba(0,0,0,.18);
+  }
+  .menuTopBtn:active{ transform: translateY(1px); }
+
+</style>
 <!-- DDR6: Background Theme A (lite, safe - UI unchanged) -->
 <style id="bg-theme-a-lite">
   body{
@@ -333,6 +350,7 @@
   <div id="menu-overlay">
     <div class="menu-card">
       <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
+      <button class="menuTopBtn" onclick="location.href='index.html'">🏝️ TOPへ</button>
       <div class="menu-note">※Safariで下のバーが出る場合は、<b>共有 → ホーム画面に追加</b> でフルスクリーン推奨</div>
       
       <div class="menu-list">

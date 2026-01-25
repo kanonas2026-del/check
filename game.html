@@ -362,6 +362,11 @@
   .verBadge{ display:none !important; }
 </style>
 
+
+<!-- DDR6 FIX4: prevent vertical stretch (use app box as single source of truth) -->
+<style id="ddr6-game-fix4">
+  #app{ height: calc(var(--vh) * 100) !important; }
+</style>
 </head>
 <body>
 
@@ -1161,14 +1166,26 @@ function drawFretboard(){
   }
 }
 
+
 function applyViewportSize(){
+  const container = document.getElementById('app');
   const vv = window.visualViewport;
-  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
-  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  // expose CSS vh unit (iPhone Safari 100vh issue)
+  let w, h;
+  if(container){
+    const r = container.getBoundingClientRect();
+    w = r.width;
+    h = r.height;
+  }else{
+    w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+    h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  }
   document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
-  canvas.width  = Math.floor(w);
-  canvas.height = Math.floor(h);
+  const c = document.getElementById('gameCanvas');
+  if(!c) return;
+  c.style.width  = Math.floor(w) + 'px';
+  c.style.height = Math.floor(h) + 'px';
+  c.width  = Math.floor(w);
+  c.height = Math.floor(h);
 }
 applyViewportSize();
 if (window.visualViewport){

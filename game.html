@@ -44,6 +44,40 @@
       box-shadow: 0 12px 0 rgba(122,177,204,0.35), 0 18px 36px var(--shadow);
       display: flex; flex-direction: column; gap: 14px;
     }
+    .menu-note{font-size:12.5px; line-height:1.4; color:#245; background:rgba(255,255,255,.65); border-radius:12px; padding:8px 10px; margin-bottom:6px;}
+
+    /* メニューを1画面に収める（スクロールなし） */
+    .menu-list{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 12px;
+    }
+    .menu-btn{
+      padding: 12px;
+      border-radius: 16px;
+    }
+    .menu-btn .badge{
+      width: 44px; height: 44px; border-radius: 14px;
+      font-size: 22px;
+      flex: 0 0 auto;
+    }
+    .menu-text .title{ font-size: 15px; }
+    .menu-text small{ font-size: 11px; opacity: .85; }
+
+    /* 画面高さが小さいときはさらに詰めて確実に収める */
+    @media (max-height: 520px){
+      .menu-card{ padding: 16px; gap: 10px; }
+      .menu-card h1{ font-size: 20px; }
+      .menu-note{ font-size: 11.5px; padding: 6px 8px; margin-bottom: 2px; }
+      .menu-list{ gap: 10px 10px; }
+      .menu-btn{ padding: 10px; }
+      .menu-text small{ display:none; } /* ここだけ省略して高さを稼ぐ */
+      .mode-pills{ gap: 8px; }
+      .mode-pill{ padding: 9px 12px; font-size: 13px; }
+      .action-btn{ padding: 12px; }
+    }
+
+
     .menu-card h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
     
     .menu-btn {
@@ -64,7 +98,7 @@
 
     /* モード選択 */
     .mode-select { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); }
-    .mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .mode-pills { flex-wrap:wrap; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
     .mode-pill {
       border: 2px solid rgba(0,0,0,0.1); background: #fff; border-radius: 20px;
       padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
@@ -269,8 +303,9 @@
   <div id="menu-overlay">
     <div class="menu-card">
       <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
+      <div class="menu-note">※Safariで下のバーが出る場合は、<b>共有 → ホーム画面に追加</b> でフルスクリーン推奨</div>
       
-      <div class="menu-list" style="display:flex; flex-direction:column; gap:14px;">
+      <div class="menu-list">
         <button class="menu-btn mode1" onclick="prepGame('scale')">
           <div class="badge">🐤</div>
           <div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
@@ -469,6 +504,7 @@ let waitHold = false;
 let waitTargetGroup = null;
 let comboStreak = 0;
 let speedLevel = 0;
+let normalBoosted = false; // 非スケール: 5HITで1.7x
 
 // スケール（ドレミファ）専用: 8音ノーミスで 1.7倍
 let scalePhrasePos = 0;      // 0..7
@@ -514,6 +550,7 @@ function showFx(text, kind, opts = {}){
 function resetSpeedState(){
   comboStreak = 0;
   speedLevel = 0;
+  normalBoosted = false;
 
   // scale専用
   scalePhrasePos = 0;
@@ -529,8 +566,8 @@ function applySpeed(){
   if(gameMode === 'scale'){
     currentScrollSpeed = baseScrollSpeed * (scaleBoosted ? 1.7 : 1.0);
   } else {
-    const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD;
-    currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
+    // 非スケールは 5HIT達成で 1.7x（それまでは 1.0x）
+    currentScrollSpeed = baseScrollSpeed * (normalBoosted ? 1.7 : 1.0);
   }
   if(gameState === 'PLAY' && !waitHold){
     scrollSpeed = currentScrollSpeed;
@@ -804,8 +841,8 @@ if(didSpawn) lastSpawn=time;
   for(let i=groups.length-1; i>=0; i--){
     groups[i].update();
 
-    // スケール（ドレミファ）は「判定位置を過ぎたらMISS」
-    if(gameMode==='scale' && !waitHold && groups[i].active && groups[i].x < (NUT_X - HIT_WIN)){
+    // 判定位置を過ぎたらMISS（スケール以外も同じ挙動：おちついて＋点滅＋正解位置で止めて弾き直し）
+    if(!waitHold && groups[i].active && groups[i].x < (NUT_X - HIT_WIN)){
       triggerHoldMiss(groups[i]);
     }
 
@@ -886,7 +923,7 @@ function handleAction(){
         scaleStreak++;
         const label = (best<50) ? 'PERFECT' : 'NICE';
         // 軽量表示（通常）
-        showFx(`${label}  ${scaleStreak}/8`, 'hit', { mega:false, durationMs: 420 });
+        showFx(`${label}  ${scaleStreak}`, 'hit', { mega:false, durationMs: 420 });
 
         if(!scaleBoosted && scaleStreak >= 8){
           scaleBoosted = true;
@@ -896,40 +933,24 @@ function handleAction(){
           burstStars(50, canvas.width/2, canvas.height/2, 2, 160);
         }
       } else {
-        // 通常（コード等）は 5連続で加速
+        // 非スケール（コード等）は「5HITで 1.7倍」
         comboStreak++;
 
         const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
-        const isMilestone5  = (comboStreak === 5);
-        const isMilestone10 = (comboStreak === 10);
-        const isMilestone = isMilestone5 || isMilestone10;
+        const label2 = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
 
-        // speed up every 5
-        if(comboStreak % SPEED_UP_EVERY === 0){
-          speedLevel++;
+        if(!normalBoosted && comboStreak >= 5){
+          // 5HIT到達で一度だけ加速
+          normalBoosted = true;
           applySpeed();
-
-          if(isMilestone){
-            flashScreen();
-            showFx(`💥 ${comboStreak} COMBO!! 💥\nSUPER!!`, 'speed', { mega:true, durationMs: 1200 });
-            // 5/10だけ派手：波状に出して“数”は抑え、カクつきを減らす
-            burstStars(isMilestone10 ? 55 : 45, canvas.width/2, canvas.height/2, 2, 140);
-          } else {
-            showFx(`🚀 スピードUP!\n${comboStreak}連続`, 'speed', { mega:true, durationMs: 1050 });
-            burstStars(26, canvas.width/2, canvas.height/2, 1);
-          }
-
+          flashScreen();
+          showFx('🚀 1.7× SPEED!', 'speed', { mega:true, durationMs: 1050 });
+          burstStars(55, canvas.width/2, canvas.height/2, 2, 140);
         } else {
-          const label2 = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
-
-          if(isMilestone){
-            flashScreen();
-            showFx(`${label2}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:true, durationMs: 1150 });
-            burstStars(isMilestone10 ? 50 : 40, canvas.width/2, canvas.height/2, 2, 140);
-          } else {
-            showFx(`${label2}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 950 });
-            burstStars(14, canvas.width/2, canvas.height/2, 1);
-          }
+          // 5HIT到達後も表示は軽め（速度は維持）
+          showFx(`${label2}
+${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 920 });
+          burstStars(normalBoosted ? 18 : 14, canvas.width/2, canvas.height/2, 1);
         }
       }
     } else if(playMode==='WAIT' || playMode==='TAP'){
@@ -1110,18 +1131,11 @@ canvas.addEventListener('mousedown', ()=>{ if(playMode==='TAP') handleAction(); 
 (function(){
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (isIOS) return;
-function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){ try{ window.scrollTo(0, 1); }catch(e){} }, 50); }
-  window.addEventListener('touchstart', nudge, {passive:true});
-  window.addEventListener('touchend',   nudge, {passive:true});
-  window.addEventListener('click',      nudge, {passive:true});
-  window.addEventListener('orientationchange', function(){ setTimeout(nudge, 250); }, {passive:true});
-  window.addEventListener('pageshow', function(){ setTimeout(nudge, 250); }, {passive:true});
-  setTimeout(nudge, 300);
 
 })();
 
 // __setMenuClassInit
 try{ document.body.classList.add('isMenu'); }catch(e){}</script>
-<div class="verBadge">v2</div>
+<div class="verBadge">vI</div>
 </body>
 </html>

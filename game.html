@@ -35,18 +35,35 @@
     #menu-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.32);
       display: flex; align-items: center; justify-content: center;
+      padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
       z-index: 100; backdrop-filter: blur(2px);
+      box-sizing: border-box;
     }
     .menu-card {
       background: var(--card); width: min(560px, 96vw);
-      max-height: calc(100dvh - 24px); overflow: hidden;
-      border-radius: 18px; padding: 22px;
+      /* safe-area を考慮して 1画面に収める */
+      max-height: calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);
+      overflow: hidden;
+      border-radius: 18px; padding: 16px 16px 14px;
       box-shadow: 0 12px 0 rgba(122,177,204,0.35), 0 18px 36px var(--shadow);
-      display: flex; flex-direction: column; gap: 14px;
+      display: flex; flex-direction: column; gap: 12px;
     }
     .menu-note{font-size:12.5px; line-height:1.4; color:#245; background:rgba(255,255,255,.65); border-radius:12px; padding:8px 10px; margin-bottom:6px;}
 
-    /* メニューを1画面に収める（スクロールなし） */
+    
+    /* 低い画面（iPhone横など）は全体を少し圧縮してスクロール不要に */
+    @media (max-height: 520px){
+      .menu-card{ padding: 14px 14px 12px; gap:10px; }
+      .menu-note{ font-size:12px; padding:7px 9px; margin-bottom:2px; }
+      .menu-title{ font-size:20px; }
+      .menu-btn{ padding:10px; border-radius:14px; }
+      .menu-btn .lbl{ font-size:16px; }
+      .menu-btn .sub{ display:none; } /* 説明文は隠して高さ確保 */
+      .modebar{ padding-top:6px; }
+      .modechip{ padding:8px 10px; font-size:13px; }
+      .action-btn{ padding:12px 14px; font-size:16px; margin-top:6px !important; }
+    }
+/* メニューを1画面に収める（スクロールなし） */
     .menu-list{
       display:grid;
       grid-template-columns: 1fr 1fr;

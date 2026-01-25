@@ -268,7 +268,7 @@
 
       /* ネック表示エリアを少し下げて上の文字と干渉させない */
       #neck-area{
-        margin-top: 0px;
+        margin-top: 12px;
       }
     }
 
@@ -327,22 +327,22 @@
   }
 </style>
 
+<style id="ddr6-tuning-fix2">
+/* tuning: align + background unify (safe overrides) */
+#screen-tuning{ background: transparent !important; }
+#tuner-nav, #guide-msg{ z-index: 5; } /* keep text above */
+canvas#tuningCanvas{ position:absolute; inset:0; z-index:1; }
+#neck-area{ margin-top: 0px !important; } /* in case it exists */
 
-<!-- DDR6 FIX2: visible version marker (to verify cache) -->
-<style id="ddr6-ver-badge">
-  #ddr6VerBadge{
-    position: fixed;
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-    z-index: 9999;
-    font-weight: 900;
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: rgba(0,0,0,.45);
-    color: #fff;
-    pointer-events: none;
-  }
+</style>
+
+<!-- DDR6 FIX3: tuning vertical align + ensure background shows -->
+<style id="ddr6-tuning-fix3">
+  /* Let body A background be visible */
+  #screen-tuning{ background: transparent !important; }
+
+  /* If any accidental debug/version chips exist, hide common patterns */
+  .version-badge, .versionBadge, .verBadge, #versionBadge, #version-badge{ display:none !important; }
 </style>
 
 </head>
@@ -1039,8 +1039,9 @@ function autoCorrelate(buf, sampleRate) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const midY = canvas.height / 2;
-  const nutX = 180;
+  const isLand = (canvas.width > canvas.height);
+  const midY = isLand ? (canvas.height * 0.44) : (canvas.height / 2);
+  const nutX = 160;
   ctx.fillStyle = "#6d4c41"; ctx.fillRect(nutX, midY - 150, canvas.width, 300);
   const fretW = (canvas.width - nutX - 100) / 12;
   for (let i = 0; i <= 12; i++) {
@@ -1715,10 +1716,5 @@ draw();
 
 </script>
 
-<div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
-tuning_fix_v1
-</div>
-
-<div id="ddr6VerBadge">tuning_fix_v2</div>
 </body>
 </html>

@@ -305,28 +305,49 @@ const ctx = canvas.getContext('2d');
 // 目的: ネック/弦/フレットの「座標と見た目」を1か所で固定し、ズレ再発を防ぐ。
 // 注意: ここは原則いじらない（変更すると game/tuning 両方に影響）。
 const STAGE = Object.freeze({
-  NUT_X: 180,
-  NECK_HALF_H: 150,
-  NECK_H: 300,
+  NUT_X: 150,
+  NECK_HALF_H: 130,
+  NECK_H: 260,
   FRET_COUNT: 12,
-  FRET_RIGHT_PAD: 60,        // (canvas.width - NUT_X - PAD)/FRET_COUNT
+  FRET_RIGHT_PAD: 20,        // (canvas.width - NUT_X - PAD)/FRET_COUNT
   LANE_DY: 75,
-  LABEL_X: 125,
-  LABEL_R: 24,
+  LABEL_X: 110,
+  LABEL_R: 22,
   NUT_LINE_W: 10,
   FRET_LINE_W: 3,
   STRING_LINE_W: 6,
   NUT_COLOR: "#eee",
   FRET_COLOR: "#a1887f",
+  FRET_MARK_COLOR: "#c9b7ae",
+  FRET_MARK_W_MULT: 1.3,
+  INLAY_COLOR: "rgba(255,255,255,0.28)",
+  INLAY_STROKE: "rgba(0,0,0,0.15)",
+  INLAY_R: 6,
+  INLAY_DY: 16,
   NECK_COLOR: "#6d4c41",
   LABEL_FONT: "bold 16px sans-serif",
+  NUT_BLOCK_W: 18,
+  NUT_BLOCK_OVER: 6,
 });
 
 function stageGeom(canvas){
   const cy = canvas.height/2;
   const nutX = STAGE.NUT_X;
   const fretW = (canvas.width - nutX - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
-  return { cy, nutX, fretW };
+  const y = cy - STAGE.NECK_HALF_H;
+  const h = STAGE.NECK_H;
+  return { cy, nutX, fretW, y, h };
+}
+
+function rrRect(ctx,x,y,w,h,r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
 }
 
 function drawFretboardBase(ctx, canvas, stringColors){
@@ -335,17 +356,68 @@ function drawFretboardBase(ctx, canvas, stringColors){
 
   // neck
   ctx.fillStyle = STAGE.NECK_COLOR;
-  ctx.fillRect(nutX, cy - STAGE.NECK_HALF_H, canvas.width, STAGE.NECK_H);
+  // main neck (from nut to right)
+  ctx.fillRect(nutX, cy - STAGE.NECK_HALF_H, canvas.width - nutX, STAGE.NECK_H);
 
-  // frets
-  for(let i=0;i<=STAGE.FRET_COUNT;i++){
-    const x = nutX + i*fretW;
-    ctx.strokeStyle = (i===0) ? STAGE.NUT_COLOR : STAGE.FRET_COLOR;
-    ctx.lineWidth   = (i===0) ? STAGE.NUT_LINE_W : ((i===5||i===10) ? STAGE.FRET_LINE_W*1.5 : STAGE.FRET_LINE_W);
-    ctx.beginPath();
-    ctx.moveTo(x, cy - STAGE.NECK_HALF_H);
-    ctx.lineTo(x, cy + STAGE.NECK_HALF_H);
+  // nut block (clearly visible)
+  (function(){
+    const nutW = STAGE.NUT_BLOCK_W;
+    const over = STAGE.NUT_BLOCK_OVER;
+    const x0 = nutX - nutW/2;
+    const y0 = cy - STAGE.NECK_HALF_H - over;
+    const h0 = STAGE.NECK_H + over*2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = STAGE.NUT_COLOR;
+    rrRect(ctx, x0, y0, nutW, h0, 6);
+    ctx.fill();
+    ctx.restore();
+    // outline
+    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.lineWidth = 2;
+    rrRect(ctx, x0, y0, nutW, h0, 6);
     ctx.stroke();
+  })();
+
+// frets (1..10)  ※ inlay描画がパスを潰さないよう、先にフレット線をstrokeしてからインレイを描く
+  for (let i=1; i<=STAGE.FRET_COUNT; i++){
+    const x = nutX + g.fretW * i;
+    const isMark = (i===5 || i===10);
+
+    ctx.strokeStyle = isMark ? STAGE.FRET_MARK_COLOR : STAGE.FRET_COLOR;
+    ctx.lineWidth = STAGE.FRET_LINE_W * (isMark ? STAGE.FRET_MARK_W_MULT : 1);
+
+    ctx.beginPath();
+    ctx.moveTo(x, g.y);
+    ctx.lineTo(x, g.y + g.h);
+    ctx.stroke();
+
+    // inlays: 5F=1dot, 10F=2dot（同じ●●）
+    if(i===5){
+      ctx.save();
+      ctx.fillStyle = STAGE.INLAY_COLOR;
+      ctx.strokeStyle = STAGE.INLAY_STROKE;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, cy, STAGE.INLAY_R, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }else if(i===10){
+      ctx.save();
+      ctx.fillStyle = STAGE.INLAY_COLOR;
+      ctx.strokeStyle = STAGE.INLAY_STROKE;
+      ctx.lineWidth = 1;
+      const dy = STAGE.INLAY_DY;
+      for(const yy of [cy - dy, cy + dy]){
+        ctx.beginPath();
+        ctx.arc(x, yy, STAGE.INLAY_R, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   // strings + left labels

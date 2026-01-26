@@ -344,6 +344,9 @@
 
 <script>
 // ===== 基本設定 =====
+const BASE_SPEED_MULT = 1.5; // 全体のベース速度倍率
+const SPEEDUP_MULT = 1.7;     // スピードアップ倍率
+
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -553,7 +556,10 @@ let isSongMode = false;
 let waitHold = false;
 let waitTargetGroup = null;
 let comboStreak = 0;
-let speedLevel = 0;
+let speedLevel = 0; // 旧ロジック用（温存）
+let speedBoosted = false;      // 5連続 or 8音ノーミスで1.7倍にしたか
+let scaleSeqCount = 0;         // scaleで「doからdo2まで」ノーミスカウント
+let scaleSpeedBoosted = false; // scale専用
   updateComboUI();
   const big=document.getElementById('comboBig'); if(big) big.style.display='none';
 let currentScrollSpeed = 3.5;
@@ -580,9 +586,8 @@ function showFx(text, kind, opts = {}){
   el.style.display = 'block';
   if(kind) el.classList.add(kind);
   if(opts.mega) el.classList.add('mega');
-  // restart animation
-  void el.offsetWidth;
-  el.classList.add('show');
+  // restart animation (軽量)
+  requestAnimationFrame(()=>{ el.classList.add('show'); });
   clearTimeout(_fxTimer);
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
@@ -593,6 +598,9 @@ function showFx(text, kind, opts = {}){
 function resetSpeedState(){
   comboStreak = 0;
   speedLevel = 0;
+  speedBoosted = false;
+  scaleSeqCount = 0;
+  scaleSpeedBoosted = false;
   currentScrollSpeed = baseScrollSpeed;
   if(gameState === 'PLAY' && !waitHold){
     scrollSpeed = currentScrollSpeed;
@@ -776,7 +784,7 @@ function initGame(mode, levelData, opts){
   // 変数リセット
   score=0; groups=[]; stars=[];
   waitHold=false; waitTargetGroup=null;
-  baseScrollSpeed = opts.speedBase || 3.5;
+  baseScrollSpeed = (opts.speedBase || 3.5) * BASE_SPEED_MULT;
   currentScrollSpeed = baseScrollSpeed;
   scrollSpeed = currentScrollSpeed;
   resetSpeedState();
@@ -827,7 +835,9 @@ function gameLoop(time){
         songIndex++;
       } else if(gameMode==='scale'){
         const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
-        groups.push(new ChordGroup(SOLO_LIB[k], ""));
+        const g = new ChordGroup(SOLO_LIB[k], "");
+        g.noteKey = k;
+        groups.push(g);
         scaleIndex++;
       } else {
         const k = currentLevelChords[practiceIndex % currentLevelChords.length];
@@ -863,7 +873,38 @@ function gameLoop(time){
     if(groups[i].x < -300) groups.splice(i,1);
   }
 
-  // エフェクト
+  
+  // 自動MISS：判定位置を通過したら（タップしなくても）MISS扱い
+  if(!waitHold && target && target.active){
+    const win = 110; // handleActionと同じ判定窓
+    if(target.x < (NUT_X - win) && !target._autoMissed){
+      target._autoMissed = true;
+
+      // 連続・速度リセット＆MISS演出（“おちついて”＋flash）
+      comboStreak = 0;
+      resetSpeedState();
+      updateComboUI();
+
+      flashScreen();
+      const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
+      showFx(missMsg, 'miss', { durationMs: 980 });
+      burstStars(18, NUT_X, canvas.height/2, 1);
+
+      if(playMode==='WAIT' || playMode==='TAP'){
+        // 従来どおり：止めて弾き直し（同じ符号を正解位置で点滅）
+        waitHold = true;
+        scrollSpeed = 0;
+        waitTargetGroup = target;
+        target.x = NUT_X;
+        target._autoMissed = false; // 弾き直し用に解除
+      } else {
+        // NORMAL：流して次へ
+        target.active = false;
+      }
+    }
+  }
+
+// エフェクト
   stars.forEach(s=>{ s.update(); s.draw(); });
   stars = stars.filter(s=>s.life>0);
   if(stars.length > STAR_CAP) stars.splice(0, stars.length-STAR_CAP);
@@ -930,54 +971,81 @@ function handleAction(){
       score += (best<50 ? 15 : 10);
       document.getElementById('score').innerText=score;
       burstStars(18, NUT_X, canvas.height/2, 1);
-      // combo / speed up
-comboStreak++;
+      // combo / speed (DDR6ルール)
+      comboStreak++;
+      updateComboUI();
 
-const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
-const isMilestone5  = (comboStreak === 5);
-const isMilestone10 = (comboStreak === 10);
-const isMilestone = isMilestone5 || isMilestone10;
+      const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
 
-// speed up every 5
-if(comboStreak % SPEED_UP_EVERY === 0){
-  speedLevel++;
-  applySpeed();
+      // ===== スピードアップ判定 =====
+      if(gameMode==='scale'){
+        // scaleは「doからdo2まで(8音)をノーミス達成」でのみ1.7倍
+        if(!scaleSpeedBoosted){
+          if(target.noteKey === 'do'){
+            scaleSeqCount = 1;
+          } else if(scaleSeqCount > 0){
+            scaleSeqCount++;
+          } // else: doから始まっていないので数えない
 
-  if(isMilestone){
-    flashScreen();
-    showFx(`💥 ${comboStreak} COMBO!! 💥\nSUPER!!`, 'speed', { mega:true, durationMs: 1200 });
-    // 5/10だけ派手：波状に出して“数”は抑え、カクつきを減らす
-    burstStars(isMilestone10 ? 55 : 45, canvas.width/2, canvas.height/2, 2, 140);
-  } else {
-    showFx(`🚀 スピードUP!\n${comboStreak}連続`, 'speed', { mega:true, durationMs: 1050 });
-    burstStars(26, canvas.width/2, canvas.height/2, 1);
-  }
+          if(scaleSeqCount >= 8){
+            scaleSpeedBoosted = true;
+            currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT;
+            if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
+            flashScreen();
+            showFx(`💥 8音ノーミス！\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
+            burstStars(55, canvas.width/2, canvas.height/2, 2, 140);
+          } else {
+            // 通常HIT（scaleでも気分が上がる言葉だけ）
+            showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 880 });
+            burstStars(12, canvas.width/2, canvas.height/2, 1);
+          }
+        } else {
+          // 既に加速中
+          showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 820 });
+          burstStars(10, canvas.width/2, canvas.height/2, 1);
+        }
+
+      } else {
+        // practice/songは「5連続HITで1.7倍」
+        if(!speedBoosted && comboStreak >= 5){
+          speedBoosted = true;
+          currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT;
+          if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
+
+          flashScreen();
+          showFx(`💥 5 COMBO!! 💥\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
+          burstStars(45, canvas.width/2, canvas.height/2, 2, 140);
+        } else {
+          const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
+          showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 900 });
+          burstStars(14, canvas.width/2, canvas.height/2, 1);
+        }
+      }
 } else {
-  const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
+      // MISS（早すぎ/遅すぎ）
+      comboStreak = 0;
+      resetSpeedState();
+      updateComboUI();
 
-  if(isMilestone){
-    flashScreen();
-    showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:true, durationMs: 1150 });
-    burstStars(isMilestone10 ? 50 : 40, canvas.width/2, canvas.height/2, 2, 140);
-  } else {
-    showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 950 });
-    burstStars(14, canvas.width/2, canvas.height/2, 1);
-  }
-}
+      flashScreen();
+      const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
+      showFx(missMsg, 'miss', { durationMs: 980 });
+      burstStars(18, NUT_X, canvas.height/2, 1);
 
-    } else if(playMode==='WAIT' || playMode==='TAP'){
-      // MISS in WAIT mode
-      if(!waitHold){
-                comboStreak = 0;
-        updateComboUI();
-        const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
-        showFx(missMsg, 'miss');
-        waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
+      if(playMode==='WAIT' || playMode==='TAP'){
+        // 従来どおり：止めて弾き直し
+        if(!waitHold){
+          waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
+        }
+      } else {
+        // NORMAL：流して次へ
+        target.active=false;
       }
     }
   }
 }
+
 
 // --- 描画クラス ---
 class ChordGroup {

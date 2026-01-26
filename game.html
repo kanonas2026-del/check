@@ -391,7 +391,7 @@ function drawFretboardBase(ctx, canvas, stringColors){
   for(let i=0;i<=STAGE.FRET_COUNT;i++){
     const x = nutX + i*fretW;
     ctx.strokeStyle = (i===0) ? STAGE.NUT_COLOR : STAGE.FRET_COLOR;
-    ctx.lineWidth   = (i===0) ? STAGE.NUT_LINE_W : STAGE.FRET_LINE_W;
+    ctx.lineWidth   = (i===0) ? STAGE.NUT_LINE_W : ((i===5||i===10) ? STAGE.FRET_LINE_W*1.5 : STAGE.FRET_LINE_W);
     ctx.beginPath();
     ctx.moveTo(x, cy - STAGE.NECK_HALF_H);
     ctx.lineTo(x, cy + STAGE.NECK_HALF_H);

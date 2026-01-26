@@ -2,22 +2,10 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ウクレレ診断 - チューニング</title>
   <style>
-    
-/* === ALIGN: use the same safe-area "app" container concept as game === */
-html, body { height: 100%; margin: 0; overflow: hidden; }
-#app{
-  position: fixed;
-  inset: 0;
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  box-sizing: border-box;
-}
-/* スタイルは前回の「グレーアウト」と「弦の色」を維持 */
+    /* スタイルは前回の「グレーアウト」と「弦の色」を維持 */
     body { margin: 0; background: #4a3728; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
 
     :root{
@@ -94,7 +82,8 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
       .ui-panel{ bottom: calc(var(--safe-bottom) + 10px); }
     }
 
-    #screen-tuning { background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%); width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative; }
+    #screen-tuning { background: linear-gradient(135deg, #a8d8f0 0%, #f7d7d2 52%, #bff0d6 100%);
+width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative; }
     canvas { display: block; width: 100%; height: 100%; }
     #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
     .start-btn { background: #ff914d; color: white; border: none; padding: 25px 50px; font-size: 24px; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #d97b41; }
@@ -259,8 +248,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 </head>
 <body>
 
-  <div id="app">
-<div id="start-overlay">
+  <div id="start-overlay">
     <button class="start-btn" onclick="startEverything()">🎵 チューニングをはじめましょう！</button>
   </div>
 
@@ -312,6 +300,91 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 <script>
 const canvas = document.getElementById('tuningCanvas');
 const ctx = canvas.getContext('2d');
+
+// ===== SHARED_STAGE_BLOCK v1 (GAME/TUNING 共通) =====
+// 目的: ネック/弦/フレットの「座標と見た目」を1か所で固定し、ズレ再発を防ぐ。
+// 注意: ここは原則いじらない（変更すると game/tuning 両方に影響）。
+const STAGE = Object.freeze({
+  NUT_X: 180,
+  NECK_HALF_H: 150,
+  NECK_H: 300,
+  FRET_COUNT: 12,
+  FRET_RIGHT_PAD: 60,        // (canvas.width - NUT_X - PAD)/FRET_COUNT
+  LANE_DY: 75,
+  LABEL_X: 125,
+  LABEL_R: 24,
+  NUT_LINE_W: 10,
+  FRET_LINE_W: 3,
+  STRING_LINE_W: 6,
+  NUT_COLOR: "#eee",
+  FRET_COLOR: "#a1887f",
+  NECK_COLOR: "#6d4c41",
+  LABEL_FONT: "bold 16px sans-serif",
+});
+
+function stageGeom(canvas){
+  const cy = canvas.height/2;
+  const nutX = STAGE.NUT_X;
+  const fretW = (canvas.width - nutX - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+  return { cy, nutX, fretW };
+}
+
+function drawFretboardBase(ctx, canvas, stringColors){
+  const g = stageGeom(canvas);
+  const { cy, nutX, fretW } = g;
+
+  // neck
+  ctx.fillStyle = STAGE.NECK_COLOR;
+  ctx.fillRect(nutX, cy - STAGE.NECK_HALF_H, canvas.width, STAGE.NECK_H);
+
+  // frets
+  for(let i=0;i<=STAGE.FRET_COUNT;i++){
+    const x = nutX + i*fretW;
+    ctx.strokeStyle = (i===0) ? STAGE.NUT_COLOR : STAGE.FRET_COLOR;
+    ctx.lineWidth   = (i===0) ? STAGE.NUT_LINE_W : STAGE.FRET_LINE_W;
+    ctx.beginPath();
+    ctx.moveTo(x, cy - STAGE.NECK_HALF_H);
+    ctx.lineTo(x, cy + STAGE.NECK_HALF_H);
+    ctx.stroke();
+  }
+
+  // strings + left labels
+  const labs = ['1A','2E','3C','4G'];
+  for(let i=0;i<4;i++){
+    const y = cy + (i-1.5) * STAGE.LANE_DY;
+
+    // left circle
+    ctx.beginPath();
+    ctx.fillStyle = stringColors[i];
+    ctx.globalAlpha = 1.0;
+    ctx.arc(STAGE.LABEL_X, y, STAGE.LABEL_R, 0, Math.PI*2);
+    ctx.fill();
+
+    // label text
+    ctx.fillStyle = "#fff";
+    ctx.font = STAGE.LABEL_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(labs[i], STAGE.LABEL_X, y);
+
+    // straight string (tuning will overdraw as vibration if needed)
+    ctx.strokeStyle = stringColors[i];
+    ctx.lineWidth = STAGE.STRING_LINE_W;
+    ctx.beginPath();
+    ctx.moveTo(nutX, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  // restore defaults for other drawing
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  return g; // {cy,nutX,fretW}
+}
+// ===== /SHARED_STAGE_BLOCK v1 =====
+
+
 const FREQS = [440.00, 329.63, 261.63, 392.00]; 
 const COLORS = ["#ff5757", "#ffde59", "#7ed957", "#5ce1e6"];
 
@@ -951,41 +1024,32 @@ function autoCorrelate(buf, sampleRate) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const midY = canvas.height / 2;
-  const nutX = 180;
-  ctx.fillStyle = "#6d4c41"; ctx.fillRect(nutX, midY - 150, canvas.width, 300);
-  const fretW = (canvas.width - nutX - 100) / 12;
-  for (let i = 0; i <= 12; i++) {
-    const x = nutX + i * fretW;
-    ctx.strokeStyle = (i === 0) ? "#fff" : "#a1887f"; ctx.lineWidth = (i === 0) ? 12 : 3;
-    ctx.beginPath(); ctx.moveTo(x, midY - 150); ctx.lineTo(x, midY + 150); ctx.stroke();
-  }
-    const labels = ['1A','2E','3C','4G'];
+  const g = drawFretboardBase(ctx, canvas, COLORS);
+  const midY = g.cy;
+  const nutX = g.nutX;
+  const fretW = g.fretW;
+
+const labels = ['1A','2E','3C','4G'];
 for (let i = 0; i < 4; i++) {
     const y = midY + (i - 1.5) * 75;
     const isActive = (i === currentTargetIdx);
 
-    // 左のシンボル（色つき〇）※文字列の羅列をやめて視覚で分かるように
-    const cx = 125;
-    const r = isActive ? 27 : 24;
-    ctx.beginPath();
-    ctx.fillStyle = COLORS[i];
-    ctx.globalAlpha = isActive ? 1.0 : 0.85;
-    ctx.arc(cx, y, r, 0, Math.PI*2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
-    // 中に 1A / 2E ... を入れる（小さめ）
-    ctx.fillStyle = '#fff';
-    ctx.font = isActive ? 'bold 18px sans-serif' : 'bold 16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(labels[i], cx, y);
-
-    // 弦（振動）
+    // (base) 左の丸と文字は drawFretboardBase() で描画済み
+    const cx = STAGE.LABEL_X;
+    // Active highlight (visual only; geometry identical)
+    if (isActive) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.fillStyle = COLORS[i];
+      ctx.arc(cx, y, STAGE.LABEL_R + 8, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+// 弦（振動）
     const vib = Math.sin(Date.now() * 0.15) * vibrations[i];
     vibrations[i] *= 0.94;
-    ctx.strokeStyle = COLORS[i]; ctx.lineWidth = 8;
+    ctx.strokeStyle = COLORS[i]; ctx.lineWidth = STAGE.STRING_LINE_W;
     ctx.beginPath(); ctx.moveTo(nutX, y);
     ctx.quadraticCurveTo(nutX + (canvas.width - nutX)/2, y + vib, canvas.width, y);
     ctx.stroke();
@@ -1582,17 +1646,13 @@ function doDiagnosis() {
   btn.addEventListener('click', showResult);
 }
 function applyViewportSize(){
-  const app = document.getElementById('app');
   const vv = window.visualViewport;
-
-  const rawW = app ? app.clientWidth  : Math.round((vv ? vv.width  : window.innerWidth));
-  const rawH = app ? app.clientHeight : Math.round((vv ? vv.height : window.innerHeight));
-
-  const vh = (vv ? vv.height : window.innerHeight) * 0.01;
-  document.documentElement.style.setProperty('--vh', `${vh}px`);
-
-  canvas.width  = Math.max(1, rawW);
-  canvas.height = Math.max(1, rawH);
+  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
+  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
+  // expose CSS vh unit (for iPhone Safari 100vh issue)
+  document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+  canvas.width = Math.floor(w);
+  canvas.height = Math.floor(h);
 }
 applyViewportSize();
 if (window.visualViewport){
@@ -1631,7 +1691,6 @@ draw();
 
 </script>
 
-</div>
 <div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
 tuning_fix_v1
 </div>

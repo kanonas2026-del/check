@@ -21,16 +21,14 @@
       overflow: hidden;
       overscroll-behavior: none;
       -webkit-text-size-adjust: 100%;
-      background: linear-gradient(135deg, #a8d8f0 0%, #f7d7d2 52%, #bff0d6 100%);
+      background: linear-gradient(to bottom, #7ab1cc 0%, #a8e6cf 100%);
       color: #4a3728;
       font-family: system-ui, -apple-system, sans-serif;
       touch-action: none;
       user-select: none;
       -webkit-user-select: none;
     }
-    #app {
-  padding:0;
- position: fixed; inset: 0; width: 100%; height: 100dvh; height: calc(var(--vh) * 100); overflow: hidden; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+    #app { position: fixed; inset: 0; width: 100%; height: 100dvh; height: calc(var(--vh) * 100); overflow: hidden; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
     canvas { display:block; width:100%; height:100%; touch-action:none; }
 
     /* メニューオーバーレイ */
@@ -349,6 +347,91 @@
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// ===== SHARED_STAGE_BLOCK v1 (GAME/TUNING 共通) =====
+// 目的: ネック/弦/フレットの「座標と見た目」を1か所で固定し、ズレ再発を防ぐ。
+// 注意: ここは原則いじらない（変更すると game/tuning 両方に影響）。
+const STAGE = Object.freeze({
+  NUT_X: 180,
+  NECK_HALF_H: 150,
+  NECK_H: 300,
+  FRET_COUNT: 12,
+  FRET_RIGHT_PAD: 60,        // (canvas.width - NUT_X - PAD)/FRET_COUNT
+  LANE_DY: 75,
+  LABEL_X: 125,
+  LABEL_R: 24,
+  NUT_LINE_W: 10,
+  FRET_LINE_W: 3,
+  STRING_LINE_W: 6,
+  NUT_COLOR: "#eee",
+  FRET_COLOR: "#a1887f",
+  NECK_COLOR: "#6d4c41",
+  LABEL_FONT: "bold 16px sans-serif",
+});
+
+function stageGeom(canvas){
+  const cy = canvas.height/2;
+  const nutX = STAGE.NUT_X;
+  const fretW = (canvas.width - nutX - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+  return { cy, nutX, fretW };
+}
+
+function drawFretboardBase(ctx, canvas, stringColors){
+  const g = stageGeom(canvas);
+  const { cy, nutX, fretW } = g;
+
+  // neck
+  ctx.fillStyle = STAGE.NECK_COLOR;
+  ctx.fillRect(nutX, cy - STAGE.NECK_HALF_H, canvas.width, STAGE.NECK_H);
+
+  // frets
+  for(let i=0;i<=STAGE.FRET_COUNT;i++){
+    const x = nutX + i*fretW;
+    ctx.strokeStyle = (i===0) ? STAGE.NUT_COLOR : STAGE.FRET_COLOR;
+    ctx.lineWidth   = (i===0) ? STAGE.NUT_LINE_W : STAGE.FRET_LINE_W;
+    ctx.beginPath();
+    ctx.moveTo(x, cy - STAGE.NECK_HALF_H);
+    ctx.lineTo(x, cy + STAGE.NECK_HALF_H);
+    ctx.stroke();
+  }
+
+  // strings + left labels
+  const labs = ['1A','2E','3C','4G'];
+  for(let i=0;i<4;i++){
+    const y = cy + (i-1.5) * STAGE.LANE_DY;
+
+    // left circle
+    ctx.beginPath();
+    ctx.fillStyle = stringColors[i];
+    ctx.globalAlpha = 1.0;
+    ctx.arc(STAGE.LABEL_X, y, STAGE.LABEL_R, 0, Math.PI*2);
+    ctx.fill();
+
+    // label text
+    ctx.fillStyle = "#fff";
+    ctx.font = STAGE.LABEL_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(labs[i], STAGE.LABEL_X, y);
+
+    // straight string (tuning will overdraw as vibration if needed)
+    ctx.strokeStyle = stringColors[i];
+    ctx.lineWidth = STAGE.STRING_LINE_W;
+    ctx.beginPath();
+    ctx.moveTo(nutX, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  // restore defaults for other drawing
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  return g; // {cy,nutX,fretW}
+}
+// ===== /SHARED_STAGE_BLOCK v1 =====
+
+
 
 // --- UI safe-area for browser bars (no install required) ---
 function updateUiVars(){
@@ -973,23 +1056,9 @@ class Star {
 }
 
 function drawFretboard(){
-  const cy = canvas.height/2;
-  const fw = (canvas.width - NUT_X - 60)/12;
-  ctx.fillStyle="#6d4c41"; ctx.fillRect(NUT_X, cy-150, canvas.width, 300);
-  for(let i=0;i<=12;i++){
-    const x = NUT_X + i*fw;
-    ctx.strokeStyle=(i===0)?"#eee":"#a1887f"; ctx.lineWidth=(i===0)?10:3;
-    ctx.beginPath(); ctx.moveTo(x,cy-150); ctx.lineTo(x,cy+150); ctx.stroke();
-  }
-  const labs=['1A','2E','3C','4G'];
-  for(let i=0;i<4;i++){
-    const y = cy + (i-1.5)*75;
-    ctx.beginPath(); ctx.fillStyle=STRING_COLORS[i]; ctx.arc(125, y, 24, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.font="bold 16px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(labs[i], 125, y);
-    ctx.strokeStyle=STRING_COLORS[i]; ctx.lineWidth=6;
-    ctx.beginPath(); ctx.moveTo(NUT_X, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
+  drawFretboardBase(ctx, canvas, STRING_COLORS);
 }
+
 
 function applyViewportSize(){
   const vv = window.visualViewport;

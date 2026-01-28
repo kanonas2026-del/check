@@ -1,12 +1,13 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#88cfd3" />
-  <title>ウクレレ・ゲーム</title>
-  <style>/* iphone-viewport-fix */
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="#88cfd3" name="theme-color"/>
+<title>ウクレレ・ゲーム</title>
+<style>/* iphone-viewport-fix */
 
     :root{
       --vh: 1vh;
@@ -95,6 +96,12 @@
       /* 下段: モード/はやさを圧縮して必ず見える */
       .mode-select{ margin-top: 6px; padding-top: 6px; }
       .mode-pill{ padding: 5px 10px; font-size: 10px; }
+
+      /* 曲スピードは「曲：きらきら星」内に表示（コンパクト） */
+      #song-speed-wrap.song-speed-inline{margin-top:4px !important; gap:4px !important;}
+      #song-speed-wrap.song-speed-inline > div:first-child{font-size:10px !important;}
+      #song-speed-wrap.song-speed-inline #song-speed-note{display:none;}
+      #song-speed-wrap.song-speed-inline .mode-pill{padding:4px 8px !important; font-size:10px !important;}
     }
 
     /* ゲームUI */
@@ -324,99 +331,88 @@ body.playing #menu-overlay{ display:none; }
 .verBadge{display:none !important;}
 #back-btn{display:none !important;}
 
+
+/* Hide chord debug HUD (user request) */
+#chordHud{display:none !important;}
 </style>
 </head>
 <body class="menuOpen">
-
 <div id="app">
-  <div id="menu-overlay">
-    <div class="menu-card">
-      <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
-      
-      <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
-        <div class="menu-main">
-        <button class="menu-btn mode1" onclick="prepGame('scale')">
-          <div class="badge">🐤</div>
-          <div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
-        </button>
-        <button class="menu-btn mode2" onclick="prepGame('easy')">
-          <div class="badge">🐱</div>
-          <div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
-        </button>
-        <button class="menu-btn mode3" onclick="prepGame('hard')">
-          <div class="badge">🐼</div>
-          <div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
-        </button>
-        <button class="menu-btn mode4" onclick="prepGame('song')">
-          <div class="badge">🦁</div>
-          <div class="menu-text"><div class="title">曲：きらきら星</div><small>メロディ＋コード</small></div>
-        </button>
-        </div>
-
-        <div id="song-speed-wrap" style="margin-top:-2px; margin-left:54px; display:flex; flex-direction:column; gap:6px;">
-          <div style="font-size:11px; font-weight:900; opacity:.85;">曲スピード</div>
-          <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start;">
-            <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
-            <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
-            <div class="mode-pill" data-ss="FAST">はやい</div>
-          </div>
-          <div id="song-speed-note" style="font-size:11px; opacity:.75;">（曲中はスピード変化なし）</div>
-        </div>
-
-      </div>
-<div class="mode-select">
-        <div class="mode-pills">
-          <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
-          <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>
-          <div class="mode-pill" data-mode="TAP" onclick="setMode(this, 'TAP')">タップモード</div>
-        </div>
-      </div>
-      
-      <button class="action-btn btn-secondary" onclick="goFlip('index.html')" style="margin-top:10px;">🏝️ TOPへもどる</button>
-    </div>
-  </div>
-
-  <div id="screenFlash"></div>
-  <div id="fxMsg"></div>
-  <div id="comboBig"></div>
-
-  <div id="lyrics-area"></div>
-  <div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
-  <div id="score-panel">⭐ <span id="score">0</span></div>
-  <div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
-  <div id="chordHud" aria-hidden="true"></div>
-  
-  <div id="back-btn"><button onclick="goMenu()">🏝️ メニュー</button></div>
-  <button id="stopBtn" type="button">ストップ</button>
-
-  <div id="loading-overlay" class="overlay-card">
-    <div class="card-content">
-      <h2>マイクじゅんび中...</h2>
-      <p id="loading-msg">静かにしてね（ノイズをはかっています）</p>
-    </div>
-  </div>
-
-  <div id="pause-overlay" class="overlay-card">
-    <div class="card-content">
-      <h2>ストップ中</h2>
-      <button class="action-btn btn-primary" onclick="resumeGame()">つづける</button>
-      <button class="action-btn btn-secondary" onclick="goMenu()">メニューへ</button>
-    </div>
-  </div>
-
-  <div id="result-overlay" class="overlay-card">
-    <div class="card-content">
-      <h2>Finish!</h2>
-      <div class="result-score">⭐ <span id="result-score">0</span> pts</div>
-      <p id="result-msg">Good Job!</p>
-      <button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
-      <button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
-    </div>
-  </div>
-
-  <canvas id="gameCanvas"></canvas>
+<div id="menu-overlay">
+<div class="menu-card">
+<h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
+<div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
+<div class="menu-main">
+<button class="menu-btn mode1" onclick="prepGame('scale')">
+<div class="badge">🐤</div>
+<div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
+</button>
+<button class="menu-btn mode2" onclick="prepGame('easy')">
+<div class="badge">🐱</div>
+<div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
+</button>
+<button class="menu-btn mode3" onclick="prepGame('hard')">
+<div class="badge">🐼</div>
+<div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
+</button>
+<button class="menu-btn mode4" onclick="prepGame('song')">
+<div class="badge">🦁</div>
+<div class="menu-text"><div class="title">曲：きらきら星</div><small>メロディ＋コード</small></div>
+<div class="song-speed-inline" id="song-speed-wrap" style="margin-top:6px; margin-left:0; display:flex; flex-direction:column; gap:4px; width:100%;">
+<div style="font-size:11px; font-weight:900; opacity:.85;">曲スピード</div>
+<div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start; flex-wrap:wrap; gap:6px;">
+<div class="mode-pill" data-ss="SLOW">ゆっくり</div>
+<div class="mode-pill active" data-ss="NORMAL">ふつう</div>
+<div class="mode-pill" data-ss="FAST">はやい</div>
 </div>
-
+<div id="song-speed-note" style="font-size:11px; opacity:.75;">（曲中はスピード変化なし）</div>
+</div></button>
+</div>
+</div>
+<div class="mode-select">
+<div class="mode-pills">
+<div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+<div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>
+<div class="mode-pill" data-mode="TAP" onclick="setMode(this, 'TAP')">タップモード</div>
+</div>
+</div>
+<button class="action-btn btn-secondary" onclick="goFlip('index.html')" style="margin-top:10px;">🏝️ TOPへもどる</button>
+</div>
+</div>
+<div id="screenFlash"></div>
+<div id="fxMsg"></div>
+<div id="comboBig"></div>
+<div id="lyrics-area"></div>
+<div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
+<div id="score-panel">⭐ <span id="score">0</span></div>
+<div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
+<div aria-hidden="true" id="chordHud"></div>
+<div id="back-btn"><button onclick="goMenu()">🏝️ メニュー</button></div>
+<button id="stopBtn" type="button">ストップ</button>
+<div class="overlay-card" id="loading-overlay">
+<div class="card-content">
+<h2>マイクじゅんび中...</h2>
+<p id="loading-msg">静かにしてね（ノイズをはかっています）</p>
+</div>
+</div>
+<div class="overlay-card" id="pause-overlay">
+<div class="card-content">
+<h2>ストップ中</h2>
+<button class="action-btn btn-primary" onclick="resumeGame()">つづける</button>
+<button class="action-btn btn-secondary" onclick="goMenu()">メニューへ</button>
+</div>
+</div>
+<div class="overlay-card" id="result-overlay">
+<div class="card-content">
+<h2>Finish!</h2>
+<div class="result-score">⭐ <span id="result-score">0</span> pts</div>
+<p id="result-msg">Good Job!</p>
+<button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
+<button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
+</div>
+</div>
+<canvas id="gameCanvas"></canvas>
+</div>
 <script>
 
 // --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
@@ -1786,11 +1782,8 @@ window.addEventListener('pageshow', ()=>{
 
 </script>
 <div class="verBadge">v2</div>
-
-<div id="pageFlip" aria-hidden="true"></div>
-
-
-<div id="pandaHint" aria-live="polite" style="
+<div aria-hidden="true" id="pageFlip"></div>
+<div aria-live="polite" id="pandaHint" style="
   position:fixed;
   left:50%;
   transform:translateX(-50%);
@@ -1812,6 +1805,5 @@ window.addEventListener('pageshow', ()=>{
   overflow:hidden;
   text-overflow:ellipsis;
 "></div>
-
 </body>
 </html>

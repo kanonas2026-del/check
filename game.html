@@ -41,17 +41,17 @@
     .menu-card {
       background: var(--card); width: min(560px, 96vw);
       max-height: calc(100% - 24px); overflow-y: auto;
-      border-radius: 18px; padding: 18px;
-      box-shadow: 0 12px 0 rgba(122,177,204,0.35), 0 18px 36px var(--shadow);
+      border-radius: 26px; padding: 16px;
+      box-shadow: 0 10px 0 rgba(122,177,204,0.28), 0 16px 32px var(--shadow);
       display: flex; flex-direction: column; gap: 10px;
     }
     .menu-card h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
     
     .menu-btn {
-      background: rgba(255,255,255,0.98); color: #4a3728;
-      border: none; border-radius: 16px; padding: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.90)); color: #4a3728;
+      border: none; border-radius: 22px; padding: 12px 14px;
       cursor: pointer; display: flex; gap: 12px; align-items: center;
-      box-shadow: 0 4px 0 rgba(122,177,204,0.32);
+      box-shadow: 0 6px 0 rgba(122,177,204,0.26);
       transition: transform 0.08s; text-align: left;
     }
     .menu-btn:active { transform: translateY(2px); box-shadow: none; }
@@ -880,7 +880,7 @@ function showPandaHint(msg){
   el.textContent = "🐼 " + msg;
   el.style.opacity = "1";
   clearTimeout(el._t);
-  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 1200);
+  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 2200);
 }
 
 function showFx(text, kind, opts = {}){
@@ -905,7 +905,7 @@ el.classList.remove('hit','miss','speed','mega','show');
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
     el.style.display = 'none';
-  }, opts.durationMs || 1500);
+  }, opts.durationMs || 2200);
 }
 
 function resetSpeedState(){
@@ -1080,9 +1080,7 @@ function buildKirakiraFromTabBlocks(blocks){
     }
     // データ化：1ステップ=1ノート（8分）
     for(const st of steps){
-      const chordTxt = chordToTextAEGC(st.chord);
-      const pickTxt = _pickText(st.pick);
-      out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: chordTxt });
+      out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: '' });
     }
   }
   return out;
@@ -1236,7 +1234,7 @@ function initGame(mode, levelData, opts){
   resetSpeedState();
   gameMode = mode;
   isSongMode = (mode==='song');
-  disableSpeedUpActive = true; // スピードは開始時選択で固定（途中UPしない）
+  disableSpeedUpActive = !!(opts && opts.disableSpeedUp); // songのみ固定、practice/scaleは途中UPあり
   currentLevelChords = levelData || [];
   practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
   spawnInterval = 2800; // デフォルト
@@ -1323,8 +1321,7 @@ function gameLoop(time){
   }
   if(target){
     if(gameMode!=='scale'){
-      document.getElementById('chordHud').style.display='block';
-      document.getElementById('chordHud').innerText = target.chord.name||'';
+      document.getElementById('chordHud').style.display='none';
     } else {
       document.getElementById('chordHud').style.display='none';
     }
@@ -1560,7 +1557,7 @@ class ChordGroup {
     this.x -= scrollSpeed;
     // mark as 'entered' after it actually started moving on screen
     if(!this.entered && this.x < (canvas.width + 60)) this.entered = true; // enter sooner to ensure auto-miss works from first chord
-    if(!this.ticked && this.x<=NUT_X){ if(this.lyrics) document.getElementById('lyrics-area').innerText=this.lyrics; this.ticked=true; }
+    if(!this.ticked && this.x<=NUT_X){ this.ticked=true; }
   }
   getAnchorX(){
     // Visual anchor for timing: leftmost displayed circle X (accounts for open-string shifting rule)
@@ -1665,36 +1662,25 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
-    // スケール名
-    if(gameMode==='scale'){
-      const tf = this.chord.fingers[0];
-      const nx = fretCenterX(this.x, tf.f);
+    // コード名（C/F/G7...）をノーツと一緒に流す（中央HUDは使わない）
+    {
+      const nx = this.getAnchorX ? this.getAnchorX() : this.x;
 
-      // iPhone横でも上で切れないよう、ネック内（上端から少し下）に固定
       ctx.save();
-      ctx.fillStyle="#fff";
-      ctx.font="bold 50px sans-serif";
-      ctx.textAlign="center";
-      ctx.textBaseline="top";
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = "#fff";
+      const isSmallH = (window.innerHeight && window.innerHeight < 520);
+      ctx.font = (isSmallH ? "bold 22px sans-serif" : "bold 26px sans-serif");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
       const neckTop = (canvas.height/2) - 150;
-      const neckBottom = (canvas.height/2) + 150;
-      const laneY = cy + (tf.s-2.5)*75;
-      const circleR = 34;
-      const fontSize = 50;
-      // まずは「指◯の上」に出す。上が足りなければ下へ（1A対策）
-      let labelY = laneY - circleR - (fontSize + 8);
-      if(labelY < neckTop + 8){
-        labelY = laneY + circleR + 8;
-      }
-      // どこまで行ってもネック外に出ないように軽くクランプ
-      if(labelY > neckBottom - (fontSize + 8)){
-        labelY = neckBottom - (fontSize + 8);
-      }
-      ctx.fillText(this.chord.name||"", nx, labelY);
+      const labelY = neckTop + 6;
+      const nm = (this.chord && this.chord.name) ? this.chord.name : "";
+      if(nm) ctx.fillText(nm, nx, labelY);
       ctx.restore();
     }
-}
-}
+    }
+  }
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   ctx.save(); ctx.globalAlpha=alpha;
   if(blur) ctx.filter="blur(2px)";

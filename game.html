@@ -104,7 +104,7 @@
     #lyrics-area {
       position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 90%;
       text-align: center; font-size: 28px; font-weight: 900; color: #4a3728;
-      text-shadow: 0 2px 8px rgba(255,255,255,0.8); pointer-events: none; z-index: 50;
+      text-shadow: 0 2px 8px rgba(255,255,255,0.8); pointer-events: none; z-index:9999;
     }
 
     /* オーバーレイ共通 */
@@ -134,54 +134,26 @@
   position: fixed;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) rotate(-4deg) scale(1);
-  z-index: 95;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
   display: none;
   pointer-events: none;
-  padding: 14px 20px 16px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.96);
-  border: 4px solid #111;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
-  font-weight: 1000;
-  font-size: 48px;
+  padding: 10px 16px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.92);
+  border: 3px solid #111;
+  font-weight: 900;
+  font-size: 44px;
   text-align: center;
-  letter-spacing: 0.8px;
-  white-space: pre-line;
+  letter-spacing: 0.5px;
   line-height: 1.02;
   color: #ff3d00;
-  text-shadow:
-    0 3px 0 #111,
-    2px 2px 0 #111,
-    -2px 2px 0 #111,
-    2px -2px 0 #111,
-    -2px -2px 0 #111,
-    0 10px 20px rgba(0,0,0,0.22);
+  will-change: transform, opacity;
 }
-#fxMsg.hit{ color: #ff3d00; }
-#fxMsg.miss{ color: #2563eb; background: rgba(207,232,255,0.96); }
-#fxMsg.speed{ color: #0a7f4f; background: rgba(186,247,214,0.96); }
-#fxMsg.mega{
-  font-size: 68px;
-  transform: translate(-50%, -50%) rotate(-6deg) scale(1);
-}
-@keyframes fxComicPop {
-  0%   { transform: translate(-50%, -50%) rotate(-4deg) scale(0.72); opacity: 0; }
-  20%  { transform: translate(-50%, -50%) rotate(-6deg) scale(1.22); opacity: 1; }
-  55%  { transform: translate(-50%, -50%) rotate(-2deg) scale(1.02); opacity: 1; }
-  100% { transform: translate(-50%, -50%) rotate(1deg)  scale(1.00); opacity: 0; }
-}
-@keyframes fxShake {
-  0% { }
-  20%{ transform: translate(-50%, -50%) rotate(-7deg) translateX(-2px); }
-  40%{ transform: translate(-50%, -50%) rotate(-3deg) translateX(3px); }
-  60%{ transform: translate(-50%, -50%) rotate(-8deg) translateX(-3px); }
-  80%{ transform: translate(-50%, -50%) rotate(-2deg) translateX(2px); }
-  100%{ }
-}
+
 #fxMsg.show{
-  display: block;
-  animation: fxComicPop 0.98s ease-out forwards, fxShake 0.5s ease-out;
+  display:block;
+  animation: fxFade 0.45s ease-out forwards;
 }
 
 /* BIG COMBO (neck center) */
@@ -209,6 +181,12 @@
 #comboBig.pulse{
   animation: comboPulse 0.38s ease-out;
 }
+@keyframes fxFade{
+  0%{ opacity:0; transform: translate(-50%, -50%) scale(0.98); }
+  15%{ opacity:1; transform: translate(-50%, -50%) scale(1.02); }
+  100%{ opacity:0; transform: translate(-50%, -50%) scale(1); }
+}
+
 @keyframes comboPulse{
   0%{ transform: translate(-50%, -50%) rotate(-2deg) scale(0.95); opacity: 0.0; }
   40%{ transform: translate(-50%, -50%) rotate(-2deg) scale(1.18); opacity: 1.0; }
@@ -413,6 +391,18 @@ body.playing #menu-overlay{ display:none; }
 
 <script>
 
+// --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
+(function preventPageScroll(){
+  const opts = { passive: false };
+  const stop = (e)=>{ try{ e.preventDefault(); }catch(_){} };
+  document.addEventListener('touchmove', stop, opts);
+  document.addEventListener('gesturestart', stop, opts);
+  document.addEventListener('gesturechange', stop, opts);
+  document.addEventListener('gestureend', stop, opts);
+  document.addEventListener('wheel', (e)=>{ if(gameState==='PLAY') stop(e); }, opts);
+})();
+
+
 // ===== MENU CLICK FIX =====
 // Some environments fail to trigger inline onclick reliably (especially with overlays/WebView).
 // We force a reliable event delegation and a menuOpen body class that disables canvas pointer events.
@@ -467,7 +457,7 @@ body.playing #menu-overlay{ display:none; }
 // ===== SONG SPEED PRESET (曲モード：最初にスピード固定) =====
 const SONG_SPEED_KEY = 'uk_song_speed_v1';
 // 曲モードは「弾ける間隔」を優先して少し遅めに（8分アルペジオ想定）
-const SONG_SPEED_PRESETS = { SLOW: 2.35, NORMAL: 2.75, FAST: 3.15 }; // speedBase before BASE_SPEED_MULT
+const SONG_SPEED_PRESETS = { SLOW: 4.20, NORMAL: 5.10, FAST: 6.30 }; // v28: faster presets (no mid-song change) // v26: speed up (no mid-song change) // tuned: NORMALを速く（途中加速なし）
 function getSongSpeedId(){
   try{
     const v = localStorage.getItem(SONG_SPEED_KEY);
@@ -499,9 +489,10 @@ function bindSongSpeedUI(){
 }
 
 // ===== 基本設定 =====
-const BASE_SPEED_MULT = 1.5; // 全体のベース速度倍率
-const SPEEDUP_MULT = 1.7;     // スピードアップ倍率
+const BASE_SPEED_MULT = 1.15; // 全体のベース速度倍率（少しゆっくり）
+const SPEEDUP_MULT = 1.0;     // 途中スピードアップはしない（固定）
 
+const ENABLE_SPEED_UP = false; // speed is selected at start; no mid-song speed-up
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -804,6 +795,8 @@ let groups = [];
 let stars = [];
 const STAR_CAP = 90; // パフォーマンス上限（軽量化） // パフォーマンス上限
 function burstStars(n, x, y, waves=1, waveDelay=120){
+  // iPhone: keep FX light to avoid lag
+  if(IS_IOS) n = Math.min(n, 8);
   const make = ()=>{
     const add = Math.min(n, STAR_CAP);
     for(let i=0;i<add;i++) stars.push(new Star(x,y));
@@ -846,7 +839,7 @@ function flashScreen(){
 function updateComboUI(){ /* disabled */ }
 
 // --- Panda hint (FX layer only; does NOT affect gameplay) ---
-const PANDA_HINT_ENABLED = true; // false で完全無効
+const PANDA_HINT_ENABLED = false; // v26: off by default (reduce lag) // false で完全無効
 
 const _PANDA_LINES = [
   "あわてなくて大丈夫",
@@ -888,7 +881,7 @@ el.classList.remove('hit','miss','speed','mega','show');
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
     el.style.display = 'none';
-  }, opts.durationMs || 980);
+  }, opts.durationMs || 1500);
 }
 
 function resetSpeedState(){
@@ -985,17 +978,17 @@ function chordObjForPick(chordName, pick){
 // 表示は A→E→C→G（0=開放）で固定。Pick はその8分で鳴らす弦だけ表示します。
 const KIRAKIRA_TAB_BLOCKS = [
   // 1) C → F → C
-  { A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
+  { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
   // 2) G7 → C → G7 → C
-  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
-  // 3) C → G7 → C → G7
-  { A:"--3-----2-----3-----2----", E:"--0-----1--1--0--0--1----", C:"--0-----2-----0-----2----", G:"--0--0--------0-----0----" },
+  { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  // 3) C → G7 → C → G7   ※G7のG弦0が欠けないように補完
+  { label:"C→G7→C→G7", A:"--3-----2-----3-----2----", E:"--0-----1--1--0--0--1----", C:"--0-----2-----0-----2----", G:"--0--0--0-----0-----0----" },
   // 4) G7 → C → G7 → C
-  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
   // 5) C → F → C
-  { A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
+  { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
   // 6) G7 → C → G7 → C
-  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
 ];
 
 function _tabEventCols(block){
@@ -1065,7 +1058,7 @@ function buildKirakiraFromTabBlocks(blocks){
     for(const st of steps){
       const chordTxt = chordToTextAEGC(st.chord);
       const pickTxt = _pickText(st.pick);
-      out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: `${chordTxt}\nPick: ${pickTxt}` });
+      out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: chordTxt });
     }
   }
   return out;
@@ -1077,6 +1070,7 @@ const SONG_DATA = buildKirakiraFromTabBlocks(KIRAKIRA_TAB_BLOCKS);
 
 
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
+let songFinished=false; let songFinishedAt=0;
 let currentLevelChords = [];
 let spawnInterval = 2800; // ← 間隔（ms）: 全メニュー共通
 let lastStartParams = null; // リトライ用
@@ -1218,14 +1212,14 @@ function initGame(mode, levelData, opts){
   resetSpeedState();
   gameMode = mode;
   isSongMode = (mode==='song');
-  disableSpeedUpActive = !!(opts && opts.disableSpeedUp) || isSongMode;
+  disableSpeedUpActive = true; // スピードは開始時選択で固定（途中UPしない）
   currentLevelChords = levelData || [];
-  practiceIndex=0; scaleIndex=0; songIndex=0;
+  practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
   spawnInterval = 2800; // デフォルト
   if(isSongMode){
     // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
     const sid = getSongSpeedId();
-    spawnInterval = (sid==='SLOW') ? 950 : (sid==='FAST') ? 650 : 800;
+    spawnInterval = (sid==='SLOW') ? 700 : (sid==='FAST') ? 420 : 550; // v28: tighter arpeggio timing
   }
 
   document.getElementById('score').innerText="0";
@@ -1271,9 +1265,16 @@ function gameLoop(time){
     
     if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
       if(isSongMode){
-        const d = SONG_DATA[songIndex % SONG_DATA.length];
-        groups.push(new ChordGroup(d.chord ? d.chord : (d.lib[d.key]), d.lyrics));
-        songIndex++;
+        if(songIndex < SONG_DATA.length){
+          const d = SONG_DATA[songIndex];
+          groups.push(new ChordGroup(d.chord ? d.chord : (d.lib[d.key]), d.lyrics));
+          songIndex++;
+          if(songIndex >= SONG_DATA.length){ songFinished = true; songFinishedAt = performance.now(); }
+        } else {
+          // no more notes to spawn
+          if(!songFinished){ songFinished = true; songFinishedAt = performance.now(); }
+        }
+
       } else if(gameMode==='scale'){
         const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
         const g = new ChordGroup(SOLO_LIB[k], "");
@@ -1314,39 +1315,66 @@ function gameLoop(time){
     if(groups[i].x < -300) groups.splice(i,1);
   }
 
-  // 曲モード：最後まで流れ切ったら終了（60秒打ち切り無し）
-  if(isSongMode && songIndex >= SONG_DATA.length && groups.length===0){
-    endGame();
-    return;
+  // 曲モード：最後まで流れ切ったら終了
+  if(isSongMode){
+    const done = (songFinished || songIndex >= SONG_DATA.length);
+    if(done && groups.length===0){
+      endGame();
+      return;
+    }
+    // 保険：最後まで生成し終えてから一定時間経っても残骸が0にならない場合は強制終了
+    if(done && songFinishedAt && (performance.now()-songFinishedAt)>8000){
+      endGame();
+      return;
+    }
   }
 
   
   // 自動MISS：判定位置を通過したら（タップしなくても）MISS扱い
-  if(!waitHold && target && target.active && target.entered){
-    const win = 110; // handleActionと同じ判定窓
-    if(target.getAnchorX() < (NUT_X - win) && !target._autoMissed){
-      target._autoMissed = true;
+  // iPhoneなどでフレーム落ちすると「target判定の範囲外へ一気に飛ぶ」ことがあり、
+  // 最初のコードがMISS表示なしで通り過ぎることがあるため、全グループを走査してMISS判定します。
+  if(!waitHold){
+    const win = 0; // v26: per-chord auto-miss line (1 fret left of pressed)
+    let cand = null;
+    let candAX = Infinity;
+
+    for(const g of groups){
+      if(!g.active) continue;
+      if(!g.entered) continue;
+      if(g._autoMissed) continue;
+      const ax = g.getAnchorX();
+      if(ax < g.getAutoMissX()){
+        // もっと左に行っている（＝最も取りこぼしが確定している）ものを優先
+        if(ax < candAX){ cand = g; candAX = ax; }
+      }
+    }
+
+    if(cand){
+      cand._autoMissed = true;
 
       // 連続・速度リセット＆MISS演出（“おちついて”＋flash）
       comboStreak = 0;
       resetSpeedState();
       updateComboUI();
 
-      flashScreen();
+      // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
       showFx(missMsg, 'miss', { durationMs: 980 });
-      burstStars(18, NUT_X, canvas.height/2, 1);
 
-      if(playMode==='WAIT' || playMode==='TAP'){
+      // iPhoneはDOM更新が重く感じることがあるので、🐼は控えめ（PCでは従来どおり）
+      try{ if(!IS_IOS && typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
+
+      /* burstStars disabled v26 (perf) */
+if(playMode==='WAIT' || playMode==='TAP'){
         // 従来どおり：止めて弾き直し（同じ符号を正解位置で点滅）
         waitHold = true;
         scrollSpeed = 0;
-        waitTargetGroup = target;
-        target.x = NUT_X;
-        target._autoMissed = false; // 弾き直し用に解除
+        waitTargetGroup = cand;
+        cand.x = NUT_X;
+        cand._autoMissed = false; // 弾き直し用に解除
       } else {
         // NORMAL：流して次へ
-        target.active = false;
+        cand.active = false;
       }
     }
   }
@@ -1418,8 +1446,8 @@ function handleAction(){
       }
       score += (best<50 ? 15 : 10);
       document.getElementById('score').innerText=score;
-      burstStars(18, NUT_X, canvas.height/2, 1);
-      // combo / speed (DDR6ルール)
+      /* burstStars disabled v26 (perf) */
+// combo / speed (DDR6ルール)
       comboStreak++;
       updateComboUI();
 
@@ -1440,35 +1468,35 @@ function handleAction(){
             if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
             if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
-            flashScreen();
+            // flashScreen(); // 重いので無効化
             showFx(`💥 8音ノーミス！\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
-            burstStars(55, canvas.width/2, canvas.height/2, 2, 140);
-          } else {
+            /* burstStars disabled v26 (perf) */
+} else {
             // 通常HIT（scaleでも気分が上がる言葉だけ）
             showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 880 });
-            burstStars(12, canvas.width/2, canvas.height/2, 1);
-          }
+            /* burstStars disabled v26 (perf) */
+}
         } else {
           // 既に加速中
           showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 820 });
-          burstStars(10, canvas.width/2, canvas.height/2, 1);
-        }
+          /* burstStars disabled v26 (perf) */
+}
 
       } else {
         // practice/songは「5連続HITで1.7倍」
-        if(!speedBoosted && comboStreak >= 5){
+        if(!disableSpeedUpActive && !speedBoosted && comboStreak >= 5){
           speedBoosted = true;
           if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
           if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
-          flashScreen();
+          // flashScreen(); // 重いので無効化
           showFx(`💥 5 COMBO!! 💥\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
-          burstStars(45, canvas.width/2, canvas.height/2, 2, 140);
-        } else {
+          /* burstStars disabled v26 (perf) */
+} else {
           const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
           showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 900 });
-          burstStars(14, canvas.width/2, canvas.height/2, 1);
-        }
+          /* burstStars disabled v26 (perf) */
+}
       }
 } else {
       // MISS（早すぎ/遅すぎ）
@@ -1476,12 +1504,12 @@ function handleAction(){
       resetSpeedState();
       updateComboUI();
 
-      flashScreen();
+      // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
       showFx(missMsg, 'miss', { durationMs: 980 });
-      burstStars(18, NUT_X, canvas.height/2, 1);
-
-      if(playMode==='WAIT' || playMode==='TAP'){
+      try{ if(typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
+      /* burstStars disabled v26 (perf) */
+if(playMode==='WAIT' || playMode==='TAP'){
         // 従来どおり：止めて弾き直し
         if(!waitHold){
           waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
@@ -1507,7 +1535,7 @@ class ChordGroup {
   update(){
     this.x -= scrollSpeed;
     // mark as 'entered' after it actually started moving on screen
-    if(!this.entered && this.x < (canvas.width - 40)) this.entered = true;
+    if(!this.entered && this.x < (canvas.width + 60)) this.entered = true; // enter sooner to ensure auto-miss works from first chord
     if(!this.ticked && this.x<=NUT_X){ if(this.lyrics) document.getElementById('lyrics-area').innerText=this.lyrics; this.ticked=true; }
   }
   getAnchorX(){
@@ -1535,6 +1563,34 @@ class ChordGroup {
       if(x < minX) minX = x;
     }
     return minX;
+  }
+
+  getAutoMissX(){
+    // Auto-MISS threshold: when the leftmost displayed circle passes "1 fret left of the pressed position"
+    // User request: 押弦から1F左に過ぎたらエラー
+    const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+
+    const fretsAll = this.chord.fingers.map(f=>f.f);
+    const maxF = Math.max(...fretsAll);
+    const minF = Math.min(...fretsAll);
+    const hasOpen = (minF === 0);
+    const hasPressed = (maxF > 0);
+    const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
+    const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
+
+    // Determine the leftmost displayed fret number (0 may be shifted to minPressed)
+    let dispMinF = Infinity;
+    for(const f of fretsAll){
+      const df = (shiftOpenToLeftMostPressed && f===0) ? minPressed : f;
+      if(df < dispMinF) dispMinF = df;
+    }
+    if(!isFinite(dispMinF)) dispMinF = 0;
+
+    // Intended X when the group is at the hit position (baseX == NUT_X)
+    const intendedLeftmostX = (dispMinF > 0) ? (NUT_X + (dispMinF*fw) - (fw/2)) : NUT_X;
+
+    // 1 fret to the left
+    return intendedLeftmostX - fw;
   }
 
   draw(){
@@ -1710,20 +1766,20 @@ window.addEventListener('pageshow', ()=>{
   position:fixed;
   left:50%;
   transform:translateX(-50%);
-  bottom:8px;
+  bottom:calc(env(safe-area-inset-bottom) + 10px);
   max-width:92vw;
   padding:8px 12px;
   border-radius:16px;
   background:rgba(255,255,255,0.88);
   color:#111;
-  font-size:14px;
+  font-size:15px;
   font-weight:800;
   line-height:1.2;
   box-shadow:0 6px 16px rgba(0,0,0,0.12);
   opacity:0;
   transition:opacity .18s ease;
   pointer-events:none;
-  z-index:50;
+  z-index:9999;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;

@@ -71,6 +71,32 @@
     }
     .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
 
+
+    /* === iPhone横: メニューを1画面に収める（スクロール不要） === */
+    @media (orientation: landscape) and (max-height: 430px){
+      .menu-card{
+        width: min(720px, 98vw);
+        max-height: calc(100dvh - 10px);
+        padding: 10px;
+        gap: 6px;
+        overflow: hidden; /* 1画面に収める */
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      }
+      .menu-card h1{ font-size: 16px; margin: 0 0 4px; }
+      .menu-btn{ padding: 8px; border-radius: 14px; gap: 10px; }
+      .badge{ flex: 0 0 30px; height: 30px; border-radius: 10px; font-size: 16px; }
+      .menu-text .title{ font-size: 14px; margin-bottom: 1px; }
+      .menu-text small{ font-size: 10px; }
+
+      /* 上段: メニュー項目を2列で詰める */
+      .menu-main{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .menu-main .menu-btn{ width: 100%; }
+
+      /* 下段: モード/はやさを圧縮して必ず見える */
+      .mode-select{ margin-top: 6px; padding-top: 6px; }
+      .mode-pill{ padding: 5px 10px; font-size: 10px; }
+    }
+
     /* ゲームUI */
     #score-panel, #timer-panel {
       position: fixed; z-index: 90; background: rgba(255,255,255,0.85);
@@ -308,6 +334,7 @@ body.playing #menu-overlay{ display:none; }
       <h1 style="margin-bottom: 2px;">🪕 ゲームメニュー</h1>
       
       <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
+        <div class="menu-main">
         <button class="menu-btn mode1" onclick="prepGame('scale')">
           <div class="badge">🐤</div>
           <div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
@@ -324,7 +351,8 @@ body.playing #menu-overlay{ display:none; }
           <div class="badge">🦁</div>
           <div class="menu-text"><div class="title">曲：きらきら星</div><small>メロディ＋コード</small></div>
         </button>
-      
+        </div>
+
         <div id="song-speed-wrap" style="margin-top:-2px; margin-left:54px; display:flex; flex-direction:column; gap:6px;">
           <div style="font-size:11px; font-weight:900; opacity:.85;">曲スピード</div>
           <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start;">
@@ -334,9 +362,9 @@ body.playing #menu-overlay{ display:none; }
           </div>
           <div id="song-speed-note" style="font-size:11px; opacity:.75;">（曲中はスピード変化なし）</div>
         </div>
-</div>
 
-      <div class="mode-select">
+      </div>
+<div class="mode-select">
         <div class="mode-pills">
           <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
           <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">まちモード</div>

@@ -262,6 +262,13 @@
 
   body:not(.isMenu) .verBadge{ display:none; }
 
+
+// === INIT (safe) ===
+window.addEventListener('load', ()=>{
+  try{ goMenu(); }catch(e){}
+  try{ bindSongSpeedUI(); }catch(e){}
+});
+
 /* === PAGE_FLIP_TRANSITION v1 (shared) === */
 #pageFlip{
   position: fixed;
@@ -298,9 +305,24 @@
   #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
 }
 
+
+
+/* ===== CLICK FIX (menu always clickable) ===== */
+body.menuOpen #gameCanvas{ pointer-events:none; }
+body.menuOpen #menu-overlay{ display:flex; z-index:10000; pointer-events:auto; }
+body.menuOpen #menu-overlay *{ pointer-events:auto; }
+body.playing #menu-overlay{ display:none; }
+
+#back-btn{ display:none !important; }
+
+
+/* v7: hide top-left badges/buttons */
+.verBadge{display:none !important;}
+#back-btn{display:none !important;}
+
 </style>
 </head>
-<body>
+<body class="menuOpen">
 
 <div id="app">
   <div id="menu-overlay">
@@ -324,7 +346,17 @@
           <div class="badge">🦁</div>
           <div class="menu-text"><div class="title">曲：きらきら星</div><small>メロディ＋コード</small></div>
         </button>
-      </div>
+      
+        <div id="song-speed-wrap" style="margin-top:-2px; margin-left:54px; display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:11px; font-weight:900; opacity:.85;">曲スピード</div>
+          <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start;">
+            <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
+            <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
+            <div class="mode-pill" data-ss="FAST">はやい</div>
+          </div>
+          <div id="song-speed-note" style="font-size:11px; opacity:.75;">（曲中はスピード変化なし）</div>
+        </div>
+</div>
 
       <div class="mode-select">
         <div class="mode-pills">
@@ -380,6 +412,92 @@
 </div>
 
 <script>
+
+// ===== MENU CLICK FIX =====
+// Some environments fail to trigger inline onclick reliably (especially with overlays/WebView).
+// We force a reliable event delegation and a menuOpen body class that disables canvas pointer events.
+(function(){
+  const body = document.body;
+  const menu = document.getElementById('menu-overlay');
+  if (!body || !menu) return;
+
+  // Start in menu state
+  body.classList.add('menuOpen');
+
+  function handler(ev){
+    const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+    if (!btn) return;
+    const oc = btn.getAttribute('onclick') || '';
+    let m = oc.match(/prepGame\('([^']+)'\)/);
+    if (m && typeof window.prepGame === 'function'){
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.prepGame(m[1]);
+      return;
+    }
+    // fallback: evaluate inline handlers for other buttons
+    if (oc){
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { Function(oc).call(btn); } catch(e) {}
+    }
+  }
+
+  menu.addEventListener('pointerup', handler, true);
+  menu.addEventListener('click', handler, true);
+
+  // Wrap goMenu / prepGame to toggle menuOpen state reliably
+  const _prep = window.prepGame;
+  if (typeof _prep === 'function'){
+    window.prepGame = function(mode){
+      body.classList.remove('menuOpen');
+      return _prep.call(this, mode);
+    };
+  }
+  const _goMenu = window.goMenu;
+  if (typeof _goMenu === 'function'){
+    window.goMenu = function(){
+      body.classList.add('menuOpen');
+      return _goMenu.call(this);
+    };
+  }
+})();
+
+
+// ===== SONG SPEED PRESET (曲モード：最初にスピード固定) =====
+const SONG_SPEED_KEY = 'uk_song_speed_v1';
+// 曲モードは「弾ける間隔」を優先して少し遅めに（8分アルペジオ想定）
+const SONG_SPEED_PRESETS = { SLOW: 2.35, NORMAL: 2.75, FAST: 3.15 }; // speedBase before BASE_SPEED_MULT
+function getSongSpeedId(){
+  try{
+    const v = localStorage.getItem(SONG_SPEED_KEY);
+    return (v && SONG_SPEED_PRESETS[v]) ? v : 'SLOW';
+  }catch(e){ return 'SLOW'; }
+}
+function setSongSpeedId(id){
+  if(!SONG_SPEED_PRESETS[id]) id='SLOW';
+  try{ localStorage.setItem(SONG_SPEED_KEY, id); }catch(e){}
+  // UI reflect
+  const wrap = document.getElementById('song-speed-pills');
+  if(wrap){
+    [...wrap.querySelectorAll('.mode-pill')].forEach(p=>p.classList.toggle('active', p.dataset.ss===id));
+  }
+}
+function getSongSpeedBase(){
+  return SONG_SPEED_PRESETS[getSongSpeedId()] || SONG_SPEED_PRESETS.NORMAL;
+}
+function bindSongSpeedUI(){
+  const wrap = document.getElementById('song-speed-pills');
+  if(!wrap) return;
+  wrap.addEventListener('click', (ev)=>{
+    const pill = ev.target.closest('.mode-pill');
+    if(!pill) return;
+    setSongSpeedId(pill.dataset.ss);
+  });
+  // init
+  setSongSpeedId(getSongSpeedId());
+}
+
 // ===== 基本設定 =====
 const BASE_SPEED_MULT = 1.5; // 全体のベース速度倍率
 const SPEEDUP_MULT = 1.7;     // スピードアップ倍率
@@ -703,7 +821,8 @@ let isSongMode = false;
 let waitHold = false;
 let waitTargetGroup = null;
 let comboStreak = 0;
-let speedLevel = 0; // 旧ロジック用（温存）
+let speedLevel = 0;
+let disableSpeedUpActive = false; // 旧ロジック用（温存）
 let speedBoosted = false;      // 5連続 or 8音ノーミスで1.7倍にしたか
 let scaleSeqCount = 0;         // scaleで「doからdo2まで」ノーミスカウント
 let scaleSpeedBoosted = false; // scale専用
@@ -725,11 +844,41 @@ function flashScreen(){
 }
 
 function updateComboUI(){ /* disabled */ }
+
+// --- Panda hint (FX layer only; does NOT affect gameplay) ---
+const PANDA_HINT_ENABLED = true; // false で完全無効
+
+const _PANDA_LINES = [
+  "あわてなくて大丈夫",
+  "今のは気にしない",
+  "次いこう、次",
+  "リズムはそのまま",
+  "ゆっくりでOK"
+];
+
+function showPandaHint(msg){
+  if(!PANDA_HINT_ENABLED) return;
+  const el = document.getElementById('pandaHint');
+  if(!el) return;
+  el.textContent = "🐼 " + msg;
+  el.style.opacity = "1";
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 1200);
+}
+
 function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
   el.textContent = text;
-  el.classList.remove('hit','miss','speed','mega','show');
+  
+  // PANDA_HINT@MISS: show only AFTER miss is decided (FX layer)
+  if(PANDA_HINT_ENABLED && kind === 'miss'){
+    try{
+      const line = _PANDA_LINES[Math.floor(Math.random()*_PANDA_LINES.length)];
+      showPandaHint(line);
+    }catch(e){}
+  }
+el.classList.remove('hit','miss','speed','mega','show');
   el.style.display = 'block';
   if(kind) el.classList.add(kind);
   if(opts.mega) el.classList.add('mega');
@@ -786,16 +935,146 @@ const SOLO_LIB = {
   'si':  { name:'シ', targetIdx:0, fingers:[{s:1,f:2,txt:'中'}]},
   'do2': { name:'ド', targetIdx:0, fingers:[{s:1,f:3,txt:'薬'}]}
 };
-const SONG_DATA = [
-  {lib:CHORD_LIB,key:'C',lyrics:"きら"},{lib:SOLO_LIB,key:'do',lyrics:""},
-  {lib:CHORD_LIB,key:'C',lyrics:"きら"},{lib:SOLO_LIB,key:'so',lyrics:""},
-  {lib:CHORD_LIB,key:'F',lyrics:"ひか"},{lib:SOLO_LIB,key:'la',lyrics:""},
-  {lib:CHORD_LIB,key:'C',lyrics:"るー"},{lib:SOLO_LIB,key:'so',lyrics:""},
-  {lib:CHORD_LIB,key:'G7',lyrics:"おそ"},{lib:SOLO_LIB,key:'fa',lyrics:""},
-  {lib:CHORD_LIB,key:'C',lyrics:"らの"},{lib:SOLO_LIB,key:'mi',lyrics:""},
-  {lib:CHORD_LIB,key:'G7',lyrics:"ほし"},{lib:SOLO_LIB,key:'re',lyrics:""},
-  {lib:CHORD_LIB,key:'C',lyrics:"よー"},{lib:SOLO_LIB,key:'do',lyrics:""}
+const CHORD_SHAPES_AECG = {
+  // A→E→C→G で統一（先生のコード表に準拠）
+  'C':  { name:'C',  frets:{A:3,E:0,C:0,G:0}, fingers:{A:'薬',E:'',C:'',G:''} },
+  'F':  { name:'F',  frets:{A:0,E:1,C:0,G:2}, fingers:{A:'',E:'人',C:'',G:'中'} },
+  'G7': { name:'G7', frets:{A:2,E:1,C:2,G:0}, fingers:{A:'薬',E:'人',C:'中',G:''} },
+};
+
+function chordToTextAEGC(ch){
+  const s = CHORD_SHAPES_AECG[ch];
+  if(!s) return '';
+  // 表示は A→E→C→G（ユーザー指定）／開放弦も「0」で必ず表示
+  const fmt = (f, finger) => (f===0 ? '0' : `${f}${finger||''}`);
+  const L = [
+    `[${s.name}]`,
+    `A: ${fmt(s.frets.A, s.fingers.A)}`,
+    `E: ${fmt(s.frets.E, s.fingers.E)}`,
+    `C: ${fmt(s.frets.C, s.fingers.C)}`,
+    `G: ${fmt(s.frets.G, s.fingers.G)}`,
+  ];
+  return L.join('\n');
+}
+
+// --- 曲(タブ譜)用：その8分で鳴らす弦だけ「指(薬/中/人)」+ 開放弦は「0」を同時に流す ---
+// ChordGroup は chord.fingers のみ描画するため、ここで「0(開放)」も fingers に含める。
+function chordObjForPick(chordName, pick){
+  // pick: {A:0, E:0, C:0, G:0} のように「その8分で鳴らす弦だけ」が入る
+  const shape = CHORD_SHAPES_AECG[chordName];
+  const sidx = {A:1, E:2, C:3, G:4};
+  const fingers = [];
+  if(!pick) pick = {};
+  // A→E→C→G の順に並べる（表示・流れが分かりやすい）
+  for(const k of ['A','E','C','G']){
+    if(pick[k] === undefined) continue; // この8分で鳴らさない弦は出さない
+    const f = pick[k];
+    if(f === 0){
+      // 開放弦も「0」を“薬などと一緒に”同じタイミングで流す
+      fingers.push({s: sidx[k], f: 0, txt: '0'});
+    }else{
+      // 押弦はコード表の指（人/中/薬）を優先。無ければフレット番号だけ出す。
+      const ft = (shape && shape.fingers && shape.fingers[k]) ? shape.fingers[k] : '';
+      fingers.push({s: sidx[k], f: f, txt: ft || String(f)});
+    }
+  }
+  return { name: chordName, targetIdx: 0, fingers };
+}
+
+// きらきら星：先生タブ譜（8分×8）をそのまま「コード保持＋弾弦(Pick)」として流す
+// 表示は A→E→C→G（0=開放）で固定。Pick はその8分で鳴らす弦だけ表示します。
+const KIRAKIRA_TAB_BLOCKS = [
+  // 1) C → F → C
+  { A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
+  // 2) G7 → C → G7 → C
+  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  // 3) C → G7 → C → G7
+  { A:"--3-----2-----3-----2----", E:"--0-----1--1--0--0--1----", C:"--0-----2-----0-----2----", G:"--0--0--------0-----0----" },
+  // 4) G7 → C → G7 → C
+  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  // 5) C → F → C
+  { A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
+  // 6) G7 → C → G7 → C
+  { A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
 ];
+
+function _tabEventCols(block){
+  const L = block.A.length;
+  const cols = [];
+  for(let i=0;i<L;i++){
+    const a=block.A[i], e=block.E[i], c=block.C[i], g=block.G[i];
+    if((a>='0'&&a<='9') || (e>='0'&&e<='9') || (c>='0'&&c<='9') || (g>='0'&&g<='9')){
+      cols.push(i);
+    }
+  }
+  return cols;
+}
+function _tabNotesAt(block, col){
+  const out = {};
+  const a=block.A[col], e=block.E[col], c=block.C[col], g=block.G[col];
+  if(a>='0'&&a<='9') out.A = parseInt(a,10);
+  if(e>='0'&&e<='9') out.E = parseInt(e,10);
+  if(c>='0'&&c<='9') out.C = parseInt(c,10);
+  if(g>='0'&&g<='9') out.G = parseInt(g,10);
+  return out;
+}
+function _detectChordFromNotes(notes){
+  // 複数弦が出る列（=フォームが見える）だけで推定。単弦列は直前コードを保持。
+  const hasA = (notes.A!==undefined), hasE=(notes.E!==undefined), hasC=(notes.C!==undefined), hasG=(notes.G!==undefined);
+  const count = (hasA?1:0)+(hasE?1:0)+(hasC?1:0)+(hasG?1:0);
+  if(count < 3) return null;
+  // 既知の3コードだけ（今回の譜面範囲）
+  // C: A3 E0 C0 G0
+  if((notes.A===3) && (notes.E===0) && (notes.C===0) && (notes.G===0)) return 'C';
+  // F: A0 E1 C0 G2
+  if((notes.A===0) && (notes.E===1) && (notes.C===0) && (notes.G===2)) return 'F';
+  // G7: A2 E1 C2 (Gは0か省略)
+  if((notes.A===2) && (notes.E===1) && (notes.C===2)) return 'G7';
+  return null;
+}
+function _pickText(notes){
+  // A→E→C→G 順。0も表示（開放でも弾くなら0を出す）
+  // 「C」がコード名と紛らわしいので、弦は 1A/2E/3C/4G の表記にする
+  const parts = [];
+  if(notes.A!==undefined) parts.push(`1A${notes.A}`);
+  if(notes.E!==undefined) parts.push(`2E${notes.E}`);
+  if(notes.C!==undefined) parts.push(`3C${notes.C}`);
+  if(notes.G!==undefined) parts.push(`4G${notes.G}`);
+  return parts.length ? parts.join(' ') : '-';
+}
+
+function buildKirakiraFromTabBlocks(blocks){
+  const out = [];
+  let currentChord = 'C'; // 先頭はCから始まる
+  for(const block of blocks){
+    const cols = _tabEventCols(block);
+    // 先生譜面は 8分×8 を想定。今回のASCIIは「数字がある列」=発音タイミングで、
+    // 最後の8分が休符になることがある（colsが7個）。8個に満たない分は休符として埋めます。
+    const steps = [];
+    for(let i=0;i<8;i++){
+      if(i < cols.length){
+        const notes = _tabNotesAt(block, cols[i]);
+        const det = _detectChordFromNotes(notes);
+        if(det) currentChord = det;
+        steps.push({ chord: currentChord, pick: notes });
+      }else{
+        steps.push({ chord: currentChord, pick: {} });
+      }
+    }
+    // データ化：1ステップ=1ノート（8分）
+    for(const st of steps){
+      const chordTxt = chordToTextAEGC(st.chord);
+      const pickTxt = _pickText(st.pick);
+      out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: `${chordTxt}\nPick: ${pickTxt}` });
+    }
+  }
+  return out;
+}
+
+const SONG_DATA = buildKirakiraFromTabBlocks(KIRAKIRA_TAB_BLOCKS);
+
+
+
 
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
 let currentLevelChords = [];
@@ -825,6 +1104,7 @@ function setMode(el, mode){
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
+  try{ document.body.classList.remove('playing'); document.body.classList.add('menuOpen'); }catch(e){}
   if(rafId) cancelAnimationFrame(rafId);
   gameState = 'MENU';
   try{ document.body.classList.add('isMenu'); }catch(e){}
@@ -861,6 +1141,7 @@ function resumeGame(){
 
 // --- ゲーム開始フロー ---
 async function prepGame(type){
+  try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
   // タップモードならマイク不要
   if(playMode === 'TAP'){ startGameByType(type); return; }
 
@@ -908,7 +1189,7 @@ function startGameByType(type){
   if(type==='scale') initGame('scale', null, {speedBase:3.4});
   else if(type==='easy') initGame('practice', ['C','F','G7','Am'], {speedBase:3.2});
   else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7'], {speedBase:3.35});
-  else if(type==='song') initGame('song', 'きらきら星', {speedBase:3.45});
+  else if(type==='song') initGame('song', 'きらきら星', {speedBase:getSongSpeedBase(), disableSpeedUp:true});
 }
 
 function restartLast(){
@@ -937,13 +1218,26 @@ function initGame(mode, levelData, opts){
   resetSpeedState();
   gameMode = mode;
   isSongMode = (mode==='song');
+  disableSpeedUpActive = !!(opts && opts.disableSpeedUp) || isSongMode;
   currentLevelChords = levelData || [];
   practiceIndex=0; scaleIndex=0; songIndex=0;
-  spawnInterval = 2800; // 全モード共通（ドレミファも曲も）
+  spawnInterval = 2800; // デフォルト
+  if(isSongMode){
+    // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
+    const sid = getSongSpeedId();
+    spawnInterval = (sid==='SLOW') ? 950 : (sid==='FAST') ? 650 : 800;
+  }
 
   document.getElementById('score').innerText="0";
   document.getElementById('lyrics-area').innerText="";
-  gameEndAt = performance.now() + 60000;
+  // 曲モードは「曲が終わったら終了」なので時間制限なし
+  if(isSongMode){
+    gameEndAt = null;
+    document.getElementById('timer-panel').style.display='none';
+  }else{
+    document.getElementById('timer-panel').style.display='block';
+    gameEndAt = performance.now() + 60000;
+  }
 
   // 感度リセット
   prevRms = NOISE_RMS;
@@ -959,8 +1253,8 @@ function gameLoop(time){
   if(!lastFrameT) lastFrameT=time;
   lastFrameT=time;
 
-  // タイマー
-  if(!waitHold){
+  // タイマー（曲モードは時間制限なし）
+  if(gameEndAt!=null && !waitHold){
     const rem = Math.max(0, gameEndAt - performance.now());
     document.getElementById('timer').innerText = Math.ceil(rem/1000);
     if(rem<=0) { endGame(); return; }
@@ -978,7 +1272,7 @@ function gameLoop(time){
     if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
       if(isSongMode){
         const d = SONG_DATA[songIndex % SONG_DATA.length];
-        groups.push(new ChordGroup(d.lib[d.key], d.lyrics));
+        groups.push(new ChordGroup(d.chord ? d.chord : (d.lib[d.key]), d.lyrics));
         songIndex++;
       } else if(gameMode==='scale'){
         const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
@@ -1020,11 +1314,17 @@ function gameLoop(time){
     if(groups[i].x < -300) groups.splice(i,1);
   }
 
+  // 曲モード：最後まで流れ切ったら終了（60秒打ち切り無し）
+  if(isSongMode && songIndex >= SONG_DATA.length && groups.length===0){
+    endGame();
+    return;
+  }
+
   
   // 自動MISS：判定位置を通過したら（タップしなくても）MISS扱い
-  if(!waitHold && target && target.active){
+  if(!waitHold && target && target.active && target.entered){
     const win = 110; // handleActionと同じ判定窓
-    if(target.x < (NUT_X - win) && !target._autoMissed){
+    if(target.getAnchorX() < (NUT_X - win) && !target._autoMissed){
       target._autoMissed = true;
 
       // 連続・速度リセット＆MISS演出（“おちついて”＋flash）
@@ -1063,6 +1363,7 @@ function gameLoop(time){
 }
 
 function endGame(){
+  try{ document.body.classList.remove('playing'); }catch(e){}
   gameState='RESULT';
   cancelAnimationFrame(rafId);
   document.getElementById('result-score').innerText = score;
@@ -1136,7 +1437,7 @@ function handleAction(){
 
           if(scaleSeqCount >= 8){
             scaleSpeedBoosted = true;
-            currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT;
+            if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
             if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
             flashScreen();
@@ -1157,7 +1458,7 @@ function handleAction(){
         // practice/songは「5連続HITで1.7倍」
         if(!speedBoosted && comboStreak >= 5){
           speedBoosted = true;
-          currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT;
+          if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
           if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
           flashScreen();
@@ -1199,18 +1500,79 @@ class ChordGroup {
   constructor(chord, lyrics){
     this.chord=chord; this.lyrics=lyrics;
     this.x = canvas.width+120; this.active=true; this.ticked=false; this.isTarget=false;
+    // spawn-guard: prevent immediate auto-miss right after spawn
+    this.born = performance.now();
+    this.entered = false;
   }
-  update(){ this.x -= scrollSpeed; if(!this.ticked && this.x<=NUT_X){ if(this.lyrics) document.getElementById('lyrics-area').innerText=this.lyrics; this.ticked=true; } }
+  update(){
+    this.x -= scrollSpeed;
+    // mark as 'entered' after it actually started moving on screen
+    if(!this.entered && this.x < (canvas.width - 40)) this.entered = true;
+    if(!this.ticked && this.x<=NUT_X){ if(this.lyrics) document.getElementById('lyrics-area').innerText=this.lyrics; this.ticked=true; }
+  }
+  getAnchorX(){
+    // Visual anchor for timing: leftmost displayed circle X (accounts for open-string shifting rule)
+    const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+    const fretsAll = this.chord.fingers.map(f=>f.f);
+    const maxF = Math.max(...fretsAll);
+    const minF = Math.min(...fretsAll);
+    const hasOpen = (minF === 0);
+    const hasPressed = (maxF > 0);
+    const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
+    const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
+
+    const fretCenterX = (baseX, fret)=>{
+      if(fret > 0) return baseX + (fret*fw) - (fw/2);
+      if(shiftOpenToLeftMostPressed && fret === 0){
+        return baseX + (minPressed*fw) - (fw/2);
+      }
+      return baseX;
+    };
+
+    let minX = Infinity;
+    for(const fg of this.chord.fingers){
+      const x = fretCenterX(this.x, fg.f);
+      if(x < minX) minX = x;
+    }
+    return minX;
+  }
+
   draw(){
     if(!this.active) return;
     const cy = canvas.height/2;
     const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
-    
-    // ガイド（ターゲット時）
+
+    // --- ルール：開放弦(0)の表示位置 ---
+    // ユーザー要望：
+    // - メインの押弦（人/中/薬）と同時に鳴る開放弦(0)は、ナット(フック)ではなく
+    //   「1フレット分フック寄り（＝1Fの位置）」に寄せて流す。
+    // - 判定/ガイドも同じ位置に合わせる（補助の薄い判定がバラバラにならないように）。
+    // ここでは「0だけ」位置をズラし、押弦(>=1)は正しいフレット位置のまま。
+    const fretsAll = this.chord.fingers.map(f=>f.f);
+    const maxF = Math.max(...fretsAll);
+    const minF = Math.min(...fretsAll);
+    const hasOpen = (minF === 0);
+    const hasPressed = (maxF > 0);
+    // 0(開放)の表示位置ルール：
+    // 押弦が同時にある場合は「一番左(最小)の押弦フレット位置」に0を合わせる（表示は0のまま）
+    const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
+    const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
+
+    const fretCenterX = (baseX, fret)=>{
+      if(fret > 0) return baseX + (fret*fw) - (fw/2);
+      if(shiftOpenToLeftMostPressed && fret === 0){
+        // 0を「最小押弦フレット中心」へ寄せる（判定/ガイドも同じルール）
+        return baseX + (minPressed*fw) - (fw/2);
+      }
+      return baseX; // 開放のみの場合はナット
+    };
+const fretToX = (fret)=> fretCenterX(this.x, fret);
+// ガイド（ターゲット時）
     if(this.isTarget && Math.abs(this.x-NUT_X)<620){
       const t = Math.max(0, 1 - Math.abs(this.x-NUT_X)/620);
       this.chord.fingers.forEach(f=>{
-        const fx = f.f===0 ? NUT_X : NUT_X+(f.f*fw)-(fw/2);
+        // ガイドは「判定ライン(NUT_X)上」で表示する
+        const fx = fretCenterX(NUT_X, f.f);
         const fy = cy + (f.s-2.5)*75;
         drawCircle(fx, fy, f.txt, 32+t*10, 0.2+t*0.6, true);
       });
@@ -1219,14 +1581,14 @@ class ChordGroup {
     // 本体
     const blink = (waitHold && waitTargetGroup===this) ? (0.5+0.5*Math.sin(performance.now()/100)) : 1.0;
     this.chord.fingers.forEach(f=>{
-      const fx = f.f===0 ? this.x : this.x+(f.f*fw)-(fw/2);
+      const fx = fretToX(f.f);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
     // スケール名
     if(gameMode==='scale'){
       const tf = this.chord.fingers[0];
-      const nx = tf.f===0 ? this.x : this.x+(tf.f*fw)-(fw/2);
+      const nx = fretCenterX(this.x, tf.f);
 
       // iPhone横でも上で切れないよう、ネック内（上端から少し下）に固定
       ctx.save();
@@ -1312,6 +1674,13 @@ function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){
 try{ document.body.classList.add('isMenu'); }catch(e){}
 
 
+
+// === INIT (safe) ===
+window.addEventListener('load', ()=>{
+  try{ goMenu(); }catch(e){}
+  try{ bindSongSpeedUI(); }catch(e){}
+});
+
 /* === PAGE_FLIP_TRANSITION v1 (shared) === */
 let __navLock = false;
 function goFlip(url){
@@ -1335,6 +1704,30 @@ window.addEventListener('pageshow', ()=>{
 <div class="verBadge">v2</div>
 
 <div id="pageFlip" aria-hidden="true"></div>
+
+
+<div id="pandaHint" aria-live="polite" style="
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:8px;
+  max-width:92vw;
+  padding:8px 12px;
+  border-radius:16px;
+  background:rgba(255,255,255,0.88);
+  color:#111;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.2;
+  box-shadow:0 6px 16px rgba(0,0,0,0.12);
+  opacity:0;
+  transition:opacity .18s ease;
+  pointer-events:none;
+  z-index:50;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+"></div>
 
 </body>
 </html>

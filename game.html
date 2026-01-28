@@ -880,7 +880,7 @@ function showPandaHint(msg){
   el.textContent = "🐼 " + msg;
   el.style.opacity = "1";
   clearTimeout(el._t);
-  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 2200);
+  el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 3000);
 }
 
 function showFx(text, kind, opts = {}){
@@ -905,7 +905,7 @@ el.classList.remove('hit','miss','speed','mega','show');
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
     el.style.display = 'none';
-  }, opts.durationMs || 2200);
+  }, opts.durationMs || 3200);
 }
 
 function resetSpeedState(){
@@ -1380,7 +1380,7 @@ function gameLoop(time){
 
       // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
-      showFx(missMsg, 'miss', { durationMs: 980 });
+      showFx(missMsg, 'miss', { durationMs: 2600 });
 
       // iPhoneはDOM更新が重く感じることがあるので、🐼は控えめ（PCでは従来どおり）
       try{ if(!IS_IOS && typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
@@ -1527,7 +1527,7 @@ function handleAction(){
 
       // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
-      showFx(missMsg, 'miss', { durationMs: 980 });
+      showFx(missMsg, 'miss', { durationMs: 2600 });
       try{ if(typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
       /* burstStars disabled v26 (perf) */
 if(playMode==='WAIT' || playMode==='TAP'){
@@ -1662,25 +1662,84 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
-    // コード名（C/F/G7...）をノーツと一緒に流す（中央HUDは使わない）
-    {
-      const nx = this.getAnchorX ? this.getAnchorX() : this.x;
+    // 表示：スケール(ドレミ)は「弦ごと」に大きく、コードは「手前に大きく」流す（中央HUDは使わない）
+    const nm = (this.chord && this.chord.name) ? this.chord.name : "";
+    if(nm){
+      const fw2 = fw;
+      // どのモードか
+      const isScale = (gameMode === 'scale');
+      const isCodeMode = (gameMode === 'practice' || isSongMode);
 
-      ctx.save();
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = "#fff";
-      const isSmallH = (window.innerHeight && window.innerHeight < 520);
-      ctx.font = (isSmallH ? "bold 22px sans-serif" : "bold 26px sans-serif");
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      const neckTop = (canvas.height/2) - 150;
-      const labelY = neckTop + 6;
-      const nm = (this.chord && this.chord.name) ? this.chord.name : "";
-      if(nm) ctx.fillText(nm, nx, labelY);
-      ctx.restore();
-    }
+      if(isScale){
+        // スケール：各弦の指の近くに表示
+        // 1弦(A)は下、2/3/4弦(E/C/G)は上（ユーザー指定）
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 6;
+        const isSmallH = (window.innerHeight && window.innerHeight < 520);
+        ctx.font = (isSmallH ? "900 30px system-ui, -apple-system, sans-serif" : "900 34px system-ui, -apple-system, sans-serif");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // chord.fingers は s=1..4。1弦(A)=s:1
+        for(const f of this.chord.fingers){
+          const fx = fretToX(f.f);
+          const fy = cy + (f.s-2.5)*75;
+          const yOff = (f.s===1) ? 66 : -66;
+          const ty = fy + yOff;
+          ctx.strokeText(nm, fx, ty);
+          ctx.fillText(nm, fx, ty);
+        }
+        ctx.restore();
+      }
+
+      if(isCodeMode && !isScale){
+        // コード：ノーツの「少し手前」に大きめ表示（縦ラインに合わせず、文字先頭で次のコード感）
+        const ax = this.getAnchorX ? this.getAnchorX() : this.x;
+        const lead = Math.max(18, fw2*0.65);  // 手前量
+        const nx = ax + lead;
+
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.32)";
+        ctx.lineWidth = 6;
+        const isSmallH = (window.innerHeight && window.innerHeight < 520);
+        ctx.font = (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif");
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        const neckTop = (canvas.height/2) - 150;
+        const labelY = neckTop + 52; // 少し下げて見切れにくく
+        // 背景プレート（軽量・可読性UP）
+        const padX = 10, padY = 6;
+        const tw = ctx.measureText(nm).width;
+        const bx = nx - padX;
+        const by = labelY - 28 - padY;
+        const bw = tw + padX*2;
+        const bh = 34 + padY*2;
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        const r = 10;
+        ctx.moveTo(bx+r, by);
+        ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
+        ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
+        ctx.arcTo(bx, by+bh, bx, by, r);
+        ctx.arcTo(bx, by, bx+bw, by, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeText(nm, nx, labelY);
+        ctx.fillText(nm, nx, labelY);
+        ctx.restore();
+      }
     }
   }
+}
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   ctx.save(); ctx.globalAlpha=alpha;
   if(blur) ctx.filter="blur(2px)";

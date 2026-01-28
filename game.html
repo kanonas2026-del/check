@@ -261,6 +261,43 @@
 }
 
   body:not(.isMenu) .verBadge{ display:none; }
+
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+#pageFlip{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  display: none;
+  perspective: 900px;
+}
+#pageFlip::before{
+  content:"";
+  position:absolute;
+  inset: -6vh -8vw;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,0.00) 0%,
+      rgba(255,255,255,0.65) 35%,
+      rgba(255,255,255,0.98) 62%,
+      rgba(255,255,255,1.00) 100%);
+  box-shadow: -18px 0 45px rgba(0,0,0,0.18);
+  transform-origin: right center;
+  transform: translateX(110%) rotateY(-35deg);
+  border-left: 1px solid rgba(0,0,0,0.08);
+}
+#pageFlip.run::before{
+  animation: pageFlipIn 320ms ease-out forwards;
+}
+@keyframes pageFlipIn{
+  0%   { transform: translateX(110%) rotateY(-35deg); opacity: 0.0; }
+  25%  { opacity: 1.0; }
+  100% { transform: translateX(0%) rotateY(0deg); opacity: 1.0; }
+}
+@media (prefers-reduced-motion: reduce){
+  #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
+}
+
 </style>
 </head>
 <body>
@@ -297,7 +334,7 @@
         </div>
       </div>
       
-      <button class="action-btn btn-secondary" onclick="location.href='index.html'" style="margin-top:10px;">🏝️ TOPへもどる</button>
+      <button class="action-btn btn-secondary" onclick="goFlip('index.html')" style="margin-top:10px;">🏝️ TOPへもどる</button>
     </div>
   </div>
 
@@ -378,6 +415,10 @@ const STAGE = Object.freeze({
   LABEL_FONT: "bold 16px sans-serif",
   NUT_BLOCK_W: 18,
   NUT_BLOCK_OVER: 6,
+  FRET_HINTS: Object.freeze([1,3,5,7,10,12]),
+  FRET_HINT_FONT: "700 13px sans-serif",
+  FRET_HINT_COLOR: "rgba(255,255,255,0.62)",
+  FRET_HINT_Y_PAD:  2,
 });
 
 function stageGeom(canvas){
@@ -470,7 +511,41 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // strings + left labels
+  // teacher fret hints (inside neck top edge)
+  (function(){
+    ctx.save();
+    const born = (window.__fretHintBorn ?? (window.__fretHintBorn = performance.now()));
+    const dt = performance.now() - born;
+    // brief "noticeable" pulse on load, then settle subtle
+    const boost = dt < 900 ? (2.2 - 1.2*(dt/900)) : 1.0;
+
+    ctx.font = STAGE.FRET_HINT_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const yTxt = g.y + STAGE.FRET_HINT_Y_PAD;
+
+    const baseA = 0.65; // keep subtle but readable
+    ctx.globalAlpha = Math.min(1, baseA * boost);
+
+    // outline for readability on brown neck
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.28)";
+    ctx.fillStyle = STAGE.FRET_HINT_COLOR;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    for (const n of STAGE.FRET_HINTS){
+      if (n < 1 || n > STAGE.FRET_COUNT) continue;
+      const x = nutX + g.fretW * n;
+      const s = String(n);
+      ctx.strokeText(s, x, yTxt);
+      ctx.strokeText(s, x, yTxt);
+      ctx.fillText(s, x, yTxt);
+      }
+    ctx.restore();
+  })();
+
+// strings + left labels
   const labs = ['1A','2E','3C','4G'];
   for(let i=0;i<4;i++){
     const y = cy + (i-1.5) * STAGE.LANE_DY;
@@ -1235,7 +1310,31 @@ function nudge(){ try{ window.scrollTo(0, 1); }catch(e){} setTimeout(function(){
 
 // __setMenuClassInit
 try{ document.body.classList.add('isMenu'); }catch(e){}
+
+
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+let __navLock = false;
+function goFlip(url){
+  if(__navLock) return;
+  __navLock = true;
+  const ov = document.getElementById('pageFlip');
+  if(!ov){ location.href = url; return; }
+  ov.style.display = 'block';
+  ov.classList.remove('run');
+  void ov.offsetWidth;
+  ov.classList.add('run');
+  setTimeout(()=>{ location.href = url; }, 260);
+}
+window.addEventListener('pageshow', ()=>{
+  __navLock = false;
+  const ov = document.getElementById('pageFlip');
+  if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
+});
+
 </script>
 <div class="verBadge">v2</div>
+
+<div id="pageFlip" aria-hidden="true"></div>
+
 </body>
 </html>

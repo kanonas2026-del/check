@@ -182,11 +182,19 @@
   line-height: 1.02;
   color: #ff3d00;
   will-change: transform, opacity;
+  opacity: 0;
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+#fxMsg.speed{
+  color: #0b5cff;
+  border-color: #0b5cff;
 }
 
 #fxMsg.show{
   display:block;
-  animation: fxFade 0.45s ease-out forwards;
+  opacity:1;
+  transform: translate(-50%, -50%) scale(1.02);
 }
 
 /* BIG COMBO (neck center) */
@@ -214,8 +222,6 @@
 #comboBig.pulse{
   animation: comboPulse 0.38s ease-out;
 }
-@keyframes fxFade{
-  0%{ opacity:0; transform: translate(-50%, -50%) scale(0.98); }
   15%{ opacity:1; transform: translate(-50%, -50%) scale(1.02); }
   100%{ opacity:0; transform: translate(-50%, -50%) scale(1); }
 }
@@ -514,7 +520,8 @@ function bindSongSpeedUI(){
 
 // ===== 基本設定 =====
 const BASE_SPEED_MULT = 1.15; // 全体のベース速度倍率（少しゆっくり）
-const SPEEDUP_MULT = 1.0;     // 途中スピードアップはしない（固定）
+const SPEEDUP_MULT = 1.7;     // 5HITごと加速（practice/scaleのみ）     // 途中スピードアップはしない（固定）
+const PRACTICE_BOOST_CAP = 3; // practice(コード2モード)の5HIT加速は最大3段まで（x1.7, x2.9, x4.9）
 
 const ENABLE_SPEED_UP = false; // speed is selected at start; no mid-song speed-up
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -840,7 +847,8 @@ let waitTargetGroup = null;
 let comboStreak = 0;
 let speedLevel = 0;
 let disableSpeedUpActive = false; // 旧ロジック用（温存）
-let speedBoosted = false;      // 5連続 or 8音ノーミスで1.7倍にしたか
+let speedBoosted = false;
+let practiceBoostCount = 0; // practice(コード2モード)の5HIT加速段数      // 5連続 or 8音ノーミスで1.7倍にしたか
 let scaleSeqCount = 0;         // scaleで「doからdo2まで」ノーミスカウント
 let scaleSpeedBoosted = false; // scale専用
   updateComboUI();
@@ -905,13 +913,14 @@ el.classList.remove('hit','miss','speed','mega','show');
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
     el.style.display = 'none';
-  }, opts.durationMs || 3200);
+  }, (opts.durationMs != null ? opts.durationMs : (kind === "hit" ? 6400 : 3200)) );
 }
 
 function resetSpeedState(){
   comboStreak = 0;
   speedLevel = 0;
   speedBoosted = false;
+  practiceBoostCount = 0;
   scaleSeqCount = 0;
   scaleSpeedBoosted = false;
   currentScrollSpeed = baseScrollSpeed;
@@ -1494,30 +1503,33 @@ function handleAction(){
             /* burstStars disabled v26 (perf) */
 } else {
             // 通常HIT（scaleでも気分が上がる言葉だけ）
-            showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 880 });
+            showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 });
             /* burstStars disabled v26 (perf) */
 }
         } else {
           // 既に加速中
-          showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 820 });
+          showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 });
           /* burstStars disabled v26 (perf) */
 }
 
       } else {
-        // practice/songは「5連続HITで1.7倍」
-        if(!disableSpeedUpActive && !speedBoosted && comboStreak >= 5){
-          speedBoosted = true;
-          if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
+        // practice(コード2モード)は「5連続HITごとに累積加速」 / song(きらきら星)は速度固定
+        const canSpeedUp = (gameMode === 'practice');
+        const hitMilestone = (canSpeedUp && !disableSpeedUpActive && comboStreak > 0 && (comboStreak % 5 === 0));
+        if(hitMilestone){
+          practiceBoostCount = Math.min(practiceBoostCount + 1, PRACTICE_BOOST_CAP);
+          const mult = Math.pow(SPEEDUP_MULT, practiceBoostCount);
+          currentScrollSpeed = baseScrollSpeed * mult;
           if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
           // flashScreen(); // 重いので無効化
-          showFx(`💥 5 COMBO!! 💥\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
+          showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! x${mult.toFixed(1)}`, 'speed', { mega:true, durationMs: 2000 });
           /* burstStars disabled v26 (perf) */
-} else {
+        } else {
           const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
-          showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 900 });
+          showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 });
           /* burstStars disabled v26 (perf) */
-}
+        }
       }
 } else {
       // MISS（早すぎ/遅すぎ）
@@ -1696,34 +1708,54 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       }
 
       if(isCodeMode && !isScale){
-        // コード：ノーツの「少し手前」に大きめ表示（縦ラインに合わせず、文字先頭で次のコード感）
-        const ax = this.getAnchorX ? this.getAnchorX() : this.x;
-        const lead = Math.max(18, fw2*0.65);  // 手前量
-        const nx = ax + lead;
+        // コード表示：
+        // - practice(コード2モード)では「指◯に被らない」ように、弦の上側に大きめで
+        //   かつ「少し手前(右側)」に流す（縦ラインには合わせない）。
+        // - song側の見た目は変えないため、songは従来の小さめ表示のまま。
+        const ax = (this.getAnchorX ? this.getAnchorX() : this.x);
+        const isPractice = (gameMode === 'practice' && !isSongMode);
+
+        // 位置：practice(コード2モード)は「判定ライン寄り（左側）」に寄せて、先にコード名→あとから指◯が来るイメージ
+        // 右→左に流れるので、左側(小さいX)に置くほど「先に通過」します。
+        const lead = isPractice ? Math.max(110, fw2*1.15) : Math.max(18, fw2*0.65);
+        const nx = isPractice
+          ? Math.max(NUT_X + 12, ax - lead)   // 左へ（判定ライン寄り）。画面外に出ないようクランプ
+          : (ax + lead);
 
         ctx.save();
-        ctx.globalAlpha = 0.92;
+        ctx.globalAlpha = isPractice ? 0.96 : 0.92;
         ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "rgba(0,0,0,0.32)";
-        ctx.lineWidth = 6;
+        ctx.strokeStyle = "rgba(0,0,0,0.34)";
+        ctx.lineWidth = isPractice ? 8 : 6;
         const isSmallH = (window.innerHeight && window.innerHeight < 520);
-        ctx.font = (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif");
-        ctx.textAlign = "left";
+        ctx.font = isPractice
+          ? (isSmallH ? "900 34px system-ui, -apple-system, sans-serif" : "900 42px system-ui, -apple-system, sans-serif")
+          : (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif");
+        ctx.textAlign = isPractice ? "center" : "left";
         ctx.textBaseline = "alphabetic";
+
         const neckTop = (canvas.height/2) - 150;
-        const labelY = neckTop + 52; // 少し下げて見切れにくく
-        // 背景プレート（軽量・可読性UP）
-        const padX = 10, padY = 6;
+
+// practice: ネック上（指◯と同じ座標系）で、A弦ラインの少し上に出す（空中に出さない）
+const yA = (canvas.height/2) + (-1.5)*STAGE.LANE_DY; // 1弦(A)のライン
+const labelY = isPractice
+  ? Math.max(neckTop + 18, yA - 26)   // ネック内で少し上
+  : (neckTop + 52);
+
+        // 背景プレート（可読性UP：軽量）
+        const padX = isPractice ? 14 : 10;
+        const padY = isPractice ? 8  : 6;
         const tw = ctx.measureText(nm).width;
-        const bx = nx - padX;
-        const by = labelY - 28 - padY;
+        const bx = (isPractice ? (nx - (tw/2) - padX) : (nx - padX));
+        const by = labelY - (isPractice ? 40 : 28) - padY;
         const bw = tw + padX*2;
-        const bh = 34 + padY*2;
+        const bh = (isPractice ? 46 : 34) + padY*2;
+
         ctx.save();
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = isPractice ? 0.38 : 0.35;
         ctx.fillStyle = "#000";
         ctx.beginPath();
-        const r = 10;
+        const r = isPractice ? 12 : 10;
         ctx.moveTo(bx+r, by);
         ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
         ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);

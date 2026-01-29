@@ -166,24 +166,21 @@
 #fxMsg{
   position: fixed;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  top: calc(env(safe-area-inset-top) + 10px);
+  transform: translateX(-50%);
   z-index: 9999;
   display: none;
   pointer-events: none;
-  padding: 10px 16px 12px;
+  padding: 8px 14px 9px;
   border-radius: 14px;
-  background: rgba(255,255,255,0.92);
-  border: 3px solid #111;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 18px;
   font-weight: 900;
-  font-size: 44px;
+  letter-spacing: 0.4px;
+  max-width: 92vw;
   text-align: center;
-  letter-spacing: 0.5px;
-  line-height: 1.02;
-  color: #ff3d00;
-  will-change: transform, opacity;
-  opacity: 0;
-  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
 }
 
 #fxMsg.speed{
@@ -913,7 +910,7 @@ el.classList.remove('hit','miss','speed','mega','show');
   _fxTimer = setTimeout(()=>{
     el.classList.remove('show','hit','miss','speed','mega');
     el.style.display = 'none';
-  }, (opts.durationMs != null ? opts.durationMs : (kind === "hit" ? 6400 : 3200)) );
+  }, (opts.durationMs != null ? opts.durationMs : (kind === "hit" ? 2600 : 3200)) );
 }
 
 function resetSpeedState(){

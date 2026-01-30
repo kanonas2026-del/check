@@ -165,15 +165,14 @@
     /* FX message (HIT / MISS / SPEED) - comic style (center / bigger) */
 #fxMsg{
   position: fixed;
-  left: 50%;
-  top: calc(env(safe-area-inset-top) + 10px);
-  transform: translateX(-50%);
+  left: 0px; top: 0px;
+  transform: translate(-50%,-50%);
   z-index: 9999;
   display: none;
   pointer-events: none;
   padding: 8px 14px 9px;
   border-radius: 14px;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.45);
   color: #fff;
   font-size: 18px;
   font-weight: 900;
@@ -181,6 +180,7 @@
   max-width: 92vw;
   text-align: center;
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  backdrop-filter: blur(4px);
 }
 
 #fxMsg.speed{
@@ -337,6 +337,72 @@ body.playing #menu-overlay{ display:none; }
 
 /* Hide chord debug HUD (user request) */
 #chordHud{display:none !important;}
+
+    /* menu preview: match "コード かんたん" single-note label style */
+    .menu-text{ display:flex; flex-direction:column; flex: 1 1 auto; min-width:0; }
+    .menu-preview{ margin-top:6px; width:100%; }
+    .scale-mini{
+      --fx: 72px;   /* finger center X */
+      --gap: 18px;  /* gap between label and finger */
+      position: relative;
+      width: 100%;
+      height: 46px;
+      border-radius: 16px;
+      background: rgba(90,60,45,0.30);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+      overflow: hidden;
+    }
+    .scale-mini .nut{
+      position:absolute; left: 12px; top: 7px;
+      width: 10px; height: 32px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.92);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    }
+    .scale-mini .line{
+      position:absolute; left: 22px; right: 10px;
+      height: 4px; border-radius: 4px;
+      opacity: .95;
+    }
+    .scale-mini .line.a{ top: 12px; background: rgba(255,90,90,0.95); }
+    .scale-mini .line.e{ top: 20px; background: rgba(255,230,90,0.95); }
+    .scale-mini .line.c{ top: 28px; background: rgba(120,255,120,0.95); }
+    .scale-mini .line.g{ top: 36px; background: rgba(90,220,255,0.95); }
+
+    .scale-mini .finger{
+      position:absolute;
+      left: var(--fx);
+      top: 28px; /* C string */
+      transform: translate(-50%, -50%);
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(160,160,160,0.95);
+      border: 4px solid rgba(255,255,255,0.98);
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 900;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.22);
+      pointer-events:none;
+    }
+    .scale-mini .label{
+      position:absolute;
+      left: calc(var(--fx) - var(--gap));
+      top: 28px; /* align to C string */
+      transform: translate(-100%, -50%);
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.38);
+      color: #fff;
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 1;
+      white-space: nowrap;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+      pointer-events:none;
+    }
+
 </style>
 </head>
 <body class="menuOpen">
@@ -348,7 +414,10 @@ body.playing #menu-overlay{ display:none; }
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
 <div class="badge">🐤</div>
-<div class="menu-text"><div class="title">ドレミファソラシド</div><small>だんだん速くなるよ</small></div>
+<div class="menu-text">
+  <div class="title">ドレミファソラシド</div>
+  <small>だんだん速くなるよ</small>
+  </div>
 </button>
 <button class="menu-btn mode2" onclick="prepGame('easy')">
 <div class="badge">🐱</div>
@@ -834,6 +903,20 @@ function burstStars(n, x, y, waves=1, waveDelay=120){
   for(let w=1; w<waves; w++) setTimeout(make, waveDelay*w);
 }
 
+
+function getNeckMidY(){
+  // between E and C strings (2 and 3) = neck middle
+  try{ return (canvas.height/2) + (0.0)*STAGE.LANE_DY; }catch(e){ return (window.innerHeight/2); }
+}
+function getFxPointFromGroup(g){
+  try{
+    const x = (g && typeof g.getAnchorX === 'function') ? g.getAnchorX() : (g && g.x != null ? g.x : (NUT_X+260));
+    const y = getNeckMidY();
+    return {x,y};
+  }catch(e){
+    return {x: (typeof NUT_X!=='undefined'? NUT_X+260 : (window.innerWidth*0.45)), y: (window.innerHeight*0.55)};
+  }
+}
 let lastSpawn = 0;
 let scrollSpeed = 3.5;
 let baseScrollSpeed = 3.5;
@@ -856,7 +939,7 @@ const SPEED_STEP = 0.375;   // 1段階の加速量（×1.5）
 const SPEED_MAX_ADD = 2.25; // 上限（×1.5）
 
 let _fxTimer = 0;
-const CHEER_PHRASES = ['その調子！','いいぞ！','ノってる！','キター！','最高！','つづけ！','いける！'];
+const CHEER_PHRASES = ['その調子！','いいぞ！','ナイス！','いい音！','指ばっちり！','リズム完璧！','ノってる！','キター！','最高！','つづけ！','いける！','落ち着いていこう！','今のきれい！'];
 function flashScreen(){
   const f = document.getElementById('screenFlash');
   if(!f) return;
@@ -892,6 +975,18 @@ function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
   el.textContent = text;
+  // place FX on the neck area (do not cover the next-chord label)
+  try{
+    const cx = canvas ? canvas.width : window.innerWidth;
+    const cy2 = canvas ? canvas.height/2 : window.innerHeight/2;
+    const baseX = (typeof NUT_X !== 'undefined') ? (NUT_X + 320) : (cx*0.45);
+    const baseY = (typeof STAGE !== 'undefined' && STAGE.LANE_DY) ? (cy2 + STAGE.LANE_DY*0.9) : (cy2 + 80);
+    const px = (opts.x != null) ? opts.x : baseX;
+    const py = (opts.y != null) ? opts.y : baseY;
+    el.style.left = px + 'px';
+    el.style.top  = py + 'px';
+    el.style.transform = 'translate(-50%,-50%)';
+  }catch(e){}
   
   // PANDA_HINT@MISS: show only AFTER miss is decided (FX layer)
   if(PANDA_HINT_ENABLED && kind === 'miss'){
@@ -1001,7 +1096,26 @@ function chordObjForPick(chordName, pick){
       fingers.push({s: sidx[k], f: f, txt: ft || String(f)});
     }
   }
-  return { name: chordName, targetIdx: 0, fingers };
+    let nm = chordName;
+  if (fingers.length === 1) {
+    try { nm = noteNameForFinger({s: fingers[0].s, f: fingers[0].f}); } catch(e) { nm = chordName; }
+  }
+  return { name: nm, targetIdx: 0, fingers };
+}
+
+
+// --- song用：アルペジオ(単音)の表示名（きらきら星はCメジャー想定） ---
+function _pcToSolfege(pc){
+  const map = {0:"ド",2:"レ",4:"ミ",5:"ファ",7:"ソ",9:"ラ",11:"シ",
+               1:"ド#",3:"レ#",6:"ファ#",8:"ソ#",10:"ラ#"};
+  return map[pc%12] || "?";
+}
+function noteNameForFinger(fg){
+  // fg: {s:1..4, f:fret}
+  const basePCByS = {1:9, 2:4, 3:0, 4:7}; // A,E,C,G with C=0
+  const base = basePCByS[fg.s] ?? 0;
+  const pc = (base + (fg.f|0)) % 12;
+  return _pcToSolfege(pc);
 }
 
 // きらきら星：先生タブ譜（8分×8）をそのまま「コード保持＋弾弦(Pick)」として流す
@@ -1272,6 +1386,7 @@ function initGame(mode, levelData, opts){
 let lastFrameT=0;
 function gameLoop(time){
   if(gameState!=='PLAY') return;
+  try{
   if(!lastFrameT) lastFrameT=time;
   lastFrameT=time;
 
@@ -1391,7 +1506,7 @@ function gameLoop(time){
       // iPhoneはDOM更新が重く感じることがあるので、🐼は控えめ（PCでは従来どおり）
       try{ if(!IS_IOS && typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
 
-      /* burstStars disabled v26 (perf) */
+      try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 if(playMode==='WAIT' || playMode==='TAP'){
         // 従来どおり：止めて弾き直し（同じ符号を正解位置で点滅）
         waitHold = true;
@@ -1414,6 +1529,14 @@ if(playMode==='WAIT' || playMode==='TAP'){
   // マイク判定
   processMicInput();
 
+  }catch(e){
+    console.error(e);
+    // ここで止まると「7Fあたりで消えて何も起きない」になるので、ループは維持
+    if(!window.__lastRuntimeErrAt || (performance.now()-window.__lastRuntimeErrAt)>2000){
+      window.__lastRuntimeErrAt = performance.now();
+      try{ showFx('⚠️ いったん続行します', {kind:'miss'}); }catch(_){ }
+    }
+  }
   rafId = requestAnimationFrame(gameLoop);
 }
 
@@ -1473,7 +1596,7 @@ function handleAction(){
       }
       score += (best<50 ? 15 : 10);
       document.getElementById('score').innerText=score;
-      /* burstStars disabled v26 (perf) */
+      try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 // combo / speed (DDR6ルール)
       comboStreak++;
       updateComboUI();
@@ -1497,16 +1620,16 @@ function handleAction(){
 
             // flashScreen(); // 重いので無効化
             showFx(`💥 8音ノーミス！\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
-            /* burstStars disabled v26 (perf) */
+            try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 } else {
             // 通常HIT（scaleでも気分が上がる言葉だけ）
-            showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 });
-            /* burstStars disabled v26 (perf) */
+            try{const p=getFxPointFromGroup(target); showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 , x:p.x, y:p.y});}catch(e){ showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 });}
+            try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 }
         } else {
           // 既に加速中
-          showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 });
-          /* burstStars disabled v26 (perf) */
+          try{const p=getFxPointFromGroup(target); showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 , x:p.x, y:p.y});}catch(e){ showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 });}
+          try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 }
 
       } else {
@@ -1521,11 +1644,11 @@ function handleAction(){
 
           // flashScreen(); // 重いので無効化
           showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! x${mult.toFixed(1)}`, 'speed', { mega:true, durationMs: 2000 });
-          /* burstStars disabled v26 (perf) */
+          try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
         } else {
           const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
-          showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 });
-          /* burstStars disabled v26 (perf) */
+          try{const p=getFxPointFromGroup(target); showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 , x:p.x, y:p.y});}catch(e){ showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 });}
+          try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
         }
       }
 } else {
@@ -1538,7 +1661,7 @@ function handleAction(){
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
       showFx(missMsg, 'miss', { durationMs: 2600 });
       try{ if(typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
-      /* burstStars disabled v26 (perf) */
+      try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 if(playMode==='WAIT' || playMode==='TAP'){
         // 従来どおり：止めて弾き直し
         if(!waitHold){
@@ -1672,34 +1795,84 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
     // 表示：スケール(ドレミ)は「弦ごと」に大きく、コードは「手前に大きく」流す（中央HUDは使わない）
-    const nm = (this.chord && this.chord.name) ? this.chord.name : "";
+    // 表示名：songのアルペジオ(単音)はコード名ではなく音名(ドレミ)を出す
+    const nmRaw = (this.chord && this.chord.name) ? this.chord.name : "";
+    const isScale = (gameMode === 'scale');
+    const isSong = !!isSongMode;
+    let nm = nmRaw;
+    if(isSong && !isScale){
+      // chordObjForPick は「その8分で鳴らす弦だけ」fingersに入る。
+      // 単音(アルペジオ)のときは、音名を表示して混乱を避ける。
+      if(this.chord && this.chord.fingers && this.chord.fingers.length === 1){
+        try{ nm = noteNameForFinger(this.chord.fingers[0]); }catch(e){ console.error(e); nm = ''; }
+      }
+    }
+
     if(nm){
       const fw2 = fw;
       // どのモードか
-      const isScale = (gameMode === 'scale');
+      
       const isCodeMode = (gameMode === 'practice' || isSongMode);
 
       if(isScale){
-        // スケール：各弦の指の近くに表示
-        // 1弦(A)は下、2/3/4弦(E/C/G)は上（ユーザー指定）
+        // スケール（ドレミファ）：コード2モード/曲(単音)と同じ考え方で
+        // 「指◯の左側（判定ライン寄り）」に、弦の中央（上下センター）で先に表示する
         ctx.save();
-        ctx.globalAlpha = 0.95;
-        ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "rgba(0,0,0,0.35)";
-        ctx.lineWidth = 6;
+        const cy0 = canvas.height/2;
+
+        // 基本スタイル（songの単音ラベル相当）
         const isSmallH = (window.innerHeight && window.innerHeight < 520);
-        ctx.font = (isSmallH ? "900 30px system-ui, -apple-system, sans-serif" : "900 34px system-ui, -apple-system, sans-serif");
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.34)";
+        ctx.lineWidth = 7;
+        ctx.font = (isSmallH ? "900 28px system-ui, -apple-system, sans-serif"
+                             : "900 32px system-ui, -apple-system, sans-serif");
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        // chord.fingers は s=1..4。1弦(A)=s:1
-        for(const f of this.chord.fingers){
-          const fx = fretToX(f.f);
-          const fy = cy + (f.s-2.5)*75;
-          const yOff = (f.s===1) ? 66 : -66;
-          const ty = fy + yOff;
-          ctx.strokeText(nm, fx, ty);
-          ctx.fillText(nm, fx, ty);
+        const neckTop = cy0 - 150;
+        const neckBot = cy0 + 150;
+        const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
+
+        // スケールは基本1音（念のため複数でも先頭の指で代表）
+        const f0 = (this.chord && this.chord.fingers && this.chord.fingers.length)
+          ? this.chord.fingers[0] : null;
+        if(f0){
+          const fx = fretToX(f0.f);
+          const fy = cy0 + (f0.s-2.5)*75;
+          const labelY = clamp(fy, neckTop + 34, neckBot - 34);
+
+          // 背景プレート（中心基準でズレない）
+          const padX = 12, padY = 6;
+          const tw = ctx.measureText(nm).width;
+          const bw = tw + padX*2;
+          const bh = 34 + padY*2;
+
+          // 指◯(半径40)に被らないよう、プレート右端と指◯左端の間に少し隙間を作る
+          const circleR = 40;
+          const gap = 16;
+          const nx = Math.max(-180, fx - (bw/2 + circleR + gap));
+
+          const bx = nx - bw/2;
+          const by = labelY - bh/2;
+
+          ctx.save();
+          ctx.globalAlpha = 0.34; // 軽め
+          ctx.fillStyle = "#000";
+          ctx.beginPath();
+          const r = 12;
+          ctx.moveTo(bx+r, by);
+          ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
+          ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
+          ctx.arcTo(bx, by+bh, bx, by, r);
+          ctx.arcTo(bx, by, bx+bw, by, r);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          ctx.strokeText(nm, nx, labelY);
+          ctx.fillText(nm, nx, labelY);
         }
         ctx.restore();
       }
@@ -1711,48 +1884,79 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
         // - song側の見た目は変えないため、songは従来の小さめ表示のまま。
         const ax = (this.getAnchorX ? this.getAnchorX() : this.x);
         const isPractice = (gameMode === 'practice' && !isSongMode);
+        const isSongLabel = (!!isSongMode && gameMode !== 'scale');
+        const usePracticeStyle = isPractice || isSongLabel;
 
-        // 位置：practice(コード2モード)は「判定ライン寄り（左側）」に寄せて、先にコード名→あとから指◯が来るイメージ
-        // 右→左に流れるので、左側(小さいX)に置くほど「先に通過」します。
-        const lead = isPractice ? Math.max(110, fw2*1.15) : Math.max(18, fw2*0.65);
-        const nx = isPractice
-          ? Math.max(NUT_X + 12, ax - lead)   // 左へ（判定ライン寄り）。画面外に出ないようクランプ
+        // 位置：
+        // - practice / song は「指◯の左側（判定ライン寄り）」に寄せて、先にラベル→あとから指◯が来るイメージ
+        // - 右→左に流れるので、左側(小さいX)に置くほど「先に通過」します。
+        const lead = usePracticeStyle
+          ? (Math.max(isPractice ? 70 : 52, fw2*0.80) + (isPractice ? 26 : 18))
+          : Math.max(18, fw2*0.65);
+
+        const nx = usePracticeStyle
+          ? Math.max(-180, ax - lead)          // 左へ（判定ライン寄り）。左側(フック外)も表示する
           : (ax + lead);
 
-        ctx.save();
-        ctx.globalAlpha = isPractice ? 0.96 : 0.92;
+ctx.save();
+        const isWaitingThis = (waitHold && waitTargetGroup===this);
+
+        // 透明度：practiceはWAIT中だけ薄く。songは通常少しだけ控えめに。
+        ctx.globalAlpha = usePracticeStyle
+          ? (isWaitingThis ? 0.55 : (isPractice ? 0.96 : 0.92))
+          : 0.92;
+
         ctx.fillStyle = "#fff";
         ctx.strokeStyle = "rgba(0,0,0,0.34)";
-        ctx.lineWidth = isPractice ? 8 : 6;
+        ctx.lineWidth = usePracticeStyle ? (isPractice ? 8 : 7) : 6;
+
         const isSmallH = (window.innerHeight && window.innerHeight < 520);
         ctx.font = isPractice
-          ? (isSmallH ? "900 34px system-ui, -apple-system, sans-serif" : "900 42px system-ui, -apple-system, sans-serif")
-          : (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif");
-        ctx.textAlign = isPractice ? "center" : "left";
-        ctx.textBaseline = "alphabetic";
+          ? (isSmallH ? "900 38px system-ui, -apple-system, sans-serif" : "900 46px system-ui, -apple-system, sans-serif")
+          : (isSongLabel
+              ? (isSmallH ? "900 28px system-ui, -apple-system, sans-serif" : "900 32px system-ui, -apple-system, sans-serif")
+              : (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif"));
 
-        const neckTop = (canvas.height/2) - 150;
+        ctx.textAlign = usePracticeStyle ? "center" : "left";
+        ctx.textBaseline = usePracticeStyle ? "middle" : "alphabetic";
 
-// practice: ネック上（指◯と同じ座標系）で、A弦ラインの少し上に出す（空中に出さない）
-const yA = (canvas.height/2) + (-1.5)*STAGE.LANE_DY; // 1弦(A)のライン
-const labelY = isPractice
-  ? Math.max(neckTop + 18, yA - 26)   // ネック内で少し上
-  : (neckTop + 52);
+const cy0 = canvas.height/2;
+        const neckTop = cy0 - 150;
+        const neckBot = cy0 + 150;
 
-        // 背景プレート（可読性UP：軽量）
-        const padX = isPractice ? 14 : 10;
-        const padY = isPractice ? 8  : 6;
+        // 指◯の集合の上下幅の「中央」にコード名を置く（弦の中心＝見やすい）
+        let minY = Infinity, maxY = -Infinity;
+        for(const f of this.chord.fingers){
+          const fy = cy0 + (f.s-2.5)*75;
+          if(fy < minY) minY = fy;
+          if(fy > maxY) maxY = fy;
+        }
+        const yMid = (minY + maxY) * 0.5;
+
+        const clamp = (v, a, b)=> Math.max(a, Math.min(b, v));
+
+        // practice(コード2モード)：ネック上で、指◯より「左側（判定ライン寄り）」にコード名を先出し
+        const labelY = usePracticeStyle
+          ? clamp(yMid, neckTop + 38, neckBot - 38)
+          : (neckTop + 52);
+
+        // 背景プレート（可読性UP：軽量）※文字とズレないように「中心基準」で作る
+        const padX = usePracticeStyle ? 14 : 10;
+        const padY = usePracticeStyle ? 8  : 6;
         const tw = ctx.measureText(nm).width;
-        const bx = (isPractice ? (nx - (tw/2) - padX) : (nx - padX));
-        const by = labelY - (isPractice ? 40 : 28) - padY;
         const bw = tw + padX*2;
-        const bh = (isPractice ? 46 : 34) + padY*2;
+        const bhBase = isPractice ? 52 : (isSongLabel ? 42 : 34);
+        const bh = bhBase + padY*2;
+
+        // practice / song は textBaseline=middle なので、矩形も中心で合わせる
+        const bx = usePracticeStyle ? (nx - bw/2) : (nx - padX);
+        const by = usePracticeStyle ? (labelY - bh/2) : (labelY - 28 - padY);
 
         ctx.save();
-        ctx.globalAlpha = isPractice ? 0.38 : 0.35;
+        ctx.globalAlpha = usePracticeStyle ? (isPractice ? 0.38 : 0.34) : 0.35;
         ctx.fillStyle = "#000";
         ctx.beginPath();
-        const r = isPractice ? 12 : 10;
+        const r = usePracticeStyle ? 12 : 10;
         ctx.moveTo(bx+r, by);
         ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
         ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);

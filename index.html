@@ -368,6 +368,7 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     line-height: 1.2;
     overflow-wrap: anywhere;
   }
+  .tSub:empty{ display:none; }
 
   /* 2枚を交互に表示：各2秒（合計4秒サイクル） */
   .teacherRow .teacherSlide.s1{ animation: tSwap 4s infinite; }
@@ -481,6 +482,75 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     .teacherRow .tMain{ font-size: 14px; white-space: normal; line-height: 1.1; }
   }
 
+
+  /* --- help modal (no alert) --- */
+  .helpModal{
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+  }
+  .helpModal.show{ display:flex; }
+  .helpPanel{
+    width: min(560px, 92vw);
+    max-height: calc(100dvh - 40px);
+    border-radius: 22px;
+    background: rgba(255,255,255,0.92);
+    border: 3px solid rgba(255,255,255,0.96);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.22);
+    overflow: hidden;
+  }
+  .helpHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.88);
+    border-bottom: 2px solid rgba(0,0,0,0.06);
+  }
+  .helpTitle{
+    font-weight: 1000;
+    color: rgba(20,20,20,0.82);
+    letter-spacing: .04em;
+  }
+  .helpClose{
+    width: 44px;
+    height: 36px;
+    border-radius: 14px;
+    border: 2px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.9);
+    font-size: 22px;
+    font-weight: 1000;
+    color: rgba(20,20,20,0.65);
+    cursor: pointer;
+  }
+  .helpBody{
+    padding: 12px 14px 14px;
+    overflow: auto;
+    max-height: calc(100dvh - 120px);
+  }
+  .helpSection{
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.78);
+    border: 2px solid rgba(0,0,0,0.05);
+    box-shadow: 0 10px 16px rgba(0,0,0,0.06);
+    margin-bottom: 10px;
+  }
+  .helpH{ font-weight: 1000; color: rgba(20,20,20,0.82); margin-bottom: 6px; }
+  .helpP{ font-weight: 900; color: rgba(20,20,20,0.70); line-height: 1.35; }
+  @media (max-height: 430px){
+    .helpBody{ max-height: calc(100dvh - 110px); }
+  }
+
+  /* せんせい行は押さないのでタップを奪わない */
+  .teacherRow{ pointer-events: none; }
+
 </style>
 </head>
 <body>
@@ -495,20 +565,20 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     <div class="teacherSlide s1">
       <div class="tTitle">せんせいの おしえて！</div>
       <div class="tMain">はじめては「ゲームで あそぶ」</div>
-      <div class="tSub">中で「タップ」をえらぶよ</div>
+      <div class="tSub"></div>
     </div>
 
     <div class="teacherSlide s2">
       <div class="tTitle">せんせいの おしえて！</div>
-      <div class="tMain">ウクレレがあるなら…</div>
-      <div class="tSub">まず チューニング → つぎ ゲームでマイク</div>
+      <div class="tMain">まず「チューニング」→ つぎに「ゲーム」</div>
+      <div class="tSub"></div>
     </div>
   </div>
 </div>
 
 <button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">ゲームで あそぶ</span><span class="sub">タップ / マイク えらべる</span></span></button>
 <button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">チューニング（マイク）</span><span class="sub">ウクレレの おとを あわせる</span></span></button>
-<button class="btn btnHelp" id="btn-help" onclick="alert('【ゲームで あそぶ】\nタップでも マイクでも あそべるよ！\n\n【チューニング（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
+<button class="btn btnHelp" id="btn-help" onclick="openHelp()"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
 </div>
 <div class="palm-wrap">
 <svg aria-hidden="true" preserveaspectratio="xMidYMid meet" viewbox="0 0 800 600">
@@ -557,6 +627,30 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
 
 </svg>
 </div>
+<div id="helpModal" class="helpModal" aria-hidden="true">
+  <div class="helpPanel" role="dialog" aria-modal="true" aria-label="あそびかた">
+    <div class="helpHead">
+      <div class="helpTitle">❓ あそびかた</div>
+      <button class="helpClose" type="button" onclick="closeHelp()" aria-label="とじる">×</button>
+    </div>
+    <div class="helpBody">
+      <div class="helpSection">
+        <div class="helpH">🎮 ゲームで あそぶ</div>
+        <div class="helpP">タップでも マイクでも あそべるよ！</div>
+      </div>
+      <div class="helpSection">
+        <div class="helpH">🪕 チューニング（マイク）</div>
+        <div class="helpP">ウクレレをもって、マイクをつかうよ。まずは おとを あわせよう！</div>
+      </div>
+      <div class="helpSection">
+        <div class="helpH">人 ・中 ・薬 ・小・0 の いみ</div>
+        <div class="helpP">げんをおさえる”ゆび”です</div>
+        <div class="helpP">人＝ひとさしゆび　中＝なかゆび　薬＝くすりゆび　小＝こゆび</div>
+        <div class="helpP">0＝おさえない（かいほうげん）</div>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="pageFlip" aria-hidden="true"></div>
 
 <script>
@@ -600,6 +694,27 @@ window.addEventListener('pageshow', ()=>{
 
 
 
+
+function openHelp(){
+  const m = document.getElementById('helpModal');
+  if(!m) return;
+  m.classList.add('show');
+  m.setAttribute('aria-hidden','false');
+}
+function closeHelp(){
+  const m = document.getElementById('helpModal');
+  if(!m) return;
+  m.classList.remove('show');
+  m.setAttribute('aria-hidden','true');
+}
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape') closeHelp();
+});
+document.addEventListener('click', (e)=>{
+  const m = document.getElementById('helpModal');
+  if(!m || !m.classList.contains('show')) return;
+  if(e.target === m) closeHelp();
+});
 </script>
 
 </body>

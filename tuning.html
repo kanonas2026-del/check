@@ -48,10 +48,6 @@
       font-size: clamp(46px, 12vw, 80px);
     }
 
-      font-size: clamp(14px, 4.2vw, 24px);
-      margin-top: 2px;
-      line-height: 1.2;
-    }
     .ui-panel{ display:none; /* hide right buttons: use left labels instead */
 
       bottom: calc(var(--safe-bottom) + 14px);
@@ -86,12 +82,14 @@
 width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative; }
     canvas { display: block; width: 100%; height: 100%; }
     #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-    .start-btn { background: #ff914d; color: white; border: none; padding: 25px 50px; font-size: 24px; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 8px 0 #d97b41; }
+    .start-btn { background: linear-gradient(90deg, #ff5f6d 0%, #ffb86c 100%); color: #fff; border: none; padding: clamp(16px, 4.8vw, 25px) clamp(28px, 7vw, 50px); font-size: clamp(18px, 5vw, 24px); font-weight: 900; border-radius: 26px; cursor: pointer; box-shadow: 0 10px 0 rgba(0,0,0,0.16), 0 18px 32px rgba(0,0,0,0.22); transition: transform 0.1s; }
+    .start-btn:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,0.16), 0 14px 26px rgba(0,0,0,0.22); }
+
     #guide-msg { position: absolute; top: 6%; width: 100%; text-align: center; font-size: 26px; font-weight: bold; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); z-index: 5; }
     #tuner-nav { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); text-align: center; font-size: 80px; font-weight: 900; z-index: 5; height: 120px;}
     .arrow-up { color: #ff5757; text-shadow: 0 0 20px #fff; }
     .arrow-down { color: #5ce1e6; text-shadow: 0 0 20px #fff; }
-    .status-msg { font-size: 22px; display:block; margin-top: 8px; line-height: 1.2; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .status-msg { font-size: clamp(14px, 4.2vw, 22px); display:block; margin-top: clamp(2px, 0.8vw, 8px); line-height: 1.2; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     .ui-panel { position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 10; }
     .string-btn { width: 75px; height: 75px; border-radius: 50%; border: 4px solid #fff; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; color: white; opacity: 0.8; }
     .string-btn.played { background: #888 !important; color: #ccc !important; border-color: #666 !important; transform: scale(0.9); opacity: 0.5; }
@@ -244,6 +242,42 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
     #tuner-nav{ top: calc(env(safe-area-inset-top) + 64px) !important; }
   }
 
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+#pageFlip{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  display: none;
+  perspective: 900px;
+}
+#pageFlip::before{
+  content:"";
+  position:absolute;
+  inset: -6vh -8vw;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,0.00) 0%,
+      rgba(255,255,255,0.65) 35%,
+      rgba(255,255,255,0.98) 62%,
+      rgba(255,255,255,1.00) 100%);
+  box-shadow: -18px 0 45px rgba(0,0,0,0.18);
+  transform-origin: right center;
+  transform: translateX(110%) rotateY(-35deg);
+  border-left: 1px solid rgba(0,0,0,0.08);
+}
+#pageFlip.run::before{
+  animation: pageFlipIn 320ms ease-out forwards;
+}
+@keyframes pageFlipIn{
+  0%   { transform: translateX(110%) rotateY(-35deg); opacity: 0.0; }
+  25%  { opacity: 1.0; }
+  100% { transform: translateX(0%) rotateY(0deg); opacity: 1.0; }
+}
+@media (prefers-reduced-motion: reduce){
+  #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
+}
+
 </style>
 </head>
 <body>
@@ -252,7 +286,7 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
     <button class="start-btn" onclick="startEverything()">🎵 チューニングをはじめましょう！</button>
   </div>
 
-  <div class="nav-back"><a href="index.html">🏝️ TOPへ</a></div>
+  <div class="nav-back"><a href="index.html" onclick="goFlip('index.html'); return false;">🏝️ TOPへ</a></div>
 
   <section id="screen-tuning">
     <div id="guide-msg">1げんを ひいてみよう</div>
@@ -270,9 +304,6 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
   </div>
 
 <div id="diagnosis-card">
-      <div id="diag-face" style="margin-bottom:10px; display:flex; justify-content:center;"><img id="diag-face-img" alt="face" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22120%22%20height%3D%22120%22%20viewBox%3D%220%200%20120%20120%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3CradialGradient%20id%3D%22g%22%20cx%3D%2230%25%22%20cy%3D%2230%25%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe08a%22/%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffb347%22/%3E%0A%20%20%20%20%3C/radialGradient%3E%0A%20%20%3C/defs%3E%0A%20%20%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2252%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22%23e59a2b%22%20stroke-width%3D%224%22/%3E%0A%20%20%0A%20%20%3Ccircle%20cx%3D%2244%22%20cy%3D%2248%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%3Ccircle%20cx%3D%2276%22%20cy%3D%2248%22%20r%3D%228%22%20fill%3D%22%233a2a1a%22/%3E%0A%20%20%3Cpath%20d%3D%22M40%2070%20Q60%2088%2080%2070%22%20fill%3D%22none%22%20stroke%3D%22%233a2a1a%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E" style="width:120px; height:120px;"/></div>
-      <h2 style="color: #ff914d;">今日のウクレレ診断</h2>
-      <div id="diag-title" style="font-size:18px; font-weight:900; color:#ff7a3d; margin-top:6px;"></div>
       <div id="diag-personality" style="font-size:28px; font-weight:900; margin:10px 0 6px; color:#4a3728;"></div>
       <div id="diag-ukulele" style="font-size:18px; font-weight:900; margin:4px 0 10px; color:#333;"></div>
       <div id="diag-scoreline" class="diag-scoreline"></div>
@@ -328,6 +359,10 @@ const STAGE = Object.freeze({
   LABEL_FONT: "bold 16px sans-serif",
   NUT_BLOCK_W: 18,
   NUT_BLOCK_OVER: 6,
+  FRET_HINTS: Object.freeze([1,3,5,7,10,12]),
+  FRET_HINT_FONT: "700 13px sans-serif",
+  FRET_HINT_COLOR: "rgba(255,255,255,0.62)",
+  FRET_HINT_Y_PAD:  2,
 });
 
 function stageGeom(canvas){
@@ -420,7 +455,41 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // strings + left labels
+  // teacher fret hints (inside neck top edge)
+  (function(){
+    ctx.save();
+    const born = (window.__fretHintBorn ?? (window.__fretHintBorn = performance.now()));
+    const dt = performance.now() - born;
+    // brief "noticeable" pulse on load, then settle subtle
+    const boost = dt < 900 ? (2.2 - 1.2*(dt/900)) : 1.0;
+
+    ctx.font = STAGE.FRET_HINT_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const yTxt = g.y + STAGE.FRET_HINT_Y_PAD;
+
+    const baseA = 0.65; // keep subtle but readable
+    ctx.globalAlpha = Math.min(1, baseA * boost);
+
+    // outline for readability on brown neck
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.28)";
+    ctx.fillStyle = STAGE.FRET_HINT_COLOR;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    for (const n of STAGE.FRET_HINTS){
+      if (n < 1 || n > STAGE.FRET_COUNT) continue;
+      const x = nutX + g.fretW * n;
+      const s = String(n);
+      ctx.strokeText(s, x, yTxt);
+      ctx.strokeText(s, x, yTxt);
+      ctx.fillText(s, x, yTxt);
+      }
+    ctx.restore();
+  })();
+
+// strings + left labels
   const labs = ['1A','2E','3C','4G'];
   for(let i=0;i<4;i++){
     const y = cy + (i-1.5) * STAGE.LANE_DY;
@@ -1761,10 +1830,34 @@ draw();
   };
 })();
 
+
+
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+let __navLock = false;
+function goFlip(url){
+  if(__navLock) return;
+  __navLock = true;
+  const ov = document.getElementById('pageFlip');
+  if(!ov){ location.href = url; return; }
+  ov.style.display = 'block';
+  ov.classList.remove('run');
+  void ov.offsetWidth;
+  ov.classList.add('run');
+  setTimeout(()=>{ location.href = url; }, 260);
+}
+window.addEventListener('pageshow', ()=>{
+  __navLock = false;
+  const ov = document.getElementById('pageFlip');
+  if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
+});
+
 </script>
 
 <div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
 tuning_fix_v1
 </div>
+
+<div id="pageFlip" aria-hidden="true"></div>
+
 </body>
 </html>

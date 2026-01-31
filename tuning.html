@@ -99,7 +99,35 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
     .diag-item { margin: 15px 0; padding: 10px; border-radius: 15px; background: #f9f9f9; }
     .diag-label { font-size: 14px; color: #888; margin-bottom: 4px; font-weight: bold; }
     .diag-value { font-size: 18px; color: #4a3728; font-weight: 900; }
+/* --- Teacher chip (diagnosis result) --- */
+.teacher-chip{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 248, 235, 0.96);
+  border: 2px solid rgba(0,0,0,0.06);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.10);
+  font-size: 13px;
+  font-weight: 1000;
+  color: #4a3728;
+  margin: 0 auto 10px;
+  user-select: none;
+}
+
   
+
+/* --- Teacher chip (splash only) --- */
+.teacher-chip-splash{ margin: 0 auto 10px; }
+.teacher-hint{
+  margin-top: -2px;
+  font-size: 14px;
+  font-weight: 1000;
+  color: rgba(20,20,20,0.72);
+  letter-spacing: .02em;
+}
 /* ===== Diagnosis splash ===== */
 .splash{
   position: fixed;
@@ -298,7 +326,10 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
     
   <div id="diagnosis-splash" class="splash">
     <div class="splash-inner">
-      <div class="splash-pop" id="splash-pop">今日のウクレレ診断結果！！</div>
+      
+      <div class="teacher-chip teacher-chip-splash">🐰 せんせい</div>
+      <div class="teacher-hint">さいごに けっかを みよう！</div>
+<div class="splash-pop" id="splash-pop">今日のウクレレ診断結果！！</div>
       <button id="btn-show-result" class="splash-btn">結果を見る</button>
     </div>
   </div>
@@ -1854,7 +1885,7 @@ window.addEventListener('pageshow', ()=>{
 </script>
 
 <div style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:6px 10px;border-radius:12px;background:rgba(255,255,255,0.9);color:#111;font-size:12px;font-weight:900;">
-tuning_fix_v1
+tuning_fix_v2
 </div>
 
 <div id="pageFlip" aria-hidden="true"></div>

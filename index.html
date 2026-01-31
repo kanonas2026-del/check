@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
 <title>ウクレレであそぼう</title>
 <style>
-  :root{ --vh: 1vh; }
+  :root{ --vh: 1vh; --menuW: min(420px, 44vw); --menuRight: calc(env(safe-area-inset-right) + 30px); }
   html, body {
     margin: 0; padding: 0;
     width: 100%;
@@ -42,7 +42,7 @@
     z-index: 2;
   }
   .title::after{
-    content:"はじめてでも だいじょうぶ！";
+    content:"ボタンを おしてね！";
     display:block;
     margin-top: 8px;
     font-size: clamp(14px, 1.8vw, 18px);
@@ -160,6 +160,7 @@ svg .uke-notes .uke-note {
   transform-origin: center;
   filter: drop-shadow(0 2px 0 rgba(255,255,255,0.7));
   animation: ukeFly var(--dur, 1.9s) ease-out infinite;
+  animation-delay: var(--delay, 0s);
 }
 svg .uke-notes .n1{ --dx:-44px; --dy:-120px; --rot:-14deg; animation-delay: 0.0s; }
 svg .uke-notes .n2{ --dx:  0px; --dy:-140px; --rot:  0deg; animation-delay: 0.45s; }
@@ -178,29 +179,253 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
   svg .uke-notes .uke-note{ animation: none; opacity: .35; }
 }
 
-</style>
+
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+#pageFlip{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  display: none;
+  perspective: 900px;
+}
+#pageFlip::before{
+  content:"";
+  position:absolute;
+  inset: -6vh -8vw;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,0.00) 0%,
+      rgba(255,255,255,0.65) 35%,
+      rgba(255,255,255,0.98) 62%,
+      rgba(255,255,255,1.00) 100%);
+  box-shadow: -18px 0 45px rgba(0,0,0,0.18);
+  transform-origin: right center;
+  transform: translateX(110%) rotateY(-35deg);
+  border-left: 1px solid rgba(0,0,0,0.08);
+}
+#pageFlip.run::before{
+  animation: pageFlipIn 320ms ease-out forwards;
+}
+@keyframes pageFlipIn{
+  0%   { transform: translateX(110%) rotateY(-35deg); opacity: 0.0; }
+  25%  { opacity: 1.0; }
+  100% { transform: translateX(0%) rotateY(0deg); opacity: 1.0; }
+}
+@media (prefers-reduced-motion: reduce){
+  #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
+}
 
 
-<!-- DDR6: Background Theme A (stronger, buttons unchanged) -->
-<style id="bg-theme-a">
-  /* Theme A: Hawaiian sunrise (a bit stronger) */
-  body{
-    background:
-      radial-gradient(1200px 700px at 20% 15%, rgba(255,225,240,.72), transparent 60%),
-      radial-gradient(1000px 650px at 85% 20%, rgba(223,246,255,.78), transparent 60%),
-      radial-gradient(900px 650px  at 60% 85%, rgba(233,255,233,.70), transparent 60%),
-      linear-gradient(180deg, #fff0d7, #ffffff) !important;
-    background-attachment: fixed;
+  .vbadge{
+    position: fixed;
+    right: calc(env(safe-area-inset-right) + 12px);
+    bottom: calc(env(safe-area-inset-bottom) + 10px);
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.78);
+    border: 2px solid rgba(255,255,255,0.92);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.10);
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(20,20,20,0.70);
+    z-index: 3;
+    user-select: none;
   }
+
+    .guide{
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.82);
+    border: 2px solid rgba(255,255,255,0.92);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+    transform: rotate(-0.8deg);
+    user-select: none;
+  }
+  .guide .bunny{
+    font-size: clamp(22px, 2.2vw, 30px);
+    line-height: 1;
+    filter: drop-shadow(0 3px 0 rgba(255,255,255,0.8));
+  }
+  .guide .speech{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap: 2px;
+  }
+  .guide .label{
+    font-size: clamp(11px, 1.3vw, 13px);
+    font-weight: 1000;
+    color: rgba(20,20,20,0.62);
+    letter-spacing: .06em;
+  }
+  .guide .text{
+    font-size: clamp(14px, 1.8vw, 18px);
+    font-weight: 1000;
+    color: rgba(20,20,20,0.78);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+  }
+  .guide{ animation: guideWiggle 3.2s ease-in-out infinite; }
+  @keyframes guideWiggle{
+    0%,100%{ transform: rotate(-0.8deg) translateY(0); }
+    50%{ transform: rotate(0.8deg) translateY(-1px); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .guide{ animation: none; }
+  }
+
+  /* --- clearer button labels (main + sub) --- */
+  .btnLabel{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 2px;
+    line-height: 1.05;
+  }
+  .btnLabel .main{
+    font-weight: 1000;
+    letter-spacing: .02em;
+  }
+  .btnLabel .sub{
+    font-size: clamp(11px, 1.35vw, 13px);
+    font-weight: 900;
+    opacity: 0.92;
+    letter-spacing: .02em;
+  }
+
+  /* --- 🐰せんせいガイド: menuとは分離。ふきだしで「タップで あそぶ」を指す --- */
+  #teacherGuide{
+    position: fixed;
+    right: calc(var(--menuRight) + var(--menuW) + 16px); /* menuの左側 */
+    top: 50%;
+    transform: translateY(calc(-50% - 128px)); /* 1つ目のボタンあたり */
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 4;
+    user-select: none;
+  }
+.teacherAvatar{
+    width: 62px;
+    height: 62px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.86);
+    border: 2px solid rgba(255,255,255,0.95);
+    box-shadow: 0 12px 22px rgba(0,0,0,0.12);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap: 2px;
+    transform: rotate(-1deg);
+  }
+  .teacherEmoji{ font-size: 28px; line-height: 1; }
+  .teacherTag{
+    font-size: 11px;
+    font-weight: 1000;
+    color: rgba(20,20,20,0.65);
+    letter-spacing: .08em;
+  }
+
+  .teacherBubble{
+    position: relative;
+    max-width: 230px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.92);
+    border: 2px solid rgba(255,255,255,0.97);
+    box-shadow: 0 14px 26px rgba(0,0,0,0.14);
+    transform: rotate(0.6deg);
+  }
+  .teacherBubble::after{
+    content:"";
+    position: absolute;
+    right: -12px;
+    bottom: 18px;
+    width: 0;
+    height: 0;
+    border-left: 14px solid rgba(255,255,255,0.92);
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    filter: drop-shadow(0 8px 10px rgba(0,0,0,0.12));
+  }
+  .teacherBig{
+    font-size: 12px;
+    font-weight: 1000;
+    color: rgba(20,20,20,0.62);
+    letter-spacing: .08em;
+    margin-bottom: 3px;
+  }
+  .teacherMid{
+    font-size: 18px;
+    font-weight: 1000;
+    color: rgba(20,20,20,0.82);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+  }
+  .teacherSmall{
+    font-size: 12px;
+    font-weight: 900;
+    color: rgba(20,20,20,0.60);
+    margin-top: 3px;
+  }
+  #teacherGuide{ animation: teacherWiggle 3.1s ease-in-out infinite; }
+  @keyframes teacherWiggle{
+    0%,100%{ transform: translateY(0); }
+    50%{ transform: translateY(-1px); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #teacherGuide{ animation: none; }
+  }
+
+  /* On narrow screens (portrait), move the nav above buttons so it never looks like a 4th button */
+  @media (max-width: 700px){
+    #teacherGuide{
+      left: 0;
+      top: -96px;
+      width: 100%;
+      justify-content: center;
+    }
+    .teacherBubble::after{ display:none; }
+  }
+
+
+  @media (max-width: 860px){
+    #teacherGuide{
+      right: var(--menuRight);
+      top: calc(env(safe-area-inset-top) + 120px);
+      transform: none;
+    }
+    .teacherBubble::after{ display:none; }
+  }
+
 </style>
 </head>
 <body>
-<div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div><div class="b">ボタンを おしてね！</div></div><div class="vbadge">vK13</div>
+<div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div>
+<div class="vbadge">vK17</div>
 <div aria-hidden="true" class="titleCard"></div><div class="title">ウクレレであそぼう</div>
+<div id="teacherGuide" aria-label="🐰せんせいの おしえて！">
+  <div class="teacherAvatar" aria-hidden="true">
+    <div class="teacherEmoji">🐰</div>
+    <div class="teacherTag">せんせい</div>
+  </div>
+  <div class="teacherBubble">
+    <div class="teacherBig">はじめては ①これ！</div>
+    <div class="teacherMid">「タップで あそぶ」</div>
+    <div class="teacherSmall">ウクレレがなくてもOK</div>
+  </div>
+</div>
+
 <div class="menu">
-<button class="primary btn btnGame" id="btn-start" onclick="location.href='game.html'"><span aria-hidden="true" class="btnIcon">🎮</span><span>ゲームで あそぶ</span></button>
-<button class="btn btnTuning" id="btn-tuning" onclick="location.href='tuning.html'"><span aria-hidden="true" class="btnIcon">🪕</span><span>おとの じゅんび</span></button>
-<button class="btn btnHelp" id="btn-help" onclick="alert('音に合わせて画面をタップしたり、実際にウクレレを弾いて遊ぶゲームです！')"><span aria-hidden="true" class="btnIcon">❓</span><span>あそびかた</span></button>
+<button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">タップで あそぶ</span><span class="sub">はじめて / ウクレレなしOK</span></span></button>
+<button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">おとで あそぶ（マイク）</span><span class="sub">ウクレレがある人 / マイクをつかうよ</span></span></button>
+<button class="btn btnHelp" id="btn-help" onclick="alert('【タップで あそぶ】\n画面をタップして あそぶよ！\n\n【おとで あそぶ（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
 </div>
 <div class="palm-wrap">
 <svg aria-hidden="true" preserveaspectratio="xMidYMid meet" viewbox="0 0 800 600">
@@ -249,5 +474,45 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
 
 </svg>
 </div>
+<div id="pageFlip" aria-hidden="true"></div>
+
+<script>
+
+/* === PAGE_FLIP_TRANSITION v1 (shared) === */
+let __navLock = false;
+function goFlip(url){
+  if(__navLock) return;
+  __navLock = true;
+  const ov = document.getElementById('pageFlip');
+  if(!ov){ location.href = url; return; }
+  ov.style.display = 'block';
+  ov.classList.remove('run');
+  void ov.offsetWidth;
+  ov.classList.add('run');
+  setTimeout(()=>{ location.href = url; }, 260);
+}
+window.addEventListener('pageshow', ()=>{
+  __navLock = false;
+  const ov = document.getElementById('pageFlip');
+  if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
+});
+
+
+(function(){
+  function setVh(){
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    document.documentElement.style.setProperty('--vh', (h*0.01)+'px');
+  }
+  setVh();
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setVh);
+    window.visualViewport.addEventListener('scroll', setVh);
+  }
+  window.addEventListener('resize', setVh);
+  window.addEventListener('orientationchange', ()=>setTimeout(setVh, 250));
+})();
+
+</script>
+
 </body>
 </html>

@@ -324,13 +324,29 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     font-size: 22px;
     line-height: 1;
     box-shadow: 0 10px 18px rgba(0,0,0,0.10);
+    flex: 0 0 auto;
   }
-  .teacherRow .lines{
+
+  /* 入れ替わりメッセージ（1秒おきに自動で表示） */
+  .teacherRow .teacherSlides{
+    position: relative;
+    min-width: 0;
+    flex: 1;
+    height: 62px; /* 3行ぶん確保（切れ防止） */
+  }
+  .teacherRow .teacherSlide{
+    position: absolute;
+    inset: 0;
     display:flex;
     flex-direction:column;
+    justify-content:center;
     gap: 2px;
     min-width: 0;
+    opacity: 0;
+    transform: translateY(2px);
+    overflow: hidden;
   }
+
   .teacherRow .tTitle{
     font-size: 12px;
     font-weight: 1000;
@@ -342,15 +358,48 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     font-weight: 1000;
     color: rgba(20,20,20,0.84);
     text-shadow: 0 1px 0 rgba(255,255,255,0.9);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
   }
   .teacherRow .tSub{
     font-size: 12px;
     font-weight: 900;
     color: rgba(20,20,20,0.60);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
   }
+
+  /* 2枚を交互に表示：各2秒（合計4秒サイクル） */
+  .teacherRow .teacherSlide.s1{ animation: tSwap 4s infinite; }
+  .teacherRow .teacherSlide.s2{ animation: tSwap 4s infinite; animation-delay: 2s; }
+
+  @keyframes tSwap{
+    0%   { opacity: 0; transform: translateY(4px); }
+    10%  { opacity: 1; transform: translateY(0); }
+    45%  { opacity: 1; transform: translateY(0); }
+    55%  { opacity: 0; transform: translateY(-2px); }
+    100% { opacity: 0; transform: translateY(-2px); }
+  }
+
+  /* 画面が低いときは高さを少し詰める（切れ防止） */
+  @media (max-height: 430px){
+    .teacherRow .teacherSlides{ height: 56px; }
+    .teacherRow .tMain{ font-size: 15px; }
+  }
+
+  /* 動きが苦手な端末設定では、1枚目だけ表示 */
+  @media (prefers-reduced-motion: reduce){
+    .teacherRow .teacherSlides{ height: auto; }
+    .teacherRow .teacherSlide{ position: relative; opacity: 1; transform: none; animation: none !important; }
+    .teacherRow .teacherSlide.s2{ display:none; }
+  }
+
+/* recommended button outline (mode hint) */
+  .btn.reco{
+    outline: 4px solid rgba(255,255,255,0.60);
+    outline-offset: 3px;
+  }
+
 
   /* 横画面（高さが低い）では、タイトルを左へ逃がし、ボタンを少し詰めて「タイトルが見えない」を防ぐ */
   @media (max-height: 460px){
@@ -436,21 +485,30 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
 </head>
 <body>
 <div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div>
-<div class="vbadge">vK19</div>
+<div class="vbadge">Ver.0.1</div>
 <div aria-hidden="true" class="titleCard"></div><div class="title">ウクレレであそぼう</div>
 <div class="menu">
 <div class="teacherRow" aria-label="🐰せんせいの おしえて！">
   <div class="bunny" aria-hidden="true">🐰</div>
-  <div class="lines">
-    <div class="tTitle">せんせいの おしえて！</div>
-    <div class="tMain">はじめては「タップで あそぶ」</div>
-    <div class="tSub">ウクレレがなくてもOK</div>
+
+  <div class="teacherSlides" aria-hidden="true">
+    <div class="teacherSlide s1">
+      <div class="tTitle">せんせいの おしえて！</div>
+      <div class="tMain">はじめては「ゲームで あそぶ」</div>
+      <div class="tSub">中で「タップ」をえらぶよ</div>
+    </div>
+
+    <div class="teacherSlide s2">
+      <div class="tTitle">せんせいの おしえて！</div>
+      <div class="tMain">ウクレレがあるなら…</div>
+      <div class="tSub">まず チューニング → つぎ ゲームでマイク</div>
+    </div>
   </div>
 </div>
 
-<button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">タップで あそぶ</span><span class="sub">はじめて / ウクレレなしOK</span></span></button>
-<button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">おとで あそぶ（マイク）</span><span class="sub">ウクレレがある人 / マイクをつかうよ</span></span></button>
-<button class="btn btnHelp" id="btn-help" onclick="alert('【タップで あそぶ】\n画面をタップして あそぶよ！\n\n【おとで あそぶ（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
+<button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">ゲームで あそぶ</span><span class="sub">タップ / マイク えらべる</span></span></button>
+<button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">チューニング（マイク）</span><span class="sub">ウクレレの おとを あわせる</span></span></button>
+<button class="btn btnHelp" id="btn-help" onclick="alert('【ゲームで あそぶ】\nタップでも マイクでも あそべるよ！\n\n【チューニング（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
 </div>
 <div class="palm-wrap">
 <svg aria-hidden="true" preserveaspectratio="xMidYMid meet" viewbox="0 0 800 600">
@@ -536,6 +594,11 @@ window.addEventListener('pageshow', ()=>{
   window.addEventListener('resize', setVh);
   window.addEventListener('orientationchange', ()=>setTimeout(setVh, 250));
 })();
+
+
+
+
+
 
 </script>
 

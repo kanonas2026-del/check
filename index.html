@@ -298,131 +298,120 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     letter-spacing: .02em;
   }
 
-  /* --- 🐰せんせいガイド: menuとは分離。ふきだしで「タップで あそぶ」を指す --- */
-  #teacherGuide{
-    position: fixed;
-    right: calc(var(--menuRight) + var(--menuW) + 16px); /* menuの左側 */
-    top: 50%;
-    transform: translateY(calc(-50% - 128px)); /* 1つ目のボタンあたり */
+  
+  /* --- 🐰せんせいガイド（TOPだけ）：ボタン列の「見出し」として表示（ボタンに混ざらない） --- */
+  .teacherRow{
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
-    pointer-events: none;
-    z-index: 4;
-    user-select: none;
-  }
-.teacherAvatar{
-    width: 62px;
-    height: 62px;
-    border-radius: 22px;
-    background: rgba(255,255,255,0.86);
-    border: 2px solid rgba(255,255,255,0.95);
+    padding: 10px 12px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.90);
+    border: 2px solid rgba(255,255,255,0.96);
     box-shadow: 0 12px 22px rgba(0,0,0,0.12);
+    user-select: none;
+    cursor: default;
+  }
+  .teacherRow .bunny{
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.86);
+    border: 2px solid rgba(255,255,255,0.96);
     display:flex;
-    flex-direction:column;
     align-items:center;
     justify-content:center;
+    font-size: 22px;
+    line-height: 1;
+    box-shadow: 0 10px 18px rgba(0,0,0,0.10);
+  }
+  .teacherRow .lines{
+    display:flex;
+    flex-direction:column;
     gap: 2px;
-    transform: rotate(-1deg);
+    min-width: 0;
   }
-  .teacherEmoji{ font-size: 28px; line-height: 1; }
-  .teacherTag{
-    font-size: 11px;
-    font-weight: 1000;
-    color: rgba(20,20,20,0.65);
-    letter-spacing: .08em;
-  }
-
-  .teacherBubble{
-    position: relative;
-    max-width: 230px;
-    padding: 12px 14px;
-    border-radius: 18px;
-    background: rgba(255,255,255,0.92);
-    border: 2px solid rgba(255,255,255,0.97);
-    box-shadow: 0 14px 26px rgba(0,0,0,0.14);
-    transform: rotate(0.6deg);
-  }
-  .teacherBubble::after{
-    content:"";
-    position: absolute;
-    right: -12px;
-    bottom: 18px;
-    width: 0;
-    height: 0;
-    border-left: 14px solid rgba(255,255,255,0.92);
-    border-top: 10px solid transparent;
-    border-bottom: 10px solid transparent;
-    filter: drop-shadow(0 8px 10px rgba(0,0,0,0.12));
-  }
-  .teacherBig{
+  .teacherRow .tTitle{
     font-size: 12px;
     font-weight: 1000;
     color: rgba(20,20,20,0.62);
     letter-spacing: .08em;
-    margin-bottom: 3px;
   }
-  .teacherMid{
-    font-size: 18px;
+  .teacherRow .tMain{
+    font-size: 16px;
     font-weight: 1000;
-    color: rgba(20,20,20,0.82);
+    color: rgba(20,20,20,0.84);
     text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .teacherSmall{
+  .teacherRow .tSub{
     font-size: 12px;
     font-weight: 900;
     color: rgba(20,20,20,0.60);
-    margin-top: 3px;
-  }
-  #teacherGuide{ animation: teacherWiggle 3.1s ease-in-out infinite; }
-  @keyframes teacherWiggle{
-    0%,100%{ transform: translateY(0); }
-    50%{ transform: translateY(-1px); }
-  }
-  @media (prefers-reduced-motion: reduce){
-    #teacherGuide{ animation: none; }
   }
 
-  /* On narrow screens (portrait), move the nav above buttons so it never looks like a 4th button */
-  @media (max-width: 700px){
-    #teacherGuide{
-      left: 0;
-      top: -96px;
-      width: 100%;
-      justify-content: center;
+  /* 横画面（高さが低い）では、タイトルを左へ逃がし、ボタンを少し詰めて「タイトルが見えない」を防ぐ */
+  @media (max-height: 460px){
+    .titleCard{
+      left: calc(env(safe-area-inset-left) + 10px);
+      right: auto;
+      top: calc(env(safe-area-inset-top) + 6px);
+      width: min(520px, 60vw);
+      padding: 10px 12px;
+      border-radius: 18px;
     }
-    .teacherBubble::after{ display:none; }
-  }
-
-
-  @media (max-width: 860px){
-    #teacherGuide{
-      right: var(--menuRight);
-      top: calc(env(safe-area-inset-top) + 120px);
-      transform: none;
+    .title{
+      left: calc(env(safe-area-inset-left) + 22px);
+      right: auto;
+      top: calc(env(safe-area-inset-top) + 10px);
+      text-align: left;
+      font-size: clamp(22px, 3.4vw, 34px);
     }
-    .teacherBubble::after{ display:none; }
+    .title::after{
+      margin-top: 4px;
+      font-size: clamp(12px, 1.6vw, 14px);
+    }
+    .menu{
+      top: 60%;
+      gap: 12px;
+    }
+    .btn{
+      padding: 12px 12px;
+      border-radius: 18px;
+      box-shadow: 0 8px 0 rgba(0,0,0,0.18), 0 14px 22px rgba(0,0,0,0.14);
+    }
+    .btn .btnIcon{
+      width: 34px; height: 34px;
+      border-radius: 12px;
+      font-size: 18px;
+    }
+    .btnLabel .sub{
+      font-size: 11px;
+    }
+    .teacherRow{
+      padding: 8px 10px;
+      border-radius: 16px;
+    }
   }
 
 </style>
 </head>
 <body>
 <div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div>
-<div class="vbadge">vK17</div>
+<div class="vbadge">vK18</div>
 <div aria-hidden="true" class="titleCard"></div><div class="title">ウクレレであそぼう</div>
-<div id="teacherGuide" aria-label="🐰せんせいの おしえて！">
-  <div class="teacherAvatar" aria-hidden="true">
-    <div class="teacherEmoji">🐰</div>
-    <div class="teacherTag">せんせい</div>
-  </div>
-  <div class="teacherBubble">
-    <div class="teacherBig">はじめては ①これ！</div>
-    <div class="teacherMid">「タップで あそぶ」</div>
-    <div class="teacherSmall">ウクレレがなくてもOK</div>
+<div class="menu">
+<div class="teacherRow" aria-label="🐰せんせいの おしえて！">
+  <div class="bunny" aria-hidden="true">🐰</div>
+  <div class="lines">
+    <div class="tTitle">せんせいの おしえて！</div>
+    <div class="tMain">はじめては「タップで あそぶ」</div>
+    <div class="tSub">ウクレレがなくてもOK</div>
   </div>
 </div>
 
-<div class="menu">
 <button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">タップで あそぶ</span><span class="sub">はじめて / ウクレレなしOK</span></span></button>
 <button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">おとで あそぶ（マイク）</span><span class="sub">ウクレレがある人 / マイクをつかうよ</span></span></button>
 <button class="btn btnHelp" id="btn-help" onclick="alert('【タップで あそぶ】\n画面をタップして あそぶよ！\n\n【おとで あそぶ（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>

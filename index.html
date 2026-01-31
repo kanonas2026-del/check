@@ -396,11 +396,47 @@ svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s
     }
   }
 
+
+  /* === vK19: iPhone横でも「切れない・被らない」最優先の上書き === */
+  .titleCard{ z-index: 5; }
+  .title{ z-index: 6; }
+  .menu{ z-index: 4; }
+  .vbadge{ z-index: 7; }
+
+  /* 低い画面（iPhone横など）で下部が切れるのを防ぐ：高さを詰め、足りなければメニュー内だけスクロール */
+  @media (max-height: 460px){
+    .vbadge{
+      top: calc(env(safe-area-inset-top) + 8px);
+      bottom: auto;
+      right: calc(env(safe-area-inset-right) + 12px);
+    }
+  }
+  @media (max-height: 430px){
+    .title::after{ display:none; } /* タイトル下の説明は省略して高さを確保 */
+    .menu{
+      top: 52%;
+      gap: 10px;
+      max-height: calc((var(--vh) * 100) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 14px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-bottom: 10px;
+    }
+    .btn{
+      padding: 10px 12px;
+      border-radius: 18px;
+      box-shadow: 0 8px 0 rgba(0,0,0,0.18), 0 14px 22px rgba(0,0,0,0.14);
+    }
+    .btnLabel .sub{ display:none; } /* 2行目は切って「押す」優先 */
+    .teacherRow{ padding: 6px 10px; border-radius: 16px; }
+    .teacherRow .tSub{ display:none; }
+    .teacherRow .tMain{ font-size: 14px; white-space: normal; line-height: 1.1; }
+  }
+
 </style>
 </head>
 <body>
 <div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div>
-<div class="vbadge">vK18</div>
+<div class="vbadge">vK19</div>
 <div aria-hidden="true" class="titleCard"></div><div class="title">ウクレレであそぼう</div>
 <div class="menu">
 <div class="teacherRow" aria-label="🐰せんせいの おしえて！">

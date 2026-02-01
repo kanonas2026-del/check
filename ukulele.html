@@ -30,8 +30,8 @@
   .app-container {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: space-between;
-    padding: env(safe-area-inset-top) 20px 20px 20px;
+    align-items: center; justify-content: center;
+    padding: 10px 20px calc(16px + env(safe-area-inset-bottom)) 20px;
     z-index: 10;
   }
 
@@ -73,7 +73,7 @@
   /* 背景イラスト（ヤシ＋ウクレレ） */
   .center-illustration {
     position: absolute;
-    top: 55%; left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     width: min(800px, 90vw);
     height: min(600px, 70vh);
@@ -93,10 +93,10 @@
   .guide-bubble {
     position: absolute;
     left: 50%;
-    top: clamp(140px, 26vh, 215px);
+    top: clamp(48px, 9vh, 96px);
     transform: translate(-50%, 0);
     background: #fff;
-    padding: 8px 20px;
+    padding: 6px 18px;
     border-radius: 50px;
     box-shadow: 0 6px 15px rgba(0,0,0,0.15);
     display: flex;
@@ -106,9 +106,9 @@
     animation: popIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     transition: opacity .22s ease, transform .22s ease;
   }
-  .guide-bubble .bunny { font-size: 26px; line-height: 1; }
+  .guide-bubble .bunny { font-size: 24px; line-height: 1; }
   .guide-bubble .text {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 900;
     color: #555;
     line-height: 1.1;
@@ -147,11 +147,11 @@
   /* ボタン（TOPと同じ形/フォント/サイズ感） */
   .menu-area {
     width: 100%;
-    margin-bottom: 2vh;
+    margin-bottom: 0;
   }
   .menu-row {
     display: flex;
-    gap: clamp(140px, 26vw, 360px);
+    gap: clamp(180px, 30vw, 400px); /* TOPに合わせて間隔をあける */
     align-items: center;
     justify-content: center;
     width: 100%;
@@ -229,7 +229,7 @@
   }
 
   @media (max-width: 700px) {
-    .menu-row { gap: 14px; }
+    .menu-row { gap: 20px; }
     .play-btn { width: min(210px, 46vw); }
     .btn-back { width: min(210px, 46vw); }
   }
@@ -264,16 +264,34 @@
   #landscapeLock .t1 { margin-top: 10px; font-size: 22px; font-weight: 1000; }
   #landscapeLock .t2 { margin-top: 6px; font-size: 14px; opacity: .9; font-weight: 900; }
 
+
+  /* TOPへもどる：右下に小さく固定 */
+  .btn-back{
+    position: fixed;
+    right: calc(14px + env(safe-area-inset-right));
+    top: calc(14px + env(safe-area-inset-top));
+    width: auto !important;
+    padding: 9px 12px !important;
+    border-radius: 16px !important;
+    box-shadow:
+      0 6px 0 rgba(0,0,0,0.10),
+      0 14px 18px rgba(0,0,0,0.14) !important;
+    z-index: 30;
+  }
+  .btn-back .btn-icon{ font-size: 18px; margin-bottom: 0; display:inline-block; margin-right: 8px; }
+  .btn-back .btn-title{ font-size: 13px; display:inline-block; -webkit-text-stroke: 0; }
+  .btn-back .btn-desc{ display:none; }
+
+  /* 先生が邪魔にならない余白 */
+  .menu-area{ padding-top: 8px; }
+  @media (max-height: 430px){
+    .guide-bubble{ top: clamp(42px, 10vh, 86px); }
+  }
 </style>
 </head>
 <body>
   <div class="app-container">
-    <div class="title-area">
-      <h1 class="game-title">ウクレレであそぼう</h1>
-      <span class="sub-title">チューニング → ゲーム が おすすめ</span>
-    </div>
-
-    <div class="center-illustration">
+<div class="center-illustration">
     <svg preserveAspectRatio="xMidYMid meet" viewBox="0 0 800 600">
       <g transform="translate(0, 20)"> <ellipse cx="400" cy="500" fill="#cfeeb0" rx="260" ry="60"></ellipse>
         <path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="#7a4a21"></path>
@@ -335,13 +353,10 @@
         </div>
       </div>
 
-      <div class="menu-row back-row">
-        <div id="btnTop" class="play-btn btn-back" onclick="goFlip('index.html')">
+          <div id="btnTop" class="play-btn btn-back" onclick="goFlip('index.html')">
           <span class="btn-icon">🏝️</span>
-          <h2 class="btn-title">TOPへ もどる</h2>
+          <h2 class="btn-title">TOPへもどる</h2>
           <span class="btn-desc">メニューにもどる</span>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -418,7 +433,7 @@
         bubble.classList.add('point-right');
         btnGame && btnGame.classList.add('hint');
       } else {
-        bubble.classList.add('point-center');
+        bubble.classList.add('point-right');
         btnTop && btnTop.classList.add('hint');
       }
     }

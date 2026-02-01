@@ -1,587 +1,377 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
 <title>ウクレレであそぼう</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@700;900&display=swap" rel="stylesheet">
+
 <style>
-  :root{ --vh: 1vh; --menuW: min(420px, 44vw); --menuRight: calc(env(safe-area-inset-right) + 30px); }
+  :root {
+    --vh: 1vh;
+  }
+  
   html, body {
     margin: 0; padding: 0;
-    width: 100%;
-    height: 100dvh;
-    height: calc(var(--vh) * 100);
+    width: 100%; height: 100%;
     overflow: hidden;
     position: fixed;
-    background: linear-gradient(135deg, #e8f7ff 0%, #fff6e8 55%, #eafff3 100%);
-    font-family: "M PLUS Rounded 1c","Rounded Mplus 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Meiryo",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  }
-  body::before{
-    content:"";
-    position: fixed;
-    inset: 0;
-    background-image:
-      radial-gradient(circle at 20% 25%, rgba(255,255,255,0.75) 0 14px, transparent 15px),
-      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.55) 0 10px, transparent 11px),
-      radial-gradient(circle at 40% 80%, rgba(255,255,255,0.55) 0 12px, transparent 13px);
-    opacity: .55;
-    pointer-events:none;
+    font-family: "Mochiy Pop One", "Zen Maru Gothic", sans-serif;
+    /* 鮮やかなトロピカルグラデーション */
+    background: linear-gradient(180deg, #4facfe 0%, #00f2fe 50%, #ffd194 100%);
+    user-select: none;
   }
 
-  .title {
-    position: absolute;
-    top: calc(env(safe-area-inset-top) + 18px);
-    right: calc(env(safe-area-inset-right) + 22px);
-    font-size: clamp(30px, 4vw, 48px);
-    font-weight: 1000;
-    letter-spacing: .04em;
-    color: #2b2b2b;
-    text-align: right;
-    text-shadow: 0 2px 0 rgba(255,255,255,0.9);
-    z-index: 2;
+  /* 雲のような背景装飾（動く） */
+  body::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: 
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0, transparent 200px),
+      radial-gradient(circle at 80% 40%, rgba(255,255,255,0.3) 0, transparent 150px);
+    animation: cloudMove 20s ease-in-out infinite alternate;
+    pointer-events: none;
   }
-  .title::after{
-    content:"ボタンを おしてね！";
-    display:block;
-    margin-top: 8px;
-    font-size: clamp(14px, 1.8vw, 18px);
+  @keyframes cloudMove { from{transform:translateY(0);} to{transform:translateY(-20px);} }
+
+  /* === メインレイアウト === */
+  .app-container {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    padding: env(safe-area-inset-top) 20px 20px 20px;
+    z-index: 10;
+  }
+
+  /* === タイトルロゴ === */
+  .title-area {
+    margin-top: 2vh;
+    margin-bottom: 6px;
+    text-align: center;
+    position: relative;
+    z-index: 20;
+    filter: drop-shadow(0 4px 0 rgba(0,0,0,0.1));
+  }
+  
+  .game-title {
+    font-size: clamp(32px, 7vw, 64px);
+    margin: 0;
+    /* 文字色を濃いオレンジ、フチを白く太くして読みやすく */
+    color: #FF6B00; 
+    -webkit-text-stroke: 6px #ffffff;
+    paint-order: stroke fill;
+    /* テキストシャドウで立体感 */
+    text-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+    transform: rotate(-2deg);
+    animation: titleFloat 3s ease-in-out infinite;
+  }
+  .sub-title {
+    display: block;
+    margin-top: -5px;
+    font-size: clamp(14px, 2vw, 18px);
+    color: #00897B;
+    background: rgba(255,255,255,0.9);
+    padding: 4px 16px;
+    border-radius: 20px;
+    display: inline-block;
     font-weight: 900;
-    color: rgba(30,30,30,0.70);
-  }
-  .titleCard{
-    position:absolute;
-    top: calc(env(safe-area-inset-top) + 10px);
-    right: calc(env(safe-area-inset-right) + 10px);
-    width: min(520px, 46vw);
-    padding: 14px 16px;
-    border-radius: 22px;
-    background: rgba(255,255,255,0.78);
-    border: 3px solid rgba(255,255,255,0.92);
-    box-shadow: 0 14px 28px rgba(0,0,0,0.12);
-    transform: rotate(-1deg);
-    z-index: 1;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.1);
   }
 
-  .menu {
+  @keyframes titleFloat {
+    0%, 100% { transform: rotate(-2deg) translateY(0); }
+    50% { transform: rotate(2deg) translateY(-8px); }
+  }
+
+  /* === 背景イラスト（ウクレレとヤシの木） === */
+  /* ボタンの邪魔にならないよう、中央奥に配置 */
+  .center-illustration {
     position: absolute;
-    top: 50%;
-    right: calc(env(safe-area-inset-right) + 30px);
-    transform: translateY(-50%);
+    top: 55%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(800px, 90vw);
+    height: min(600px, 70vh);
+    z-index: -1; /* ボタンの後ろ */
+    opacity: 1; /* はっきり見せる */
+    pointer-events: none;
+  }
+  /* イラスト全体を少しゆらゆらさせる */
+  .center-illustration svg {
+    width: 100%; height: 100%;
+    animation: illustrationSway 6s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+  @keyframes illustrationSway {
+    0%,100%{ transform: rotate(-2.2deg) translateY(0); }
+    50%{ transform: rotate(2.6deg) translateY(-6px); }
+  }
+    50%{ transform: rotate(1deg); }
+  }
+
+
+  /* === ボタンエリア（左右に配置） === */
+  .menu-row {
+    display: flex;
+    gap: clamp(180px, 30vw, 400px); /* ウクレレが見えるように間隔をあける */
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 4vh;
+  }
+  
+  /* レスポンシブ：画面が狭いときは間隔を狭める */
+  @media (max-width: 700px) {
+    .menu-row { gap: 20px; }
+    .center-illustration { opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); } /* スマホなら少し薄くしてボタン優先 */
+  }
+
+  /* ぷっくりボタン */
+  .play-btn {
+    position: relative;
+    width: min(240px, 35vw);
+    padding: 15px 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 24px;
+    border: 4px solid #fff;
+    box-shadow: 
+      0 10px 0 rgba(0,0,0,0.1), /* 厚み */
+      0 20px 30px rgba(0,0,0,0.15); /* 影 */
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.1s;
+    text-decoration: none;
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    width: min(420px, 44vw);
-    z-index: 2;
-  }
-
-  .btn {
-    font-size: clamp(18px, 2.2vw, 26px);
-    padding: 18px 14px;
-    border-radius: 22px;
-    border: none;
-    cursor: pointer;
-    font-weight: 1000;
-    color: #fff;
-    background: #ccc;
-    display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    box-shadow: 0 10px 0 rgba(0,0,0,0.18), 0 18px 30px rgba(0,0,0,0.16);
-    transform: translateY(0);
-    transition: transform .08s ease, box-shadow .12s ease, filter .12s ease;
-    -webkit-tap-highlight-color: transparent;
   }
-  .btn:active{
+
+  .play-btn:active {
     transform: translateY(6px);
-    box-shadow: 0 4px 0 rgba(0,0,0,0.18), 0 10px 18px rgba(0,0,0,0.14);
-    filter: brightness(0.98);
-  }
-  .btn .btnIcon{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width: 40px; height: 40px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.18);
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
-    font-size: 22px;
-  }
-  .btnGame{ background: linear-gradient(135deg, #ff6a6a 0%, #ffb84d 100%); }
-  .btnTuning{ background: linear-gradient(135deg, #25b7ff 0%, #55e7ff 100%); }
-  .btnHelp{ background: linear-gradient(135deg, #23d57b 0%, #74f3b5 100%); }
-
-  .btnGame{ animation: pop 2.6s ease-in-out infinite; }
-  @keyframes pop{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-2px);} }
-  .btnGame:active{ animation:none; }
-
-  .palm-wrap{
-    position: absolute;
-    left: calc(env(safe-area-inset-left) - 20px);
-    top: 50%;
-    transform: translateY(-50%);
-    width: min(56vw, 900px);
-    height: 100%;
-    z-index: 0;
-    pointer-events:none;
-  }
-  svg { width: 100%; height: 100%; }
-
-  /* floating notes/stars */
-  .float-layer{
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-  
-  display:none;}
-  .float-layer .f{
-    position:absolute;
-    opacity: .55;
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,.12));
-    animation: floatUp linear infinite;
-  }
-  @keyframes floatUp{
-    from { transform: translateY(20vh) translateX(0) rotate(0deg); opacity: 0; }
-    15% { opacity: .55; }
-    to { transform: translateY(-120vh) translateX(12px) rotate(25deg); opacity: 0; }
+    box-shadow: 0 4px 0 rgba(0,0,0,0.1), 0 10px 15px rgba(0,0,0,0.1);
   }
 
-    
-/* --- Uke notes burst (SVG anchored to the existing ukulele drawing) --- */
-svg .uke-notes .uke-note {
-  font-size: var(--fs, 32px);
-  fill: rgba(35,35,35,0.55);
-  opacity: 0;
-  pointer-events: none;
-  transform-box: fill-box;
-  transform-origin: center;
-  filter: drop-shadow(0 2px 0 rgba(255,255,255,0.7));
-  animation: ukeFly var(--dur, 1.9s) ease-out infinite;
-  animation-delay: var(--delay, 0s);
-}
-svg .uke-notes .n1{ --dx:-44px; --dy:-120px; --rot:-14deg; animation-delay: 0.0s; }
-svg .uke-notes .n2{ --dx:  0px; --dy:-140px; --rot:  0deg; animation-delay: 0.45s; }
-svg .uke-notes .n3{ --dx: 48px; --dy:-118px; --rot: 14deg; animation-delay: 0.90s; }
-svg .uke-notes .n4{ --dx: 20px; --dy:-150px; --rot:  8deg; animation-delay: 1.35s; }
-svg .uke-notes .n5{ --dx:-18px; --dy:-150px; --rot:-8deg; animation-delay: 1.80s; }
+  /* ボタンごとの色 */
+  .btn-tap { background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%); }
+  .btn-uke { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
 
-@keyframes ukeFly{
-  0%   { opacity: 0; transform: translate(0,0) scale(0.75) rotate(0deg); }
-  12%  { opacity: 1; }
-  70%  { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.15) rotate(var(--rot)); }
+  .btn-icon { font-size: 32px; margin-bottom: 4px; display: block; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.2)); }
+  .btn-title { font-size: clamp(16px, 2.5vw, 22px); color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.2); margin: 0; line-height: 1.2; }
+  .btn-desc { font-size: 11px; color: rgba(255,255,255,0.95); font-weight: 900; margin-top: 4px; display: block; }
+
+
+  /* === 先生（ガイド） === */
+/* タイトルと被らないように、上からの固定位置（レスポンシブ）に配置 */
+.guide-bubble {
+  position: absolute;
+  left: 50%;
+  top: clamp(120px, 22vh, 190px); /* 画面サイズに応じて上下 */
+  transform: translate(-50%, 0);
+  background: #fff;
+  padding: 8px 22px;
+  border-radius: 50px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 25; /* タイトルより手前で可読 */
+  animation: popIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-@media (prefers-reduced-motion: reduce){
-  svg .uke-notes .uke-note{ animation: none; opacity: .35; }
+/* スマホで高さが低い時は、さらに少し下へ */
+@media (max-height: 500px) {
+  .guide-bubble { top: clamp(110px, 26vh, 210px); }
 }
 
-
-/* === PAGE_FLIP_TRANSITION v1 (shared) === */
-#pageFlip{
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  pointer-events: none;
-  display: none;
-  perspective: 900px;
-}
-#pageFlip::before{
-  content:"";
-  position:absolute;
-  inset: -6vh -8vw;
-  background:
-    linear-gradient(90deg,
-      rgba(255,255,255,0.00) 0%,
-      rgba(255,255,255,0.65) 35%,
-      rgba(255,255,255,0.98) 62%,
-      rgba(255,255,255,1.00) 100%);
-  box-shadow: -18px 0 45px rgba(0,0,0,0.18);
-  transform-origin: right center;
-  transform: translateX(110%) rotateY(-35deg);
-  border-left: 1px solid rgba(0,0,0,0.08);
-}
-#pageFlip.run::before{
-  animation: pageFlipIn 320ms ease-out forwards;
-}
-@keyframes pageFlipIn{
-  0%   { transform: translateX(110%) rotateY(-35deg); opacity: 0.0; }
-  25%  { opacity: 1.0; }
-  100% { transform: translateX(0%) rotateY(0deg); opacity: 1.0; }
-}
-@media (prefers-reduced-motion: reduce){
-  #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
-}
-
-
-  .vbadge{
-    position: fixed;
-    right: calc(env(safe-area-inset-right) + 12px);
-    bottom: calc(env(safe-area-inset-bottom) + 10px);
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.78);
-    border: 2px solid rgba(255,255,255,0.92);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.10);
-    font-size: 12px;
-    font-weight: 900;
-    color: rgba(20,20,20,0.70);
-    z-index: 3;
-    user-select: none;
-  }
-
-    .guide{
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.82);
-    border: 2px solid rgba(255,255,255,0.92);
-    box-shadow: 0 10px 22px rgba(0,0,0,0.12);
-    transform: rotate(-0.8deg);
-    user-select: none;
-  }
-  .guide .bunny{
-    font-size: clamp(22px, 2.2vw, 30px);
-    line-height: 1;
-    filter: drop-shadow(0 3px 0 rgba(255,255,255,0.8));
-  }
-  .guide .speech{
-    display:flex;
-    flex-direction:column;
-    align-items:flex-start;
-    gap: 2px;
-  }
-  .guide .label{
-    font-size: clamp(11px, 1.3vw, 13px);
-    font-weight: 1000;
-    color: rgba(20,20,20,0.62);
-    letter-spacing: .06em;
-  }
-  .guide .text{
-    font-size: clamp(14px, 1.8vw, 18px);
-    font-weight: 1000;
-    color: rgba(20,20,20,0.78);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.9);
-  }
-  .guide{ animation: guideWiggle 3.2s ease-in-out infinite; }
-  @keyframes guideWiggle{
-    0%,100%{ transform: rotate(-0.8deg) translateY(0); }
-    50%{ transform: rotate(0.8deg) translateY(-1px); }
-  }
-  @media (prefers-reduced-motion: reduce){
-    .guide{ animation: none; }
-  }
-
-  /* --- clearer button labels (main + sub) --- */
-  .btnLabel{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap: 2px;
-    line-height: 1.05;
-  }
-  .btnLabel .main{
-    font-weight: 1000;
-    letter-spacing: .02em;
-  }
-  .btnLabel .sub{
-    font-size: clamp(11px, 1.35vw, 13px);
-    font-weight: 900;
-    opacity: 0.92;
-    letter-spacing: .02em;
-  }
-
-  
-  /* --- 🐰せんせいガイド（TOPだけ）：ボタン列の「見出し」として表示（ボタンに混ざらない） --- */
-  .teacherRow{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 18px;
-    background: rgba(255,255,255,0.90);
-    border: 2px solid rgba(255,255,255,0.96);
-    box-shadow: 0 12px 22px rgba(0,0,0,0.12);
-    user-select: none;
-    cursor: default;
-  }
-  .teacherRow .bunny{
-    width: 44px;
-    height: 44px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.86);
-    border: 2px solid rgba(255,255,255,0.96);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size: 22px;
-    line-height: 1;
-    box-shadow: 0 10px 18px rgba(0,0,0,0.10);
-  }
-  .teacherRow .lines{
-    display:flex;
-    flex-direction:column;
-    gap: 1px;
-    min-width: 0;
-  }
-  .teacherRow .tTitle{
-    font-size: 12px;
-    font-weight: 1000;
-    color: rgba(20,20,20,0.62);
-    letter-spacing: .08em;
-  }
-  .teacherRow .tMain{
-    font-size: 16px;
-    font-weight: 1000;
-    color: rgba(20,20,20,0.84);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.9);
+.guide-bubble .bunny { font-size: 26px; }
+.guide-bubble .text  {font-size: 15px; font-weight: 900; color: #555;
+    line-height: 1.1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: .02em;
   }
-  .teacherRow .tSub{
-    font-size: 11px;
-    font-weight: 900;
-    color: rgba(20,20,20,0.60);
-  }
-
-  /* 横画面（高さが低い）では、タイトルを左へ逃がし、ボタンを少し詰めて「タイトルが見えない」を防ぐ */
-  @media (max-height: 460px){
-    .titleCard{
-      left: calc(env(safe-area-inset-left) + 10px);
-      right: auto;
-      top: calc(env(safe-area-inset-top) + 6px);
-      width: min(520px, 60vw);
-      padding: 10px 12px;
-      border-radius: 18px;
-    }
-    .title{
-      left: calc(env(safe-area-inset-left) + 22px);
-      right: auto;
-      top: calc(env(safe-area-inset-top) + 10px);
-      text-align: left;
-      font-size: clamp(22px, 3.4vw, 34px);
-    }
-    .title::after{
-      margin-top: 4px;
-      font-size: clamp(12px, 1.6vw, 14px);
-    }
-    .menu{
-      top: 60%;
-      gap: 12px;
-    }
-    .btn{
-      padding: 12px 12px;
-      border-radius: 18px;
-      box-shadow: 0 8px 0 rgba(0,0,0,0.18), 0 14px 22px rgba(0,0,0,0.14);
-    }
-    .btn .btnIcon{
-      width: 34px; height: 34px;
-      border-radius: 12px;
-      font-size: 18px;
-    }
-    .btnLabel .sub{
-      font-size: 11px;
-    }
-    .teacherRow{
-      padding: 8px 10px;
-      border-radius: 16px;
-    }
-  }
+.guide-bubble::after {
+  content: ""; position: absolute;
+  bottom: -8px; left: 50%; transform: translateX(-50%);
+  border-width: 8px 8px 0; border-style: solid;
+  border-color: #fff transparent transparent transparent;
+}
 
 
-  /* === Ver.0.1: iPhone横でも「切れない・被らない」最優先の上書き === */
-  .titleCard{ z-index: 5; }
-  .title{ z-index: 6; }
-  .menu{ z-index: 4; }
-  .vbadge{ z-index: 7; }
-
-  /* 低い画面（iPhone横など）で下部が切れるのを防ぐ：高さを詰め、足りなければメニュー内だけスクロール */
-  @media (max-height: 460px){
-    .vbadge{
-      top: calc(env(safe-area-inset-top) + 8px);
-      bottom: auto;
-      right: calc(env(safe-area-inset-right) + 12px);
-    }
-  }
-  @media (max-height: 430px){
-    .title::after{ display:none; } /* タイトル下の説明は省略して高さを確保 */
-    .menu{
-      top: 52%;
-      gap: 10px;
-      max-height: calc((var(--vh) * 100) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 14px);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      padding-bottom: 10px;
-    }
-    .btn{
-      padding: 10px 12px;
-      border-radius: 18px;
-      box-shadow: 0 8px 0 rgba(0,0,0,0.18), 0 14px 22px rgba(0,0,0,0.14);
-    }
-    .btnLabel .sub{ display:none; } /* 2行目は切って「押す」優先 */
-    .teacherRow{ padding: 6px 10px; border-radius: 16px; }
-    .teacherRow .tSub{ display:none; }
-    .teacherRow .tMain{ font-size: 14px; white-space: normal; line-height: 1.1; }
-  }
-
-
-  /* 🐰せんせい：セリフ切替（フェード） */
-  .teacherRow .tMain, .teacherRow .tSub{
+  /* セリフ切替（フェード） */
+  .guide-bubble{
     transition: opacity .22s ease, transform .22s ease;
   }
-  .teacherRow.teacherFade .tMain, .teacherRow.teacherFade .tSub{
+  .guide-bubble.fade{
     opacity: 0;
-    transform: translateY(-3px);
+    transform: translate(-50%, -4px) scale(0.98);
   }
+@keyframes popIn {
+  from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
+  to   { transform: translate(-50%, 0)      scale(1);   opacity: 1; }
+}
+to{transform:translate(-50%, -240%) scale(1);} }
+
+
+  /* === ページ遷移 & 横画面ロック (維持) === */
+  #pageFlip {
+    position: fixed; inset: 0; z-index: 9999; display: none; background: #fff;
+  }
+  #pageFlip.run { display: block; animation: fadeOut 0.3s forwards; }
+  @keyframes fadeOut { from{opacity:0;} to{opacity:1;} }
+
+  #landscapeLock {
+    position: fixed; inset: 0; display: none; z-index: 99999;
+    background: rgba(40,40,40,0.95); color: #fff;
+    align-items: center; justify-content: center; flex-direction: column;
+  }
+  body.needLandscape #landscapeLock { display: flex; }
+
 </style>
 </head>
+
 <body>
-<div aria-hidden="true" class="float-layer"><span class="f" style="left:38%; bottom:-2vh; animation-duration:16.54s; animation-delay:-2.23s; font-size:27px;">🎶</span><span class="f" style="left:35%; bottom:-7vh; animation-duration:12.98s; animation-delay:-0.14s; font-size:23px;">✨</span><span class="f" style="left:38%; bottom:17vh; animation-duration:14.27s; animation-delay:-1.28s; font-size:25px;">🎵</span><span class="f" style="left:69%; bottom:8vh; animation-duration:15.24s; animation-delay:-3.98s; font-size:20px;">🎵</span><span class="f" style="left:47%; bottom:-14vh; animation-duration:14.91s; animation-delay:-1.29s; font-size:19px;">✨</span><span class="f" style="left:14%; bottom:-7vh; animation-duration:10.72s; animation-delay:-1.25s; font-size:20px;">🎶</span><span class="f" style="left:19%; bottom:-9vh; animation-duration:16.35s; animation-delay:-0.54s; font-size:27px;">🎶</span><span class="f" style="left:41%; bottom:-5vh; animation-duration:16.35s; animation-delay:-0.35s; font-size:27px;">🎵</span><span class="f" style="left:18%; bottom:4vh; animation-duration:17.69s; animation-delay:-0.66s; font-size:20px;">🎵</span><span class="f" style="left:39%; bottom:-20vh; animation-duration:15.41s; animation-delay:-0.43s; font-size:24px;">🎶</span><span class="f" style="left:39%; bottom:11vh; animation-duration:15.44s; animation-delay:-1.06s; font-size:23px;">🌟</span><span class="f" style="left:5%; bottom:-19vh; animation-duration:12.21s; animation-delay:-3.93s; font-size:25px;">✨</span></div>
-<div class="vbadge">Ver.0.1</div>
-<div aria-hidden="true" class="titleCard"></div><div class="title">ウクレレであそぼう</div>
-<div class="menu">
-<div class="teacherRow" aria-label="🐰せんせいの おしえて！">
-  <div class="bunny" aria-hidden="true">🐰</div>
-  <div class="lines">
-    <div class="tTitle">せんせいの おしえて！</div>
-    <div class="tMain" id="teacherMain">はじめては「タップで あそぶ」</div>
-    <div class="tSub" id="teacherSub">ウクレレがなくてもOK</div>
+
+<div class="app-container">
+  
+  <header class="title-area">
+    <h1 class="game-title">ウクレレであそぼう</h1>
+    <span class="sub-title">リズムにあわせて エンジョイ！</span>
+  </header>
+
+  <div class="center-illustration">
+    <svg preserveAspectRatio="xMidYMid meet" viewBox="0 0 800 600">
+      <g transform="translate(0, 20)"> <ellipse cx="400" cy="500" fill="#cfeeb0" rx="260" ry="60"></ellipse>
+        <path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="#7a4a21"></path>
+        <path d="M310 350 Q350 340 380 330" fill="none" stroke="#d8b04c" stroke-width="8"></path>
+        <path d="M300 300 Q340 290 370 280" fill="none" stroke="#d8b04c" stroke-width="8"></path>
+        <path d="M295 250 Q330 240 360 230" fill="none" stroke="#d8b04c" stroke-width="8"></path>
+        
+        <g fill="#6aaa1f">
+          <path d="M330 40 C180 20, 60 120, 40 200"></path>
+          <path d="M330 40 C200 0, 120 40, 90 100"></path>
+          <path d="M330 40 C460 20, 580 120, 620 220"></path>
+          <path d="M330 40 C480 0, 620 40, 660 120"></path>
+          <path d="M330 50 C310 10, 330 0, 350 -20"></path>
+        </g>
+        <circle cx="340" cy="60" fill="#c8b04a" r="18"></circle>
+        <circle cx="365" cy="65" fill="#c8b04a" r="18"></circle>
+
+        <g transform="translate(440 420) rotate(-15)">
+          <ellipse cx="50" cy="80" fill="#c68642" rx="45" ry="60"></ellipse>
+          <ellipse cx="50" cy="80" fill="#5a3a1a" rx="12" ry="16"></ellipse>
+          <rect fill="#b5651d" height="70" width="12" x="44" y="10"></rect>
+          <rect fill="#d79a3a" height="20" rx="5" width="40" x="30" y="-20"></rect>
+          <line stroke="#ffffff" stroke-width="2" x1="48" x2="48" y1="10" y2="150"></line>
+          <line stroke="#ffffff" stroke-width="2" x1="52" x2="52" y1="10" y2="150"></line>
+        </g>
+        
+        <g class="notes-burst" transform="translate(480 400)">
+           <text x="0" y="0" font-size="40" fill="#333" style="animation: flyNote 2s infinite">♪</text>
+           <text x="20" y="-20" font-size="30" fill="#333" style="animation: flyNote 2.5s infinite 0.5s">♫</text>
+        </g>
+      </g>
+      <style>
+        @keyframes flyNote {
+          0%{ opacity:0; transform: translate(0,0) rotate(0deg); }
+          50%{ opacity:1; }
+          100%{ opacity:0; transform: translate(30px, -80px) rotate(20deg); }
+        }
+      </style>
+    </svg>
   </div>
+
+  <div class="guide-bubble">
+    <div class="bunny">🐰</div>
+    <div class="text" id="teacherText">どっちで あそぶ？</div>
+  </div>
+
+  <div class="menu-row">
+    <div class="play-btn btn-tap" onclick="goFlip('game.html?mode=TAP')">
+      <span class="btn-icon">👆</span>
+      <h2 class="btn-title">タップで<br>あそぶ</h2>
+      <span class="btn-desc">すぐにあそべる！</span>
+    </div>
+
+    <div class="play-btn btn-uke" onclick="goFlip('ukulele.html')">
+      <span class="btn-icon">🎸</span>
+      <h2 class="btn-title">ウクレレで<br>あそぶ</h2>
+      <span class="btn-desc">楽器をつかうよ</span>
+    </div>
+  </div>
+
 </div>
 
-<button class="primary btn btnGame" id="btn-start" onclick="goFlip('game.html')"><span aria-hidden="true" class="btnIcon">🎮</span><span class="btnLabel"><span class="main">タップで あそぶ</span><span class="sub">はじめて / ウクレレなしOK</span></span></button>
-<button class="btn btnTuning" id="btn-tuning" onclick="goFlip('tuning.html')"><span aria-hidden="true" class="btnIcon">🪕</span><span class="btnLabel"><span class="main">おとで あそぶ（マイク）</span><span class="sub">ウクレレがある人 / マイクをつかうよ</span></span></button>
-<button class="btn btnHelp" id="btn-help" onclick="alert('【タップで あそぶ】\n画面をタップして あそぶよ！\n\n【おとで あそぶ（マイク）】\nウクレレをもって、マイクをつかうよ。\nまずは おとを あわせよう！')"><span aria-hidden="true" class="btnIcon">❓</span><span class="btnLabel"><span class="main">あそびかた</span><span class="sub">ルールをみる</span></span></button>
+<div id="pageFlip"></div>
+
+<div id="landscapeLock">
+  <div style="font-size:40px;">📱↔️</div>
+  <p style="font-weight:bold;">横画面にしてね</p>
 </div>
-<div class="palm-wrap">
-<svg aria-hidden="true" preserveaspectratio="xMidYMid meet" viewbox="0 0 800 600">
-<ellipse cx="400" cy="500" fill="#cfeeb0" rx="260" ry="60"></ellipse>
-      <g class="palmTree">
-<path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="#7a4a21"></path>
-<path d="M310 350 Q350 340 380 330" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-<path d="M300 300 Q340 290 370 280" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-<path d="M295 250 Q330 240 360 230" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-<g class="palmLeaves" fill="#6aaa1f">
-<path d="M330 40 C180 20, 60 120, 40 200"></path>
-<path d="M330 40 C200 0, 120 40, 90 100"></path>
-<path d="M330 40 C460 20, 580 120, 620 220"></path>
-<path d="M330 40 C480 0, 620 40, 660 120"></path>
-<path d="M330 50 C310 10, 330 0, 350 -20"></path>
-</g>
-<circle cx="340" cy="60" fill="#c8b04a" r="18"></circle>
-<circle cx="365" cy="65" fill="#c8b04a" r="18"></circle>
-<g transform="translate(440 420) rotate(-15)">
-<ellipse cx="50" cy="80" fill="#c68642" rx="45" ry="60"></ellipse>
-<ellipse cx="50" cy="80" fill="#5a3a1a" rx="12" ry="16"></ellipse>
-<rect fill="#b5651d" height="70" width="12" x="44" y="10"></rect>
-<rect fill="#d79a3a" height="20" rx="5" width="40" x="30" y="-20"></rect>
-<line stroke="#ffffff" stroke-width="2" x1="48" x2="48" y1="10" y2="150"></line>
-<line stroke="#ffffff" stroke-width="2" x1="52" x2="52" y1="10" y2="150"></line>
-</g>
-
-  <g id="ukeNotes" class="uke-notes" transform="translate(482 440)">
-  <!-- Notes burst from the EXISTING ukulele body (no extra symbols) -->
-  <text class="uke-note" x="0" y="0" style="--dx:-175px;--dy:-216px;--delay:0.00s;--dur:1.7s;--rot:-35deg;--fs:36px;">♪</text>
-  <text class="uke-note" x="0" y="0" style="--dx:-112px;--dy:-264px;--delay:0.10s;--dur:1.9s;--rot:-20deg;--fs:34px;">♫</text>
-  <text class="uke-note" x="0" y="0" style="--dx:-50px;--dy:-240px;--delay:0.20s;--dur:1.6s;--rot:-10deg;--fs:32px;">♪</text>
-  <text class="uke-note" x="0" y="0" style="--dx:0px;--dy:-288px;--delay:0.05s;--dur:2.0s;--rot:0deg;--fs:36px;">♬</text>
-  <text class="uke-note" x="0" y="0" style="--dx:56px;--dy:-252px;--delay:0.25s;--dur:1.8s;--rot:12deg;--fs:32px;">♪</text>
-  <text class="uke-note" x="0" y="0" style="--dx:119px;--dy:-276px;--delay:0.15s;--dur:2.1s;--rot:25deg;--fs:34px;">♫</text>
-  <text class="uke-note" x="0" y="0" style="--dx:188px;--dy:-222px;--delay:0.30s;--dur:1.7s;--rot:38deg;--fs:36px;">♪</text>
-
-  <text class="uke-note" x="0" y="0" style="--dx:-150px;--dy:-144px;--delay:0.55s;--dur:1.5s;--rot:-30deg;--fs:26px;">♪</text>
-  <text class="uke-note" x="0" y="0" style="--dx:-75px;--dy:-168px;--delay:0.70s;--dur:1.6s;--rot:-12deg;--fs:26px;">♫</text>
-  <text class="uke-note" x="0" y="0" style="--dx:0px;--dy:-180px;--delay:0.60s;--dur:1.55s;--rot:0deg;--fs:26px;">♪</text>
-  <text class="uke-note" x="0" y="0" style="--dx:75px;--dy:-168px;--delay:0.75s;--dur:1.6s;--rot:14deg;--fs:26px;">♬</text>
-  <text class="uke-note" x="0" y="0" style="--dx:150px;--dy:-144px;--delay:0.90s;--dur:1.5s;--rot:28deg;--fs:26px;">♪</text>
-
-  <text class="uke-note" x="0" y="0" style="--dx:-38px;--dy:-312px;--delay:1.05s;--dur:2.2s;--rot:-8deg;--fs:28px;">✨</text>
-  <text class="uke-note" x="0" y="0" style="--dx:38px;--dy:-318px;--delay:1.15s;--dur:2.2s;--rot:8deg;--fs:28px;">✨</text>
-</g>
-
-</svg>
-</div>
-<div id="pageFlip" aria-hidden="true"></div>
 
 <script>
+// === スクリプト（機能は元のまま維持） ===
+function setVh(){
+  const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  document.documentElement.style.setProperty('--vh', (h*0.01)+'px');
+}
+window.addEventListener('resize', setVh);
+window.addEventListener('orientationchange', ()=>setTimeout(setVh, 250));
+setVh();
 
-/* === PAGE_FLIP_TRANSITION v1 (shared) === */
 let __navLock = false;
 function goFlip(url){
   if(__navLock) return;
   __navLock = true;
-  const ov = document.getElementById('pageFlip');
-  if(!ov){ location.href = url; return; }
-  ov.style.display = 'block';
-  ov.classList.remove('run');
-  void ov.offsetWidth;
-  ov.classList.add('run');
-  setTimeout(()=>{ location.href = url; }, 260);
+  document.getElementById('pageFlip').classList.add('run');
+  setTimeout(()=>{ location.href = url; }, 300);
 }
 window.addEventListener('pageshow', ()=>{
   __navLock = false;
-  const ov = document.getElementById('pageFlip');
-  if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
+  document.getElementById('pageFlip').classList.remove('run');
 });
 
-
 (function(){
-  function setVh(){
-    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
-    document.documentElement.style.setProperty('--vh', (h*0.01)+'px');
+  function apply(){
+    var portrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('needLandscape', portrait);
   }
-  setVh();
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', setVh);
-    window.visualViewport.addEventListener('scroll', setVh);
-  }
-  window.addEventListener('resize', setVh);
-  window.addEventListener('orientationchange', ()=>setTimeout(setVh, 250));
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', apply);
+  apply();
 })();
 
 
-
-  // 🐰せんせい：セリフを順番に流す
+  // 🐰せんせい：セリフを順番に流す（トップ案内）
   (function(){
-    const row  = document.querySelector('.teacherRow');
-    const main = document.getElementById('teacherMain');
-    const sub  = document.getElementById('teacherSub');
-    if(!row || !main || !sub) return;
+    const el = document.getElementById('teacherText');
+    const bubble = document.querySelector('.guide-bubble');
+    if(!el || !bubble) return;
 
     const msgs = [
-      { main: "どっちで あそぶ？",              sub: "まずは えらんでね" },
-      { main: "タップだけでも たのしい！",       sub: "ウクレレがなくてもOK" },
-      { main: "リズムにあわせて　エンジョイ！",   sub: "HITしたら おとが なるよ" },
-      { main: "ウクレレがあるなら",              sub: "チューニング→ゲーム" },
-      { main: "まちがえても だいじょうぶ",       sub: "ゆっくり たのしもう" }
+      "どっちで あそぶ？",
+      "タップで すぐ あそべるよ！",
+      "リズムにあわせて　エンジョイ！",
+      "HITしたら おとが なるよ♪",
+      "ウクレレが あるなら こっち！"
     ];
-    let i = 0;
 
+    let i = 0;
     function swap(next){
-      row.classList.add('teacherFade');
+      bubble.classList.add('fade');
       setTimeout(()=>{
-        main.textContent = next.main;
-        sub.textContent  = next.sub;
-        row.classList.remove('teacherFade');
+        el.textContent = next;
+        bubble.classList.remove('fade');
       }, 170);
     }
 
-    // 初期：今表示されている文を尊重しつつ、1周目から流す
-    setTimeout(()=>swap(msgs[0]), 50);
-
+    // 2.8秒ごとに更新
     setInterval(()=>{
       i = (i + 1) % msgs.length;
       swap(msgs[i]);
-    }, 3200);
+    }, 2800);
   })();
 
 </script>

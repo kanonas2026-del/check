@@ -48,6 +48,7 @@
   /* === タイトルロゴ === */
   .title-area {
     margin-top: 2vh;
+    margin-bottom: 6px;
     text-align: center;
     position: relative;
     z-index: 20;
@@ -160,31 +161,42 @@
 
 
   /* === 先生（ガイド） === */
-  /* 元の bunny 先生を、ボタンの上あたりに配置 */
-  .guide-bubble {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -240%); /* タイトルとウクレレの間くらい */
-    background: #fff;
-    padding: 8px 20px;
-    border-radius: 50px;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    z-index: 15;
-    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-  .guide-bubble .bunny { font-size: 24px; }
-  .guide-bubble .text { font-size: 14px; font-weight: bold; color: #555; }
-  .guide-bubble::after {
-    content: ""; position: absolute;
-    bottom: -8px; left: 50%; transform: translateX(-50%);
-    border-width: 8px 8px 0; border-style: solid;
-    border-color: #fff transparent transparent transparent;
-  }
+/* タイトルと被らないように、上からの固定位置（レスポンシブ）に配置 */
+.guide-bubble {
+  position: absolute;
+  left: 50%;
+  top: clamp(120px, 22vh, 190px); /* 画面サイズに応じて上下 */
+  transform: translate(-50%, 0);
+  background: #fff;
+  padding: 10px 22px;
+  border-radius: 50px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 25; /* タイトルより手前で可読 */
+  animation: popIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 
-  @keyframes popIn { from{transform:translate(-50%, -200%) scale(0);} to{transform:translate(-50%, -240%) scale(1);} }
+/* スマホで高さが低い時は、さらに少し下へ */
+@media (max-height: 500px) {
+  .guide-bubble { top: clamp(110px, 26vh, 210px); }
+}
+
+.guide-bubble .bunny { font-size: 26px; }
+.guide-bubble .text  { font-size: 15px; font-weight: 900; color: #555; }
+.guide-bubble::after {
+  content: ""; position: absolute;
+  bottom: -8px; left: 50%; transform: translateX(-50%);
+  border-width: 8px 8px 0; border-style: solid;
+  border-color: #fff transparent transparent transparent;
+}
+
+@keyframes popIn {
+  from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
+  to   { transform: translate(-50%, 0)      scale(1);   opacity: 1; }
+}
+to{transform:translate(-50%, -240%) scale(1);} }
 
 
   /* === ページ遷移 & 横画面ロック (維持) === */

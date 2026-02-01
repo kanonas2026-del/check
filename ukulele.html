@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+
+<!-- PWA_LANDSCAPE v1 -->
+<link rel="manifest" href="manifest_v02.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ウクレレ">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>ウクレレモード</title>
+<style>
+  :root{ --bg:#f7f8ff; --card:#ffffff; --primary:#ff7a00; --text:#222; }
+  html,body{ margin:0; padding:0; height:100dvh; font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; background:var(--bg); color:var(--text); }
+  .wrap{ min-height:100%; display:flex; align-items:center; justify-content:center; padding:24px 16px; }
+  .card{ width:min(520px, 92vw); background:var(--card); border-radius:22px; box-shadow: 0 18px 50px rgba(0,0,0,0.12); padding:22px 18px; }
+  h1{ margin:0 0 10px; font-size:28px; letter-spacing:0.2px; }
+  .lead{ margin:0 0 18px; font-size:16px; line-height:1.55; color:#444; }
+  .btn{ width:100%; border:none; border-radius:18px; padding:18px 16px; font-size:18px; font-weight:900; cursor:pointer; margin-top:12px; }
+  .primary{ background:var(--primary); color:#fff; }
+  .secondary{ background:#eef0f7; color:#333; }
+  .mini{ margin-top:14px; font-size:13px; color:#666; text-align:center; }
+</style>
+
+<!-- LANDSCAPE_LOCK v1 -->
+<style>
+  /* Force-landscape UX: block portrait with a friendly overlay */
+  #landscapeLock{
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 2147483647;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 18px;
+    box-sizing: border-box;
+  }
+  body.needLandscape #landscapeLock{ display:flex; }
+  .landscapeCard{
+    width: min(560px, 92vw);
+    border-radius: 22px;
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    padding: 18px 18px 16px;
+    text-align: center;
+    color: #2b2b2b;
+  }
+  .landscapeRow{
+    display:flex; gap: 14px; align-items:center; justify-content:center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .rabbit{
+    font-size: 44px; line-height: 1;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  }
+  .phone{
+    font-size: 42px; line-height: 1;
+    transform: rotate(-18deg);
+  }
+  .landscapeTitle{
+    font-weight: 1000;
+    font-size: 24px;
+    margin: 6px 0 8px;
+  }
+  .landscapeText{
+    font-weight: 900;
+    font-size: 18px;
+    margin: 0;
+    opacity: .92;
+  }
+  .landscapeHint{
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    opacity: .75;
+  }
+  @media (max-height: 430px){
+    .landscapeTitle{ font-size: 20px; }
+    .landscapeText{ font-size: 16px; }
+    .rabbit{ font-size: 38px; }
+    .phone{ font-size: 36px; }
+  }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🪕 ウクレレモード</h1>
+    <p class="lead">ウクレレを持っている人はこちら。まずは<strong>チューニング</strong>→そのあと<strong>ゲーム</strong>がおすすめ。</p>
+
+    <button class="btn primary" onclick="goFlip('tuning_v02.html')">🎵 チューニング</button>
+    <button class="btn secondary" onclick="goFlip('game_v02.html?mode=WAIT')">🎮 ゲーム（まちモードから）</button>
+
+    <div class="mini">※ うまくいかないときは、ゲームの「タップモード」でも遊べます。</div>
+    <button class="btn secondary" style="margin-top:18px;" onclick="goFlip('index_v02.html')">🏝️ TOPへもどる</button>
+  </div>
+</div>
+
+<script>
+/* page flip (lightweight) */
+function goFlip(url){
+  const f=document.getElementById('flip');
+  if(!f){ location.href=url; return; }
+  f.style.display='block';
+  f.classList.remove('go');
+  void f.offsetWidth;
+  f.classList.add('go');
+  setTimeout(()=>{ location.href=url; }, 260);
+}
+</script>
+<div id="flip" style="display:none; position:fixed; inset:0; z-index:99999; background:#fff; transform-origin:left center; transform: perspective(900px) rotateY(0deg);"></div>
+<style>
+#flip.go{ animation: flipGo .28s ease-in forwards; }
+@keyframes flipGo{
+  0%{ opacity:1; transform: perspective(900px) rotateY(0deg); }
+  100%{ opacity:0.2; transform: perspective(900px) rotateY(-78deg); }
+}
+</style>
+
+<!-- LANDSCAPE_LOCK v1 -->
+<div id="landscapeLock" aria-hidden="true">
+  <div class="landscapeCard" role="dialog" aria-label="横画面にしてね">
+    <div class="landscapeRow">
+      <div class="rabbit">🐰</div>
+      <div class="phone">📱↔️</div>
+    </div>
+    <div class="landscapeTitle">よこがめんに してね！</div>
+    <p class="landscapeText">このアプリは よこがめんで あそぶよ</p>
+    <div class="landscapeHint">（iPhoneは画面回転ロックをOFFにしてね）</div>
+  </div>
+</div>
+
+
+<!-- LANDSCAPE_LOCK v1 -->
+<script>
+(function(){
+  function apply(){
+    var portrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('needLandscape', portrait);
+    var lock = document.getElementById('landscapeLock');
+    if(lock){
+      lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
+    }
+  }
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
+  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
+  // try to lock orientation when supported (PWA/Android)
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(function(){});
+    }
+  }catch(e){}
+  apply();
+})();
+</script>
+
+</body>
+</html>

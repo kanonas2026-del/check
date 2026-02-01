@@ -2,7 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+<!-- PWA_LANDSCAPE v1 -->
+<link rel="manifest" href="manifest_v02.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ウクレレ">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ウクレレ診断 - チューニング</title>
   <style>
     /* スタイルは前回の「グレーアウト」と「弦の色」を維持 */
@@ -303,6 +310,69 @@ width: 100vw; height: 100dvh; height: calc(var(--vh) * 100); position: relative;
 }
 
 </style>
+
+<!-- LANDSCAPE_LOCK v1 -->
+<style>
+  /* Force-landscape UX: block portrait with a friendly overlay */
+  #landscapeLock{
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 2147483647;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 18px;
+    box-sizing: border-box;
+  }
+  body.needLandscape #landscapeLock{ display:flex; }
+  .landscapeCard{
+    width: min(560px, 92vw);
+    border-radius: 22px;
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    padding: 18px 18px 16px;
+    text-align: center;
+    color: #2b2b2b;
+  }
+  .landscapeRow{
+    display:flex; gap: 14px; align-items:center; justify-content:center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .rabbit{
+    font-size: 44px; line-height: 1;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  }
+  .phone{
+    font-size: 42px; line-height: 1;
+    transform: rotate(-18deg);
+  }
+  .landscapeTitle{
+    font-weight: 1000;
+    font-size: 24px;
+    margin: 6px 0 8px;
+  }
+  .landscapeText{
+    font-weight: 900;
+    font-size: 18px;
+    margin: 0;
+    opacity: .92;
+  }
+  .landscapeHint{
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    opacity: .75;
+  }
+  @media (max-height: 430px){
+    .landscapeTitle{ font-size: 20px; }
+    .landscapeText{ font-size: 16px; }
+    .rabbit{ font-size: 38px; }
+    .phone{ font-size: 36px; }
+  }
+</style>
+
 </head>
 <body>
 
@@ -1831,6 +1901,45 @@ Ver.0.1
 </div>
 
 <div id="pageFlip" aria-hidden="true"></div>
+
+
+<!-- LANDSCAPE_LOCK v1 -->
+<div id="landscapeLock" aria-hidden="true">
+  <div class="landscapeCard" role="dialog" aria-label="横画面にしてね">
+    <div class="landscapeRow">
+      <div class="rabbit">🐰</div>
+      <div class="phone">📱↔️</div>
+    </div>
+    <div class="landscapeTitle">よこがめんに してね！</div>
+    <p class="landscapeText">このアプリは よこがめんで あそぶよ</p>
+    <div class="landscapeHint">（iPhoneは画面回転ロックをOFFにしてね）</div>
+  </div>
+</div>
+
+
+<!-- LANDSCAPE_LOCK v1 -->
+<script>
+(function(){
+  function apply(){
+    var portrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('needLandscape', portrait);
+    var lock = document.getElementById('landscapeLock');
+    if(lock){
+      lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
+    }
+  }
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
+  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
+  // try to lock orientation when supported (PWA/Android)
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(function(){});
+    }
+  }catch(e){}
+  apply();
+})();
+</script>
 
 </body>
 </html>

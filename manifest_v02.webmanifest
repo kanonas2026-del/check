@@ -1,0 +1,19 @@
+{
+  "name": "ウクレレで あそぼう",
+  "short_name": "ウクレレ",
+  "start_url": "index_v02.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#7ab1cc",
+  "theme_color": "#88cfd3",
+  "orientation": "landscape",
+  "description": "タップでもウクレレでも遊べる練習アプリ",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

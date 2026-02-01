@@ -3,288 +3,361 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#FFEB3B">
 <title>ウクレレであそぼう</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800;900&family=Mochiy+Pop+One&display=swap" rel="stylesheet">
 
 <style>
   :root {
     --vh: 1vh;
-  }
-  
-  html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-    position: fixed;
-    font-family: "Mochiy Pop One", "Zen Maru Gothic", sans-serif;
-    /* 鮮やかなトロピカルグラデーション */
-    background: linear-gradient(180deg, #4facfe 0%, #00f2fe 50%, #ffd194 100%);
-    user-select: none;
+    --primary-color: #FF6B6B;
+    --secondary-color: #4ECDC4;
+    --accent-color: #FFE66D;
+    --text-color: #2d3436;
+    --card-bg: rgba(255, 255, 255, 0.65);
+    --shadow-light: inset 5px 5px 10px rgba(255, 255, 255, 0.5), 5px 5px 15px rgba(0, 0, 0, 0.1);
+    --shadow-deep: 0 15px 35px rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.1);
   }
 
-  /* 雲のような背景装飾（動く） */
-  body::before {
-    content: ""; position: absolute; inset: 0;
-    background-image: 
-      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0, transparent 200px),
-      radial-gradient(circle at 80% 40%, rgba(255,255,255,0.3) 0, transparent 150px);
-    animation: cloudMove 20s ease-in-out infinite alternate;
-    pointer-events: none;
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100dvh;
+    height: calc(var(--vh) * 100);
+    overflow: hidden;
+    position: fixed;
+    font-family: "Mochiy Pop One", "M PLUS Rounded 1c", sans-serif;
+    /* トロピカルでワクワクするグラデーション背景 */
+    background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    user-select: none;
   }
-  @keyframes cloudMove { from{transform:translateY(0);} to{transform:translateY(-20px);} }
+  
+  /* 動く背景グラデーション */
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ドットパターンのオーバーレイ（ポップな質感） */
+  body::after {
+    content: ""; position: fixed; inset: 0;
+    background-image: radial-gradient(#ffffff 20%, transparent 20%);
+    background-size: 20px 20px;
+    opacity: 0.15; pointer-events: none;
+  }
 
   /* === メインレイアウト === */
   .app-container {
     position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: space-between;
-    padding: env(safe-area-inset-top) 20px 20px 20px;
+    display: grid;
+    grid-template-rows: auto 1fr; /* タイトルエリア + メインエリア */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     z-index: 10;
   }
 
-  /* === タイトルロゴ === */
-  .title-area {
-    margin-top: 2vh;
-    text-align: center;
+  /* タイトルエリア */
+  .header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 2vh;
     position: relative;
     z-index: 20;
-    filter: drop-shadow(0 4px 0 rgba(0,0,0,0.1));
   }
-  
+
   .game-title {
-    font-size: clamp(32px, 7vw, 64px);
-    margin: 0;
-    /* 文字色を濃いオレンジ、フチを白く太くして読みやすく */
-    color: #FF6B00; 
-    -webkit-text-stroke: 6px #ffffff;
-    paint-order: stroke fill;
-    /* テキストシャドウで立体感 */
-    text-shadow: 4px 4px 0 rgba(0,0,0,0.1);
-    transform: rotate(-2deg);
-    animation: titleFloat 3s ease-in-out infinite;
-  }
-  .sub-title {
-    display: block;
-    margin-top: -5px;
-    font-size: clamp(14px, 2vw, 18px);
-    color: #00897B;
-    background: rgba(255,255,255,0.9);
-    padding: 4px 16px;
-    border-radius: 20px;
-    display: inline-block;
-    font-weight: 900;
-    box-shadow: 0 4px 0 rgba(0,0,0,0.1);
-  }
-
-  @keyframes titleFloat {
-    0%, 100% { transform: rotate(-2deg) translateY(0); }
-    50% { transform: rotate(2deg) translateY(-8px); }
-  }
-
-  /* === 背景イラスト（ウクレレとヤシの木） === */
-  /* ボタンの邪魔にならないよう、中央奥に配置 */
-  .center-illustration {
-    position: absolute;
-    top: 55%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(800px, 90vw);
-    height: min(600px, 70vh);
-    z-index: -1; /* ボタンの後ろ */
-    opacity: 1; /* はっきり見せる */
-    pointer-events: none;
-  }
-  /* イラスト全体を少しゆらゆらさせる */
-  .center-illustration svg {
-    width: 100%; height: 100%;
-    animation: illustrationSway 6s ease-in-out infinite;
-    transform-origin: center bottom;
-  }
-  @keyframes illustrationSway {
-    0%,100%{ transform: rotate(-1deg); }
-    50%{ transform: rotate(1deg); }
-  }
-
-
-  /* === ボタンエリア（左右に配置） === */
-  .menu-row {
-    display: flex;
-    gap: clamp(180px, 30vw, 400px); /* ウクレレが見えるように間隔をあける */
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    margin-bottom: 4vh;
-  }
-  
-  /* レスポンシブ：画面が狭いときは間隔を狭める */
-  @media (max-width: 700px) {
-    .menu-row { gap: 20px; }
-    .center-illustration { opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); } /* スマホなら少し薄くしてボタン優先 */
-  }
-
-  /* ぷっくりボタン */
-  .play-btn {
-    position: relative;
-    width: min(240px, 35vw);
-    padding: 15px 10px;
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 24px;
-    border: 4px solid #fff;
-    box-shadow: 
-      0 10px 0 rgba(0,0,0,0.1), /* 厚み */
-      0 20px 30px rgba(0,0,0,0.15); /* 影 */
+    font-size: clamp(32px, 6vw, 64px);
+    color: #fff;
     text-align: center;
-    cursor: pointer;
-    transition: transform 0.1s;
-    text-decoration: none;
+    text-shadow: 4px 4px 0px #FF9F43, 8px 8px 0px rgba(0,0,0,0.15);
+    transform: rotate(-2deg);
+    animation: titleBounce 3s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  .game-title span { display: inline-block; }
+  
+  @keyframes titleBounce {
+    0%, 100% { transform: rotate(-2deg) translateY(0); }
+    50% { transform: rotate(2deg) translateY(-10px); }
+  }
+
+  /* メインメニューエリア（左右分割） */
+  .menu-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4vw;
+    padding: 20px;
+    perspective: 1000px;
+  }
+
+  /* === クレイ風カード（ボタン） === */
+  .mode-card {
+    position: relative;
+    width: min(340px, 40vw);
+    height: min(280px, 55vh);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 35px;
+    border: 4px solid #fff;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 
+      0 20px 40px rgba(0,0,0,0.1),
+      inset 0 -8px 0 rgba(0,0,0,0.1);
+    text-decoration: none;
+    overflow: hidden;
   }
 
-  .play-btn:active {
-    transform: translateY(6px);
-    box-shadow: 0 4px 0 rgba(0,0,0,0.1), 0 10px 15px rgba(0,0,0,0.1);
+  /* 押した時の「むにゅっ」とした動き */
+  .mode-card:active {
+    transform: scale(0.92) translateY(5px);
+    box-shadow: 0 5px 10px rgba(0,0,0,0.1), inset 0 4px 10px rgba(0,0,0,0.1);
   }
 
-  /* ボタンごとの色 */
-  .btn-tap { background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%); }
-  .btn-uke { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+  /* ホバー（PC用） */
+  @media (hover: hover) {
+    .mode-card:hover {
+      transform: translateY(-10px) scale(1.02);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.2), inset 0 -8px 0 rgba(0,0,0,0.1);
+    }
+  }
 
-  .btn-icon { font-size: 32px; margin-bottom: 4px; display: block; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.2)); }
-  .btn-title { font-size: clamp(16px, 2.5vw, 22px); color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.2); margin: 0; line-height: 1.2; }
-  .btn-desc { font-size: 11px; color: rgba(255,255,255,0.95); font-weight: 900; margin-top: 4px; display: block; }
+  /* カードごとのテーマカラー */
+  .card-tap {
+    background: linear-gradient(145deg, #FF9A9E 0%, #FECFEF 100%);
+  }
+  .card-uke {
+    background: linear-gradient(145deg, #4facfe 0%, #00f2fe 100%);
+  }
 
+  .card-icon {
+    font-size: clamp(40px, 8vw, 70px);
+    margin-bottom: 10px;
+    filter: drop-shadow(0 4px 0 rgba(0,0,0,0.2));
+    transition: transform 0.4s ease;
+  }
+  /* カードホバー時にアイコンが跳ねる */
+  .mode-card:hover .card-icon {
+    transform: scale(1.2) rotate(10deg);
+  }
 
-  /* === 先生（ガイド） === */
-  /* 元の bunny 先生を、ボタンの上あたりに配置 */
-  .guide-bubble {
+  .card-title {
+    font-size: clamp(20px, 3vw, 32px);
+    color: #fff;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+    margin: 0;
+    line-height: 1.2;
+  }
+  .card-sub {
+    font-size: clamp(12px, 1.5vw, 16px);
+    color: rgba(255,255,255,0.9);
+    font-weight: 800;
+    margin-top: 8px;
+    display: block;
+  }
+  
+  /* カード上の飾り（光沢） */
+  .mode-card::before {
+    content: ""; position: absolute;
+    top: 15px; left: 15px; right: 15px; height: 40%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 100%);
+    border-radius: 20px;
+    pointer-events: none;
+  }
+
+  /* === ウクレレマスコット（中央配置・装飾） === */
+  .mascot-container {
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -240%); /* タイトルとウクレレの間くらい */
+    bottom: -5vh; left: 50%;
+    transform: translateX(-50%);
+    width: min(500px, 60vw);
+    height: 60vh;
+    z-index: -1; /* カードの後ろ */
+    opacity: 0.9;
+    pointer-events: none;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+    animation: ukeFloat 6s ease-in-out infinite;
+  }
+  @keyframes ukeFloat {
+    0%, 100% { transform: translateX(-50%) rotate(-5deg); }
+    50% { transform: translateX(-50%) rotate(5deg); }
+  }
+
+  /* === 先生ガイド（吹き出し） === */
+  .teacher-bubble {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
     background: #fff;
-    padding: 8px 20px;
+    padding: 10px 24px;
     border-radius: 50px;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    font-size: clamp(14px, 2vw, 18px);
+    color: #555;
+    z-index: 5;
+    white-space: nowrap;
+    animation: floatBubble 4s ease-in-out infinite;
     display: flex;
     align-items: center;
-    gap: 8px;
-    z-index: 15;
-    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    gap: 10px;
   }
-  .guide-bubble .bunny { font-size: 24px; }
-  .guide-bubble .text { font-size: 14px; font-weight: bold; color: #555; }
-  .guide-bubble::after {
+  .teacher-bubble::after {
     content: ""; position: absolute;
-    bottom: -8px; left: 50%; transform: translateX(-50%);
-    border-width: 8px 8px 0; border-style: solid;
+    bottom: -10px; left: 50%; transform: translateX(-50%);
+    border-width: 10px 10px 0; border-style: solid;
     border-color: #fff transparent transparent transparent;
   }
-
-  @keyframes popIn { from{transform:translate(-50%, -200%) scale(0);} to{transform:translate(-50%, -240%) scale(1);} }
-
-
-  /* === ページ遷移 & 横画面ロック (維持) === */
-  #pageFlip {
-    position: fixed; inset: 0; z-index: 9999; display: none; background: #fff;
+  @keyframes floatBubble {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-10px); }
   }
-  #pageFlip.run { display: block; animation: fadeOut 0.3s forwards; }
-  @keyframes fadeOut { from{opacity:0;} to{opacity:1;} }
 
+
+  /* === ページ遷移演出 === */
+  #pageFlip {
+    position: fixed; inset: 0; z-index: 9999;
+    pointer-events: none; display: none;
+    background: #fff;
+    opacity: 0;
+  }
+  #pageFlip.run {
+    display: block;
+    animation: wipeOut 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  }
+  @keyframes wipeOut {
+    0% { opacity: 0; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* === ランドスケープ警告 === */
   #landscapeLock {
-    position: fixed; inset: 0; display: none; z-index: 99999;
-    background: rgba(40,40,40,0.95); color: #fff;
-    align-items: center; justify-content: center; flex-direction: column;
+    position: fixed; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    z-index: 2147483647;
+    background: #2d3436; color: #fff;
+    flex-direction: column; text-align: center;
   }
   body.needLandscape #landscapeLock { display: flex; }
+  .lock-icon { font-size: 60px; margin-bottom: 20px; animation: rotatePhone 2s infinite; }
+  @keyframes rotatePhone { 0%,100%{transform:rotate(0deg);} 20%{transform:rotate(-90deg);} 80%{transform:rotate(-90deg);} }
 
+  /* === モバイル調整 === */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .game-title { font-size: 28px; margin-top: 5px; }
+    .header { padding-top: 10px; }
+    .mode-card { height: min(200px, 60vh); width: 40vw; }
+    .card-icon { font-size: 40px; margin-bottom: 5px; }
+    .mascot-container { width: 300px; bottom: -40px; }
+    .teacher-bubble { top: 18%; font-size: 12px; padding: 6px 16px; }
+  }
 </style>
 </head>
 
 <body>
 
+<div class="bg-particles" aria-hidden="true">
+  </div>
+
 <div class="app-container">
   
-  <header class="title-area">
-    <h1 class="game-title">ウクレレであそぼう</h1>
-    <span class="sub-title">リズムにあわせて エンジョイ！</span>
+  <header class="header">
+    <h1 class="game-title">
+      <span>ウ</span><span>ク</span><span>レ</span><span>レ</span><span>で</span><span>あ</span><span>そ</span><span>ぼ</span><span>う</span>
+    </h1>
   </header>
 
-  <div class="center-illustration">
-    <svg preserveAspectRatio="xMidYMid meet" viewBox="0 0 800 600">
-      <g transform="translate(0, 20)"> <ellipse cx="400" cy="500" fill="#cfeeb0" rx="260" ry="60"></ellipse>
-        <path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="#7a4a21"></path>
-        <path d="M310 350 Q350 340 380 330" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-        <path d="M300 300 Q340 290 370 280" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-        <path d="M295 250 Q330 240 360 230" fill="none" stroke="#d8b04c" stroke-width="8"></path>
-        
-        <g fill="#6aaa1f">
+  <div class="teacher-bubble">
+    <span style="font-size:1.5em">🐰</span>
+    <span>どっちで あそぶ？</span>
+  </div>
+
+  <main class="menu-stage">
+    
+    <div class="mascot-container">
+      <svg preserveaspectratio="xMidYMid meet" viewbox="0 0 800 600" width="100%" height="100%">
+        <ellipse cx="400" cy="500" fill="rgba(0,0,0,0.1)" rx="200" ry="40"></ellipse>
+        <path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="#D2691E"></path>
+        <path d="M360 480 C300 360, 340 260, 330 160 C320 80, 300 40, 280 20 L320 20 C360 60, 380 120, 390 200 C400 300, 380 380, 420 480 Z" fill="url(#woodGradient)" opacity="0.8"></path>
+        <path d="M310 350 Q350 340 380 330" fill="none" stroke="#F1C40F" stroke-width="8" stroke-linecap="round"></path>
+        <path d="M300 300 Q340 290 370 280" fill="none" stroke="#F1C40F" stroke-width="8" stroke-linecap="round"></path>
+        <path d="M295 250 Q330 240 360 230" fill="none" stroke="#F1C40F" stroke-width="8" stroke-linecap="round"></path>
+        <g fill="#A2D149">
           <path d="M330 40 C180 20, 60 120, 40 200"></path>
           <path d="M330 40 C200 0, 120 40, 90 100"></path>
           <path d="M330 40 C460 20, 580 120, 620 220"></path>
           <path d="M330 40 C480 0, 620 40, 660 120"></path>
-          <path d="M330 50 C310 10, 330 0, 350 -20"></path>
         </g>
-        <circle cx="340" cy="60" fill="#c8b04a" r="18"></circle>
-        <circle cx="365" cy="65" fill="#c8b04a" r="18"></circle>
-
         <g transform="translate(440 420) rotate(-15)">
-          <ellipse cx="50" cy="80" fill="#c68642" rx="45" ry="60"></ellipse>
-          <ellipse cx="50" cy="80" fill="#5a3a1a" rx="12" ry="16"></ellipse>
-          <rect fill="#b5651d" height="70" width="12" x="44" y="10"></rect>
-          <rect fill="#d79a3a" height="20" rx="5" width="40" x="30" y="-20"></rect>
+          <ellipse cx="50" cy="80" fill="#8D6E63" rx="45" ry="60"></ellipse>
+          <rect fill="#5D4037" height="70" width="12" x="44" y="10"></rect>
+          <rect fill="#F39C12" height="20" rx="5" width="40" x="30" y="-20"></rect>
           <line stroke="#ffffff" stroke-width="2" x1="48" x2="48" y1="10" y2="150"></line>
-          <line stroke="#ffffff" stroke-width="2" x1="52" x2="52" y1="10" y2="150"></line>
         </g>
-        
-        <g class="notes-burst" transform="translate(480 400)">
-           <text x="0" y="0" font-size="40" fill="#333" style="animation: flyNote 2s infinite">♪</text>
-           <text x="20" y="-20" font-size="30" fill="#333" style="animation: flyNote 2.5s infinite 0.5s">♫</text>
+        <g id="ukeNotes" class="uke-notes" transform="translate(482 440)">
+          <text x="0" y="0" style="font-size:60px; fill:#FF007F; animation: popNote 2s infinite;">♪</text>
+          <text x="60" y="-40" style="font-size:50px; fill:#00E5FF; animation: popNote 2.5s infinite 0.5s;">♫</text>
+          <text x="-40" y="-60" style="font-size:55px; fill:#F4D03F; animation: popNote 2.2s infinite 1s;">♬</text>
         </g>
-      </g>
-      <style>
-        @keyframes flyNote {
-          0%{ opacity:0; transform: translate(0,0) rotate(0deg); }
-          50%{ opacity:1; }
-          100%{ opacity:0; transform: translate(30px, -80px) rotate(20deg); }
-        }
-      </style>
-    </svg>
-  </div>
-
-  <div class="guide-bubble">
-    <div class="bunny">🐰</div>
-    <div class="text">どっちで あそぶ？</div>
-  </div>
-
-  <div class="menu-row">
-    <div class="play-btn btn-tap" onclick="goFlip('game.html?mode=TAP')">
-      <span class="btn-icon">👆</span>
-      <h2 class="btn-title">タップで<br>あそぶ</h2>
-      <span class="btn-desc">すぐにあそべる！</span>
+        <defs>
+          <linearGradient id="woodGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+             <stop offset="0%" style="stop-color:#A0522D;stop-opacity:1" />
+             <stop offset="100%" style="stop-color:#8B4513;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <style>
+          @keyframes popNote {
+            0% { opacity:0; transform: translate(0,0) scale(0.5); }
+            50% { opacity:1; }
+            100% { opacity:0; transform: translate(20px, -100px) scale(1.2) rotate(20deg); }
+          }
+        </style>
+      </svg>
     </div>
 
-    <div class="play-btn btn-uke" onclick="goFlip('ukulele.html')">
-      <span class="btn-icon">🎸</span>
-      <h2 class="btn-title">ウクレレで<br>あそぶ</h2>
-      <span class="btn-desc">楽器をつかうよ</span>
+    <div class="mode-card card-tap" onclick="goFlip('game.html?mode=TAP')" role="button" tabindex="0">
+      <div class="card-icon">👆</div>
+      <h2 class="card-title">タップで<br>あそぶ</h2>
+      <span class="card-sub">ウクレレなしでOK！</span>
     </div>
-  </div>
 
+    <div class="mode-card card-uke" onclick="goFlip('ukulele.html')" role="button" tabindex="0">
+      <div class="card-icon">🎸</div>
+      <h2 class="card-title">ウクレレで<br>あそぶ</h2>
+      <span class="card-sub">本物の楽器をつかうよ</span>
+    </div>
+
+  </main>
+</div>
+
+<div id="landscapeLock" aria-hidden="true">
+  <div class="lock-icon">📱↔️</div>
+  <div style="font-size:20px; font-weight:bold;">横画面にしてね！</div>
 </div>
 
 <div id="pageFlip"></div>
 
-<div id="landscapeLock">
-  <div style="font-size:40px;">📱↔️</div>
-  <p style="font-weight:bold;">横画面にしてね</p>
-</div>
-
 <script>
-// === スクリプト（機能は元のまま維持） ===
+/* === 共通スクリプト === */
+
+// ビューポート高さ調整
 function setVh(){
   const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
   document.documentElement.style.setProperty('--vh', (h*0.01)+'px');
@@ -293,25 +366,37 @@ window.addEventListener('resize', setVh);
 window.addEventListener('orientationchange', ()=>setTimeout(setVh, 250));
 setVh();
 
+// 画面遷移
 let __navLock = false;
 function goFlip(url){
   if(__navLock) return;
   __navLock = true;
-  document.getElementById('pageFlip').classList.add('run');
-  setTimeout(()=>{ location.href = url; }, 300);
+  const ov = document.getElementById('pageFlip');
+  
+  // タップ時の音を入れるならここ（AudioContext等）
+  
+  if(!ov){ location.href = url; return; }
+  ov.classList.add('run');
+  setTimeout(()=>{ location.href = url; }, 350); // アニメーション時間に合わせる
 }
+
 window.addEventListener('pageshow', ()=>{
   __navLock = false;
-  document.getElementById('pageFlip').classList.remove('run');
+  const ov = document.getElementById('pageFlip');
+  if(ov){ ov.classList.remove('run'); }
 });
 
+// 横画面ロック
 (function(){
   function apply(){
     var portrait = window.innerHeight > window.innerWidth;
     document.body.classList.toggle('needLandscape', portrait);
+    var lock = document.getElementById('landscapeLock');
+    if(lock) lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
   }
   window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', apply);
+  window.addEventListener('orientationchange', ()=>setTimeout(apply, 60));
+  try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{}); }catch(e){}
   apply();
 })();
 </script>

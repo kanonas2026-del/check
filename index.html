@@ -69,7 +69,8 @@
   }
   .sub-title {
     display: block;
-    margin-top: -5px;
+    margin-top: -2px;
+    margin-bottom: 10px;
     font-size: clamp(14px, 2vw, 18px);
     color: #00897B;
     background: rgba(255,255,255,0.9);
@@ -128,11 +129,11 @@
   /* ぷっくりボタン */
   .play-btn {
     position: relative;
-    width: min(240px, 35vw);
-    padding: 15px 10px;
+    width: min(220px, 30vw);
+    padding: 12px 10px;
     background: rgba(255, 255, 255, 0.9);
     border-radius: 24px;
-    border: 4px solid #fff;
+    border: 3px solid #fff;
     box-shadow: 
       0 10px 0 rgba(0,0,0,0.1), /* 厚み */
       0 20px 30px rgba(0,0,0,0.15); /* 影 */
@@ -144,6 +145,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    opacity: 0.92;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .play-btn:active {
@@ -165,10 +169,10 @@
 .guide-bubble {
   position: absolute;
   left: 50%;
-  top: clamp(120px, 22vh, 190px); /* 画面サイズに応じて上下 */
+  top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   transform: translate(-50%, 0);
   background: #fff;
-  padding: 8px 22px;
+  padding: 10px 22px;
   border-radius: 50px;
   box-shadow: 0 6px 15px rgba(0,0,0,0.15);
   display: flex;
@@ -196,7 +200,10 @@
   from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
   to   { transform: translate(-50%, 0)      scale(1);   opacity: 1; }
 }
-/* === ページ遷移 & 横画面ロック (維持) === */
+to{transform:translate(-50%, -240%) scale(1);} }
+
+
+  /* === ページ遷移 & 横画面ロック (維持) === */
   #pageFlip {
     position: fixed; inset: 0; z-index: 9999; display: none; background: #fff;
   }
@@ -211,24 +218,36 @@
   body.needLandscape #landscapeLock { display: flex; }
 
 
-
-  /* === FORCE: ボタンは必ず横並び（最終勝ち） === */
-  .menu-row{
-    display:flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: clamp(14px, 4vw, 70px) !important;
+  /* セリフ切替（フェード） */
+  .guide-bubble{
+    transition: opacity .22s ease, transform .22s ease;
   }
-  .play-btn{
-    flex: 0 1 auto !important;
-    width: min(260px, 42vw) !important;
-  }
-  @media (max-width: 700px){
-    .play-btn{ width: min(230px, 46vw) !important; }
+  .guide-bubble.fade{
+    opacity: 0;
+    transform: translate(-50%, -4px) scale(0.98);
   }
 
+  /* === POINT_TO_BUTTON v1: セリフがどっちのボタンか分かるように === */
+  .guide-bubble.point-left { left: 33%; }
+  .guide-bubble.point-right{ left: 67%; }
+  .guide-bubble.point-center{ left: 50%; }
+  .guide-bubble.point-left::after { left: 30%; }
+  .guide-bubble.point-right::after{ left: 70%; }
+  .guide-bubble.point-center::after{ left: 50%; }
+
+  /* どっちのボタンか“光らせる” */
+  .play-btn.hint{
+    animation: hintPulse 1.15s ease-in-out infinite;
+  }
+  @keyframes hintPulse{
+    0%,100%{ transform: translateZ(0) scale(1); }
+    50%    { transform: translateZ(0) scale(1.03); }
+  }
+
+  /* 画面が低いときは、さらに少し下へ（被り防止） */
+  @media (max-height: 430px){
+    .guide-bubble{ top: clamp(130px, 30vh, 230px); }
+  }
 </style>
 </head>
 
@@ -289,13 +308,13 @@
   </div>
 
   <div class="menu-row">
-    <div class="play-btn btn-tap" onclick="goFlip('game.html?mode=TAP')">
+    <div id="btnTap" class="play-btn btn-tap" onclick="goFlip('game.html?mode=TAP')">
       <span class="btn-icon">👆</span>
       <h2 class="btn-title">タップで<br>あそぶ</h2>
       <span class="btn-desc">すぐにあそべる！</span>
     </div>
 
-    <div class="play-btn btn-uke" onclick="goFlip('ukulele.html')">
+    <div id="btnUke" class="play-btn btn-uke" onclick="goFlip('ukulele.html')">
       <span class="btn-icon">🎸</span>
       <h2 class="btn-title">ウクレレで<br>あそぶ</h2>
       <span class="btn-desc">楽器をつかうよ</span>
@@ -344,33 +363,56 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-  // 🐰せんせい：セリフを順番に流す（トップ案内）
+  // POINT_TO_BUTTON v1: 🐰せんせいのセリフで、どっちのボタンか分かるようにする
   (function(){
-    const el = document.getElementById('teacherText');
     const bubble = document.querySelector('.guide-bubble');
-    if(!el || !bubble) return;
+    const textEl = document.getElementById('teacherText');
+    const btnTap = document.getElementById('btnTap');
+    const btnUke = document.getElementById('btnUke');
+    if(!bubble || !textEl) return;
 
     const msgs = [
-      "どっちで あそぶ？",
-      "タップで すぐ あそべるよ！",
-      "HITしたら おとが なるよ♪",
-      "ウクレレが あるなら こっち！",
-      "はじめては タップがおすすめ"
+      { text: "どっちで あそぶ？",            target: "center" },
+      { text: "タップで すぐ あそべるよ！",     target: "tap" },
+      { text: "HITしたら おとが なるよ♪",      target: "tap" },
+      { text: "ウクレレが あるなら こっち！",    target: "uke" },
+      { text: "はじめては タップがおすすめ",     target: "tap" },
     ];
+
+    function setTarget(t){
+      bubble.classList.remove('point-left','point-right','point-center');
+      if(t === "tap"){
+        bubble.classList.add('point-left');
+        btnTap && btnTap.classList.add('hint');
+        btnUke && btnUke.classList.remove('hint');
+      }else if(t === "uke"){
+        bubble.classList.add('point-right');
+        btnUke && btnUke.classList.add('hint');
+        btnTap && btnTap.classList.remove('hint');
+      }else{
+        bubble.classList.add('point-center');
+        btnTap && btnTap.classList.remove('hint');
+        btnUke && btnUke.classList.remove('hint');
+      }
+    }
 
     let i = 0;
     function swap(next){
       bubble.classList.add('fade');
       setTimeout(()=>{
-        el.textContent = next;
+        textEl.textContent = next.text;
+        setTarget(next.target);
         bubble.classList.remove('fade');
       }, 170);
     }
 
+    // 初期
+    setTarget(msgs[0].target);
+
     setInterval(()=>{
       i = (i + 1) % msgs.length;
       swap(msgs[i]);
-    }, 2800);
+    }, 2600);
   })();
 
 </script>

@@ -104,10 +104,8 @@
     transform-origin: center bottom;
   }
   @keyframes illustrationSway {
-    0%,100%{ transform: rotate(-2.2deg) translateY(0); }
-    50%{ transform: rotate(2.6deg) translateY(-6px); }
-  }
-    50%{ transform: rotate(1deg); }
+    0%,100%{ transform: rotate(-2.0deg) translateY(0); }
+    50%{ transform: rotate(2.4deg) translateY(-5px); }
   }
 
 
@@ -186,12 +184,7 @@
 }
 
 .guide-bubble .bunny { font-size: 26px; }
-.guide-bubble .text  {font-size: 15px; font-weight: 900; color: #555;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+.guide-bubble .text  { font-size: 15px; font-weight: 900; color: #555; }
 .guide-bubble::after {
   content: ""; position: absolute;
   bottom: -8px; left: 50%; transform: translateX(-50%);
@@ -199,23 +192,11 @@
   border-color: #fff transparent transparent transparent;
 }
 
-
-  /* セリフ切替（フェード） */
-  .guide-bubble{
-    transition: opacity .22s ease, transform .22s ease;
-  }
-  .guide-bubble.fade{
-    opacity: 0;
-    transform: translate(-50%, -4px) scale(0.98);
-  }
 @keyframes popIn {
   from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
   to   { transform: translate(-50%, 0)      scale(1);   opacity: 1; }
 }
-to{transform:translate(-50%, -240%) scale(1);} }
-
-
-  /* === ページ遷移 & 横画面ロック (維持) === */
+/* === ページ遷移 & 横画面ロック (維持) === */
   #pageFlip {
     position: fixed; inset: 0; z-index: 9999; display: none; background: #fff;
   }
@@ -228,6 +209,25 @@ to{transform:translate(-50%, -240%) scale(1);} }
     align-items: center; justify-content: center; flex-direction: column;
   }
   body.needLandscape #landscapeLock { display: flex; }
+
+
+
+  /* === FORCE: ボタンは必ず横並び（最終勝ち） === */
+  .menu-row{
+    display:flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(14px, 4vw, 70px) !important;
+  }
+  .play-btn{
+    flex: 0 1 auto !important;
+    width: min(260px, 42vw) !important;
+  }
+  @media (max-width: 700px){
+    .play-btn{ width: min(230px, 46vw) !important; }
+  }
 
 </style>
 </head>
@@ -353,9 +353,9 @@ window.addEventListener('pageshow', ()=>{
     const msgs = [
       "どっちで あそぶ？",
       "タップで すぐ あそべるよ！",
-      "リズムにあわせて　エンジョイ！",
       "HITしたら おとが なるよ♪",
-      "ウクレレが あるなら こっち！"
+      "ウクレレが あるなら こっち！",
+      "はじめては タップがおすすめ"
     ];
 
     let i = 0;
@@ -367,7 +367,6 @@ window.addEventListener('pageshow', ()=>{
       }, 170);
     }
 
-    // 2.8秒ごとに更新
     setInterval(()=>{
       i = (i + 1) % msgs.length;
       swap(msgs[i]);

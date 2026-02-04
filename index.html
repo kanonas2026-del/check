@@ -179,7 +179,8 @@
   align-items: center;
   gap: 10px;
   z-index: 25; /* タイトルより手前で可読 */
-  animation: popIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* animation removed: JSがtransformを制御するため */
+  animation: none;
 }
 
 /* スマホで高さが低い時は、さらに少し下へ */
@@ -200,7 +201,7 @@
   from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
   to   { transform: translate(-50%, 0)      scale(1);   opacity: 1; }
 }
-to{transform:translate(-50%, -240%) scale(1);} }
+
 
 
   /* === ページ遷移 & 横画面ロック (維持) === */
@@ -224,7 +225,6 @@ to{transform:translate(-50%, -240%) scale(1);} }
   }
   .guide-bubble.fade{
     opacity: 0;
-    transform: translate(-50%, -4px) scale(0.98);
   }
 
   /* === POINT_TO_BUTTON v1: セリフがどっちのボタンか分かるように === */
@@ -416,147 +416,118 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-  // BUBBLE_ANCHOR v5: 🐰せんせい（“帯”に収めて被り防止）
+  // BUBBLE_ANCHOR v6: 🐰せんせい（トップ専用：iPhoneでも“ボタンに被らない”を最優先）
   (function(){
     const bubble = document.querySelector('.guide-bubble');
     const textEl = document.getElementById('teacherText');
-    const el_tap = document.getElementById("btnTap");
-    const el_uke = document.getElementById("btnUke");
-    const row_0 = document.getElementById("btnTap");
-    const row_1 = document.getElementById("btnUke");
-    const rowEls = [row_0, row_1].filter(Boolean);
-    const header = document.querySelector(".title-area");
-    const avoidTop_0 = document.querySelector(".sub-title");
-    const avoidTopEls = [avoidTop_0].filter(Boolean);
+    const btnTap = document.getElementById('btnTap');
+    const btnUke = document.getElementById('btnUke');
+    const subTitle = document.querySelector('.sub-title');
 
-    if(!bubble || !textEl) return;
+    if(!bubble || !textEl || !btnTap || !btnUke) return;
 
     const msgs = [
       { text: "どっちで あそぶ？", target: "center" },
       { text: "タップで すぐ あそべるよ！", target: "tap" },
       { text: "HITしたら おとが なるよ♪", target: "tap" },
       { text: "ウクレレが あるなら こっち！", target: "uke" },
-      { text: "はじめては タップがおすすめ", target: "tap" }
+      { text: "はじめては タップがおすすめ", target: "tap" },
     ];
 
     let curTarget = msgs[0].target;
 
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-    function clearHints(){
-      el_tap && el_tap.classList.remove("hint");
-      el_uke && el_uke.classList.remove("hint");
+    function anchorPos(t){
+      const rTap = btnTap.getBoundingClientRect();
+      const rUke = btnUke.getBoundingClientRect();
+      if(t === "tap") return { x0: rTap.left + rTap.width/2, top: rTap.top, bottom: rTap.bottom };
+      if(t === "uke") return { x0: rUke.left + rUke.width/2, top: rUke.top, bottom: rUke.bottom };
+      // center
+      return {
+        x0: (rTap.left + rTap.width/2 + rUke.left + rUke.width/2) / 2,
+        top: Math.min(rTap.top, rUke.top),
+        bottom: Math.max(rTap.bottom, rUke.bottom)
+      };
     }
 
     function setHint(t){
-      clearHints();
-      switch(t){
-        case "tap": el_tap && el_tap.classList.add("hint"); break;
-        case "uke": el_uke && el_uke.classList.add("hint"); break;
-        default: break;
-      }
+      btnTap.classList.remove('hint');
+      btnUke.classList.remove('hint');
+      if(t === "tap") btnTap.classList.add('hint');
+      if(t === "uke") btnUke.classList.add('hint');
     }
 
-    function getAnchorEl(t){
-      switch(t){
-        case "tap": return el_tap;
-        case "uke": return el_uke;
-        default: return null;
-      }
-    }
+    function computeBand(){
+      const rTap = btnTap.getBoundingClientRect();
+      const rUke = btnUke.getBoundingClientRect();
+      const rowTop = Math.min(rTap.top, rUke.top);
 
-    function computeBandTop(){
-      let top = 12;
-      if(header) top = Math.max(top, header.getBoundingClientRect().bottom + 12);
-      avoidTopEls.forEach(el=>{
-        const r = el.getBoundingClientRect();
-        // 上部にあるものだけ
-        if(r.top < window.innerHeight * 0.5){
-          top = Math.max(top, r.bottom + 12);
-        }
-      });
-      return top;
-    }
-
-    function computeBandBottom(fallbackTop){
-      // 大ボタン（カード）の上端を bandBottom にする（これより下へ行かない）
-      let rowTop = null;
-      rowEls.forEach(el=>{
-        const r = el.getBoundingClientRect();
-        rowTop = (rowTop === null) ? r.top : Math.min(rowTop, r.top);
-      });
-      if(rowTop === null) rowTop = fallbackTop;
-      return Math.min(window.innerHeight - 12, rowTop - 10);
-    }
-
-    function anchorPos(anchorEl){
-      if(anchorEl){
-        const r = anchorEl.getBoundingClientRect();
-        return { x0: r.left + r.width/2, top: r.top, bottom: r.bottom };
+      // 上限：サブタイトルの下（なければ12px）
+      let topLimit = 12;
+      if(subTitle){
+        topLimit = Math.max(topLimit, subTitle.getBoundingClientRect().bottom + 10);
       }
-      // center fallback (2ボタン中間)
-      const a = el_tap;
-      const b = el_uke;
-      if(a && b){
-        const ra = a.getBoundingClientRect();
-        const rb = b.getBoundingClientRect();
-        return {
-          x0: (ra.left + ra.width/2 + rb.left + rb.width/2)/2,
-          top: Math.min(ra.top, rb.top),
-          bottom: Math.max(ra.bottom, rb.bottom)
-        };
-      }
-      return { x0: window.innerWidth*0.5, top: window.innerHeight*0.35, bottom: window.innerHeight*0.35+1 };
+
+      // 下限：ボタンの上（絶対にボタンに被せない）
+      const bottomLimit = Math.max(12, rowTop - 10);
+
+      return { topLimit, bottomLimit, rowTop };
     }
 
     function positionBubble(t){
       curTarget = t;
       setHint(t);
 
-      const anchorEl = getAnchorEl(t);
-      const ap = anchorPos(anchorEl);
-
-      // まず“帯”を作る
-      const bandTop = computeBandTop();
-      const bandBottom = computeBandBottom(ap.top);
-
-      // いったん等倍で計測
-      bubble.style.setProperty('--bubble-scale', '1');
+      // 初期等倍で計測（transformはJSが持つのでCSSアニメ無し）
       bubble.style.transform = 'translate(-50%, 0) scale(1)';
-      const bRect0 = bubble.getBoundingClientRect();
-      let bw = bRect0.width;
-      let bh = bRect0.height;
+      const br0 = bubble.getBoundingClientRect();
+      const bw0 = br0.width;
+      const bh0 = br0.height;
 
-      const bandH = Math.max(10, bandBottom - bandTop);
+      const { topLimit, bottomLimit, rowTop } = computeBand();
+      const bandH = Math.max(1, bottomLimit - topLimit);
 
-      // 帯に入らないなら縮小（下に逃がさず、縮めて入れる）
+      // 帯が狭い時は「読める範囲」で縮小（最低0.70）
       let scale = 1;
-      if(bh > bandH){
-        scale = clamp(bandH / bh, 0.78, 1);
+      if(bh0 > bandH){
+        scale = clamp(bandH / bh0, 0.70, 1);
       }
 
-      // 縮小を反映（サイズは概算で計算）
-      const bwS = bw * scale;
-      const bhS = bh * scale;
+      const bw = bw0 * scale;
+      const bh = bh0 * scale;
 
-      // X（端切れ防止）
-      const x = clamp(ap.x0, 12 + bwS/2, window.innerWidth - 12 - bwS/2);
+      const ap = anchorPos(t);
 
-      // Y：基本はアンカーの上。必ず“帯”の中へクランプ
-      const desiredY = ap.top - bhS - 12;
-      const maxY = bandBottom - bhS;
-      const y = clamp(desiredY, bandTop, maxY);
+      // X：画面内に収める
+      const x = clamp(ap.x0, 12 + bw/2, window.innerWidth - 12 - bw/2);
 
-      // 尻尾：アンカーが上にあるなら下向き、アンカーが下なら上向き
-      const tailUp = (y > ap.bottom + 6);
+      // Y：基本はアンカーの上。ただし「ボタンに被らない」を最優先
+      let y = ap.top - bh - 12;
+
+      // まずボタン上の上限（= bottomLimit - bh）を超えない
+      const yMaxNoOverlap = bottomLimit - bh;
+      if(y > yMaxNoOverlap) y = yMaxNoOverlap;
+
+      // 可能ならサブタイトルの下に収める（topLimit <= yMaxNoOverlap のとき）
+      if(topLimit <= yMaxNoOverlap){
+        y = clamp(y, topLimit, yMaxNoOverlap);
+      }else{
+        // 帯が成立しない＝タイトルが大きすぎる場合
+        // → ボタンに被らない位置を優先し、上は少し被ってもOK
+        y = clamp(y, 12, yMaxNoOverlap);
+      }
+
+      // 画面外防止
+      y = clamp(y, 12, window.innerHeight - 12 - bh);
+
+      // 尻尾位置（アンカーに寄せる）
+      const tail = clamp((bw/2) + (ap.x0 - x), 18, bw - 18);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
-      bubble.classList.toggle('tail-up', tailUp);
-
-      // 尻尾をアンカー側へ寄せる
-      const tail = clamp((bwS/2) + (ap.x0 - x), 18, bwS - 18);
+      bubble.classList.remove('tail-up'); // トップは常に“下向き尻尾”でOK
       bubble.style.setProperty('--tail-left', tail + 'px');
     }
 
@@ -572,7 +543,6 @@ window.addEventListener('pageshow', ()=>{
     }
 
     requestAnimationFrame(()=>positionBubble(msgs[0].target));
-
     window.addEventListener('resize', ()=>positionBubble(curTarget));
     window.addEventListener('orientationchange', ()=>setTimeout(()=>positionBubble(curTarget), 80));
 

@@ -137,7 +137,7 @@
   .guide-bubble.point-center{ left: var(--tail-left, 50%); }
   .guide-bubble.point-left::after  { left: 30%; }
   .guide-bubble.point-right::after { left: 70%; }
-  .guide-bubble.point-center::after{ left: 50%; }
+  .guide-bubble.point-center::after{ left: var(--tail-left, 50%); }
 
   @keyframes popIn {
     from { transform: translate(-50%, -14px) scale(0.6); opacity: 0; }
@@ -324,6 +324,22 @@
     border-style: solid;
     border-color: transparent transparent #fff;
   }
+
+  /* === BUBBLE_ANCHOR_V5: “帯”に収める＋縮小で被り防止（iPhone/iPad/PC統一） === */
+  .guide-bubble{
+    will-change: transform, top, left;
+  }
+  .guide-bubble{
+    /* translate はJSで入れる。scale は var で制御 */
+    --bubble-scale: 1;
+  }
+  .guide-bubble.tail-up::after{
+    top: -8px;
+    bottom: auto;
+    border-width: 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent #fff;
+  }
 </style>
 </head>
 <body>
@@ -443,7 +459,7 @@
   })();
 
 
-  // BUBBLE_ANCHOR v4: 🐰せんせい（被り回避：基本は“ボタンの上”に置く）
+  // BUBBLE_ANCHOR v5: 🐰せんせい（“帯”に収めて被り防止）
   (function(){
     const bubble = document.querySelector('.guide-bubble');
     const textEl = document.getElementById('teacherText');
@@ -454,8 +470,8 @@
     const row_1 = document.getElementById("btnGame");
     const rowEls = [row_0, row_1].filter(Boolean);
     const header = null;
-    const avoid_0 = document.querySelector("#btnTop");
-    const avoidEls = [avoid_0].filter(Boolean);
+    const avoidTop_0 = document.querySelector("#btnTop");
+    const avoidTopEls = [avoidTop_0].filter(Boolean);
 
     if(!bubble || !textEl) return;
 
@@ -466,6 +482,8 @@
     ];
 
     let curTarget = msgs[0].target;
+
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
     function clearHints(){
       el_tune && el_tune.classList.remove("hint");
@@ -492,10 +510,48 @@
       }
     }
 
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function computeBandTop(){
+      let top = 12;
+      if(header) top = Math.max(top, header.getBoundingClientRect().bottom + 12);
+      avoidTopEls.forEach(el=>{
+        const r = el.getBoundingClientRect();
+        // 上部にあるものだけ
+        if(r.top < window.innerHeight * 0.5){
+          top = Math.max(top, r.bottom + 12);
+        }
+      });
+      return top;
+    }
 
-    function intersects(a,b){
-      return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+    function computeBandBottom(fallbackTop){
+      // 大ボタン（カード）の上端を bandBottom にする（これより下へ行かない）
+      let rowTop = null;
+      rowEls.forEach(el=>{
+        const r = el.getBoundingClientRect();
+        rowTop = (rowTop === null) ? r.top : Math.min(rowTop, r.top);
+      });
+      if(rowTop === null) rowTop = fallbackTop;
+      return Math.min(window.innerHeight - 12, rowTop - 10);
+    }
+
+    function anchorPos(anchorEl){
+      if(anchorEl){
+        const r = anchorEl.getBoundingClientRect();
+        return { x0: r.left + r.width/2, top: r.top, bottom: r.bottom };
+      }
+      // center fallback (2ボタン中間)
+      const a = el_tune;
+      const b = el_game;
+      if(a && b){
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        return {
+          x0: (ra.left + ra.width/2 + rb.left + rb.width/2)/2,
+          top: Math.min(ra.top, rb.top),
+          bottom: Math.max(ra.bottom, rb.bottom)
+        };
+      }
+      return { x0: window.innerWidth*0.5, top: window.innerHeight*0.35, bottom: window.innerHeight*0.35+1 };
     }
 
     function positionBubble(t){
@@ -503,112 +559,49 @@
       setHint(t);
 
       const anchorEl = getAnchorEl(t);
+      const ap = anchorPos(anchorEl);
 
-      let x0 = window.innerWidth * 0.5;
-      let top = window.innerHeight * 0.35;
-      let bottom = top + 1;
+      // まず“帯”を作る
+      const bandTop = computeBandTop();
+      const bandBottom = computeBandBottom(ap.top);
 
-      if(anchorEl){
-        const r = anchorEl.getBoundingClientRect();
-        x0 = r.left + r.width/2;
-        top = r.top;
-        bottom = r.bottom;
-      } else {
-        const a = el_tune;
-        const b = el_game;
-        if(a && b){
-          const ra = a.getBoundingClientRect();
-          const rb = b.getBoundingClientRect();
-          x0 = (ra.left + ra.width/2 + rb.left + rb.width/2) / 2;
-          top = Math.min(ra.top, rb.top);
-          bottom = Math.max(ra.bottom, rb.bottom);
-        }
-      }
-
-      // 上の最低ライン（タイトル下、避けたいUI下）
-      let minTop = 12;
-      if(header) minTop = Math.max(minTop, header.getBoundingClientRect().bottom + 12);
-      avoidEls.forEach(el => {
-        const r = el.getBoundingClientRect();
-        if(r.top < window.innerHeight * 0.45) {
-          minTop = Math.max(minTop, r.bottom + 10);
-        }
-      });
-
-      // サイズ計測
+      // いったん等倍で計測
+      bubble.style.setProperty('--bubble-scale', '1');
+      bubble.style.transform = 'translate(-50%, 0) scale(1)';
       const bRect0 = bubble.getBoundingClientRect();
-      const bw = bRect0.width;
-      const bh = bRect0.height;
+      let bw = bRect0.width;
+      let bh = bRect0.height;
 
-      // 行（大ボタン）の上端：ここより上に吹き出しを収める（被り防止）
-      let rowTop = null;
-      rowEls.forEach(el => {
-        const r = el.getBoundingClientRect();
-        rowTop = (rowTop === null) ? r.top : Math.min(rowTop, r.top);
-      });
-      if(rowTop === null) rowTop = top; // fallback
+      const bandH = Math.max(10, bandBottom - bandTop);
 
-      const safeAboveY = rowTop - bh - 8; // 吹き出しbottomがrowTopより上に
-
-      // まずX
-      let x = clamp(x0, 12 + bw/2, window.innerWidth - 12 - bw/2);
-
-      // まずY（基本：ターゲットの上）
-      let y = top - bh - 12;
-      let tailUp = false;
-
-      // “ボタンの上”に収める
-      y = Math.min(y, safeAboveY);
-
-      // 上が足りないなら、ターゲットの下へ
-      if(y < minTop){
-        y = bottom + 12;
-        tailUp = true;
-      }
-      y = clamp(y, minTop, window.innerHeight - 12 - bh);
-
-      // 避けたいUIと被るなら（横→縦）
-      function bubbleRect(cx, cy){
-        return { left: cx - bw/2, right: cx + bw/2, top: cy, bottom: cy + bh };
+      // 帯に入らないなら縮小（下に逃がさず、縮めて入れる）
+      let scale = 1;
+      if(bh > bandH){
+        scale = clamp(bandH / bh, 0.78, 1);
       }
 
-      const pad = 10;
-      avoidEls.forEach(el => {
-        const ar = el.getBoundingClientRect();
-        let br = bubbleRect(x, y);
-        if(!intersects(br, ar)) return;
+      // 縮小を反映（サイズは概算で計算）
+      const bwS = bw * scale;
+      const bhS = bh * scale;
 
-        // 横に逃がす
-        const aCx = (ar.left + ar.right)/2;
-        if(x > aCx){
-          x = clamp(ar.right + pad + bw/2, 12 + bw/2, window.innerWidth - 12 - bw/2);
-        } else {
-          x = clamp(ar.left - pad - bw/2, 12 + bw/2, window.innerWidth - 12 - bw/2);
-        }
+      // X（端切れ防止）
+      const x = clamp(ap.x0, 12 + bwS/2, window.innerWidth - 12 - bwS/2);
 
-        br = bubbleRect(x, y);
-        if(!intersects(br, ar)) return;
+      // Y：基本はアンカーの上。必ず“帯”の中へクランプ
+      const desiredY = ap.top - bhS - 12;
+      const maxY = bandBottom - bhS;
+      const y = clamp(desiredY, bandTop, maxY);
 
-        // 縦に逃がす（下→上）
-        const down = ar.bottom + pad;
-        if(down + bh <= window.innerHeight - 12){
-          y = clamp(down, minTop, window.innerHeight - 12 - bh);
-          tailUp = true;
-        } else {
-          const up = ar.top - bh - pad;
-          if(up >= minTop){
-            y = clamp(up, minTop, window.innerHeight - 12 - bh);
-            tailUp = false;
-          }
-        }
-      });
+      // 尻尾：アンカーが上にあるなら下向き、アンカーが下なら上向き
+      const tailUp = (y > ap.bottom + 6);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
-      bubble.style.transform = 'translate(-50%, 0)';
+      bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
       bubble.classList.toggle('tail-up', tailUp);
 
-      const tail = clamp((bw/2) + (x0 - x), 18, bw - 18);
+      // 尻尾をアンカー側へ寄せる
+      const tail = clamp((bwS/2) + (ap.x0 - x), 18, bwS - 18);
       bubble.style.setProperty('--tail-left', tail + 'px');
     }
 

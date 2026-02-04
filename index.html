@@ -191,7 +191,7 @@
 .guide-bubble .text  { font-size: 15px; font-weight: 900; color: #555; }
 .guide-bubble::after {
   content: ""; position: absolute;
-  bottom: -8px; left: 50%; transform: translateX(-50%);
+  bottom: -8px; left: var(--tail-left, 50%); transform: translateX(-50%);
   border-width: 8px 8px 0; border-style: solid;
   border-color: #fff transparent transparent transparent;
 }
@@ -230,7 +230,7 @@ to{transform:translate(-50%, -240%) scale(1);} }
   /* === POINT_TO_BUTTON v1: セリフがどっちのボタンか分かるように === */
   .guide-bubble.point-left { left: 33%; }
   .guide-bubble.point-right{ left: 67%; }
-  .guide-bubble.point-center{ left: 50%; }
+  .guide-bubble.point-center{ left: var(--tail-left, 50%); }
   .guide-bubble.point-left::after { left: 30%; }
   .guide-bubble.point-right::after{ left: 70%; }
   .guide-bubble.point-center::after{ left: 50%; }
@@ -247,6 +247,43 @@ to{transform:translate(-50%, -240%) scale(1);} }
   /* 画面が低いときは、さらに少し下へ（被り防止） */
   @media (max-height: 430px){
     .guide-bubble{ top: clamp(130px, 30vh, 230px); }
+  }
+
+  /* === BUBBLE_ANCHOR_V2: 端末差で吹き出しが離れないよう、ボタン基準で配置（iPad対応） === */
+  .guide-bubble{
+    will-change: transform, top, left;
+  }
+  .guide-bubble.tail-up::after{
+    top: -8px;
+    bottom: auto;
+    border-width: 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent #fff;
+  }
+
+  /* === BUBBLE_ANCHOR_V3: ボタン基準＋衝突回避（iPhone/iPad/PCで同じ感じ） === */
+  .guide-bubble{
+    will-change: transform, top, left;
+  }
+  .guide-bubble.tail-up::after{
+    top: -8px;
+    bottom: auto;
+    border-width: 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent #fff;
+  }
+  /* 低い画面では少しだけ小さくして被り回避 */
+  @media (max-height: 420px){
+    .guide-bubble{ transform: translate(-50%, 0) scale(0.94); }
+  }
+
+  /* === BUBBLE_ANCHOR_V4: 被り回避（吹き出しは“ボタンの上”に基本配置） === */
+  .guide-bubble.tail-up::after{
+    top: -8px;
+    bottom: auto;
+    border-width: 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent #fff;
   }
 </style>
 </head>
@@ -363,52 +400,190 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-  // POINT_TO_BUTTON v1: 🐰せんせいのセリフで、どっちのボタンか分かるようにする
+  // BUBBLE_ANCHOR v4: 🐰せんせい（被り回避：基本は“ボタンの上”に置く）
   (function(){
     const bubble = document.querySelector('.guide-bubble');
     const textEl = document.getElementById('teacherText');
-    const btnTap = document.getElementById('btnTap');
-    const btnUke = document.getElementById('btnUke');
+    const el_tap = document.getElementById("btnTap");
+    const el_uke = document.getElementById("btnUke");
+    const row_0 = document.getElementById("btnTap");
+    const row_1 = document.getElementById("btnUke");
+    const rowEls = [row_0, row_1].filter(Boolean);
+    const header = document.querySelector(".title-area");
+    const avoid_0 = document.querySelector(".sub-title");
+    const avoidEls = [avoid_0].filter(Boolean);
+
     if(!bubble || !textEl) return;
 
     const msgs = [
-      { text: "どっちで あそぶ？",            target: "center" },
-      { text: "タップで すぐ あそべるよ！",     target: "tap" },
-      { text: "HITしたら おとが なるよ♪",      target: "tap" },
-      { text: "ウクレレが あるなら こっち！",    target: "uke" },
-      { text: "はじめては タップがおすすめ",     target: "tap" },
+      { text: "どっちで あそぶ？", target: "center" },
+      { text: "タップで すぐ あそべるよ！", target: "tap" },
+      { text: "HITしたら おとが なるよ♪", target: "tap" },
+      { text: "ウクレレが あるなら こっち！", target: "uke" },
+      { text: "はじめては タップがおすすめ", target: "tap" }
     ];
 
-    function setTarget(t){
-      bubble.classList.remove('point-left','point-right','point-center');
-      if(t === "tap"){
-        bubble.classList.add('point-left');
-        btnTap && btnTap.classList.add('hint');
-        btnUke && btnUke.classList.remove('hint');
-      }else if(t === "uke"){
-        bubble.classList.add('point-right');
-        btnUke && btnUke.classList.add('hint');
-        btnTap && btnTap.classList.remove('hint');
-      }else{
-        bubble.classList.add('point-center');
-        btnTap && btnTap.classList.remove('hint');
-        btnUke && btnUke.classList.remove('hint');
+    let curTarget = msgs[0].target;
+
+    function clearHints(){
+      el_tap && el_tap.classList.remove("hint");
+      el_uke && el_uke.classList.remove("hint");
+    }
+
+    function setHint(t){
+      clearHints();
+      switch(t){
+        case "tap": el_tap && el_tap.classList.add("hint"); break;
+        case "uke": el_uke && el_uke.classList.add("hint"); break;
+        default: break;
       }
     }
 
-    let i = 0;
+    function getAnchorEl(t){
+      switch(t){
+        case "tap": return el_tap;
+        case "uke": return el_uke;
+        default: return null;
+      }
+    }
+
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    function intersects(a,b){
+      return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+    }
+
+    function positionBubble(t){
+      curTarget = t;
+      setHint(t);
+
+      const anchorEl = getAnchorEl(t);
+
+      let x0 = window.innerWidth * 0.5;
+      let top = window.innerHeight * 0.35;
+      let bottom = top + 1;
+
+      if(anchorEl){
+        const r = anchorEl.getBoundingClientRect();
+        x0 = r.left + r.width/2;
+        top = r.top;
+        bottom = r.bottom;
+      } else {
+        const a = el_tap;
+        const b = el_uke;
+        if(a && b){
+          const ra = a.getBoundingClientRect();
+          const rb = b.getBoundingClientRect();
+          x0 = (ra.left + ra.width/2 + rb.left + rb.width/2) / 2;
+          top = Math.min(ra.top, rb.top);
+          bottom = Math.max(ra.bottom, rb.bottom);
+        }
+      }
+
+      // 上の最低ライン（タイトル下、避けたいUI下）
+      let minTop = 12;
+      if(header) minTop = Math.max(minTop, header.getBoundingClientRect().bottom + 12);
+      avoidEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if(r.top < window.innerHeight * 0.45) {
+          minTop = Math.max(minTop, r.bottom + 10);
+        }
+      });
+
+      // サイズ計測
+      const bRect0 = bubble.getBoundingClientRect();
+      const bw = bRect0.width;
+      const bh = bRect0.height;
+
+      // 行（大ボタン）の上端：ここより上に吹き出しを収める（被り防止）
+      let rowTop = null;
+      rowEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        rowTop = (rowTop === null) ? r.top : Math.min(rowTop, r.top);
+      });
+      if(rowTop === null) rowTop = top; // fallback
+
+      const safeAboveY = rowTop - bh - 8; // 吹き出しbottomがrowTopより上に
+
+      // まずX
+      let x = clamp(x0, 12 + bw/2, window.innerWidth - 12 - bw/2);
+
+      // まずY（基本：ターゲットの上）
+      let y = top - bh - 12;
+      let tailUp = false;
+
+      // “ボタンの上”に収める
+      y = Math.min(y, safeAboveY);
+
+      // 上が足りないなら、ターゲットの下へ
+      if(y < minTop){
+        y = bottom + 12;
+        tailUp = true;
+      }
+      y = clamp(y, minTop, window.innerHeight - 12 - bh);
+
+      // 避けたいUIと被るなら（横→縦）
+      function bubbleRect(cx, cy){
+        return { left: cx - bw/2, right: cx + bw/2, top: cy, bottom: cy + bh };
+      }
+
+      const pad = 10;
+      avoidEls.forEach(el => {
+        const ar = el.getBoundingClientRect();
+        let br = bubbleRect(x, y);
+        if(!intersects(br, ar)) return;
+
+        // 横に逃がす
+        const aCx = (ar.left + ar.right)/2;
+        if(x > aCx){
+          x = clamp(ar.right + pad + bw/2, 12 + bw/2, window.innerWidth - 12 - bw/2);
+        } else {
+          x = clamp(ar.left - pad - bw/2, 12 + bw/2, window.innerWidth - 12 - bw/2);
+        }
+
+        br = bubbleRect(x, y);
+        if(!intersects(br, ar)) return;
+
+        // 縦に逃がす（下→上）
+        const down = ar.bottom + pad;
+        if(down + bh <= window.innerHeight - 12){
+          y = clamp(down, minTop, window.innerHeight - 12 - bh);
+          tailUp = true;
+        } else {
+          const up = ar.top - bh - pad;
+          if(up >= minTop){
+            y = clamp(up, minTop, window.innerHeight - 12 - bh);
+            tailUp = false;
+          }
+        }
+      });
+
+      bubble.style.left = x + 'px';
+      bubble.style.top  = y + 'px';
+      bubble.style.transform = 'translate(-50%, 0)';
+      bubble.classList.toggle('tail-up', tailUp);
+
+      const tail = clamp((bw/2) + (x0 - x), 18, bw - 18);
+      bubble.style.setProperty('--tail-left', tail + 'px');
+    }
+
     function swap(next){
       bubble.classList.add('fade');
       setTimeout(()=>{
         textEl.textContent = next.text;
-        setTarget(next.target);
-        bubble.classList.remove('fade');
+        requestAnimationFrame(()=>{
+          positionBubble(next.target);
+          bubble.classList.remove('fade');
+        });
       }, 170);
     }
 
-    // 初期
-    setTarget(msgs[0].target);
+    requestAnimationFrame(()=>positionBubble(msgs[0].target));
 
+    window.addEventListener('resize', ()=>positionBubble(curTarget));
+    window.addEventListener('orientationchange', ()=>setTimeout(()=>positionBubble(curTarget), 80));
+
+    let i = 0;
     setInterval(()=>{
       i = (i + 1) % msgs.length;
       swap(msgs[i]);

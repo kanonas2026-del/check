@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
-<title>ウクレレ・ゲーム</title>
+<title>ウクレレであそぶ / タップであそぶ</title>
 <style>/* iphone-viewport-fix */
 
     :root{
@@ -39,40 +39,82 @@
       z-index: 100; backdrop-filter: blur(2px);
     }
     .menu-card {
+  padding-top: 56px;
+
       background: var(--card); width: min(560px, 96vw);
       max-height: calc(100% - 24px); overflow-y: auto;
       border-radius: 26px; padding: 16px;
       box-shadow: 0 10px 0 rgba(122,177,204,0.28), 0 16px 32px var(--shadow);
       display: flex; flex-direction: column; gap: 10px;
     }
-    .menu-card h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
+    .menu-card h1 { margin: 0 0 10px; font-size: 26px; text-align: center; color: #4a3728; text-shadow: 0 3px 0 rgba(255,255,255,0.65); }
     
-    .menu-btn {
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.90)); color: #4a3728;
-      border: none; border-radius: 22px; padding: 12px 14px;
-      cursor: pointer; display: flex; gap: 12px; align-items: center;
-      box-shadow: 0 6px 0 rgba(122,177,204,0.26);
-      transition: transform 0.08s; text-align: left;
+    .menu-btn{
+      border: 4px solid rgba(255,255,255,0.85);
+      border-radius: 26px;
+      padding: 16px 16px;
+      cursor: pointer;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      text-align: left;
+      box-shadow: 0 10px 0 rgba(0,0,0,0.12), 0 20px 34px rgba(0,0,0,0.16);
+      transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+      will-change: transform;
+      color: #fff;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.20);
     }
-    .menu-btn:active { transform: translateY(2px); box-shadow: none; }
-    .badge { flex: 0 0 38px; height: 38px; border-radius: 12px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
-    .menu-btn.mode2 .badge{ background: #ffde59; color:#4a3728; }
+    .menu-btn:hover{ filter: brightness(1.02); }
+    .menu-btn:active{ transform: translateY(2px); box-shadow: 0 6px 0 rgba(0,0,0,0.10); }
+    /* Color themes (トップの雰囲気に寄せる) */
+    .menu-btn.mode1{ background: linear-gradient(135deg, #ff7a3d 0%, #ffd06a 100%); }
+    .menu-btn.mode2{ background: linear-gradient(135deg, #2fc1ff 0%, #2b6bff 100%); }
+    .menu-btn.mode3{ background: linear-gradient(135deg, #43e97b 0%, #38a1ff 100%); }
+    .menu-btn.mode4{ background: linear-gradient(135deg, #ff6fd8 0%, #ffc371 100%); }
+.badge{
+      flex: 0 0 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.25);
+      border: 2px solid rgba(255,255,255,0.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 22px;
+      color: #fff;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,0.25);
+    }
+.menu-btn.mode2 .badge{ background: #ffde59; color:#4a3728; }
     .menu-btn.mode3 .badge{ background: #7ed957; }
     .menu-btn.mode4 .badge{ background: #5ce1e6; color: #133; }
     
-    .menu-text .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
-    .menu-text small { font-size: 11px; opacity: 0.8; }
+    .menu-text .title { font-size: 18px; font-weight: 900; margin-bottom: 2px; }
+    .menu-text small { font-size: 12px; opacity: 0.92; }
 
     /* モード選択 */
     .mode-select { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); }
     .mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-    .mode-pill {
-      border: 2px solid rgba(0,0,0,0.1); background: #fff; border-radius: 20px;
-      padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
+    .mode-pill{
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #fff0e6 0%, #e6f7ff 100%);
+      border: 2px solid rgba(255,255,255,0.85);
+      color: #4a3728;
+      font-weight: 900;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 10px 0 rgba(0,0,0,0.10);
+      transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+      text-shadow: 0 2px 0 rgba(255,255,255,0.55);
     }
-    .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
-
-
+    .mode-pill:active{ transform: translateY(2px); box-shadow: none; }
+    .mode-pill.active{
+      background: linear-gradient(135deg, #ff7a3d 0%, #ffb84d 100%);
+      border-color: rgba(255,255,255,0.90);
+      color: #fff;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.18);
+      box-shadow: 0 12px 0 rgba(0,0,0,0.12), 0 18px 30px rgba(0,0,0,0.12);
+    }
 /* === MODE BUTTONS (match index) === */
 .mode-select .mode-pill{
   background: rgba(255,255,255,0.78);
@@ -540,13 +582,66 @@ body.playing #menu-overlay{ display:none; }
   .mode-pill{ font-size: 12px; padding: 8px 12px; }
   .action-btn{ font-size: 14px; padding: 12px 12px; }
 }
+
+/* VERSION BADGE */
+.ver-badge{
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  padding: 6px 10px;
+  font-weight: 900;
+  font-size: 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  z-index: 9999;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+/* TOP_NAV_V03 */
+.top-nav{
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 5;
+  pointer-events: none; /* buttons enable themselves */
+}
+.nav-btn{
+  pointer-events: auto;
+  border: 3px solid rgba(255,255,255,0.85);
+  border-radius: 18px;
+  padding: 10px 14px;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  color: #fff;
+  background: rgba(0,0,0,0.30);
+  box-shadow: 0 10px 0 rgba(0,0,0,0.12);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.nav-btn:active{
+  transform: translateY(2px);
+  box-shadow: none;
+}
 </style>
 </head>
 <body class="menuOpen">
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
-<h1 id="menuTitle" style="margin-bottom: 2px;">🎮 ゲーム</h1>
+  <div class="top-nav" aria-label="navigation">
+    <button class="nav-btn nav-back" onclick="goBackSmart()" aria-label="もどる">← もどる</button>
+    <button class="nav-btn nav-top" onclick="goToTop()" aria-label="TOPへもどる">🏝️ TOPへ</button>
+  </div>
+  <h1 id="menuTitle" style="margin-bottom: 2px;">ウクレレであそぶ</h1>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -594,7 +689,7 @@ body.playing #menu-overlay{ display:none; }
   </div>
 </div>
 
-<button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ もどる</button>
+<button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="display:none;">もどる</button>
 </div>
 </div>
 <div id="screenFlash"></div>
@@ -1523,7 +1618,7 @@ function applyUiMode(mode){
   // UI: タイトル（入口に合わせる）
   const mt = document.getElementById('menuTitle');
   if(mt){
-    mt.textContent = (entryKind === 'tap') ? '👆 タップであそぶ' : '🎮 ゲーム';
+    mt.textContent = (entryKind === 'tap') ? 'タップであそぶ' : 'ウクレレであそぶ';
   }
 
   // UI: 戻るボタン（入口に合わせる）
@@ -2396,6 +2491,20 @@ window.addEventListener('pageshow', ()=>{
   if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
 });
 
+
+function goToTop(){
+  location.href = 'index.html';
+}
+function goBackSmart(){
+  // まず履歴を優先。履歴が無い場合はTOPへ。
+  try{
+    if(history.length > 1){
+      history.back();
+      return;
+    }
+  }catch(e){}
+  goToTop();
+}
 </script>
 <div class="verBadge">v2</div>
 <div aria-hidden="true" id="pageFlip"></div>
@@ -2421,5 +2530,7 @@ window.addEventListener('pageshow', ()=>{
   overflow:hidden;
   text-overflow:ellipsis;
 "></div>
+
+<div class="ver-badge">v03</div>
 </body>
 </html>

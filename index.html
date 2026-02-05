@@ -301,6 +301,26 @@
     border-style: solid;
     border-color: transparent transparent #fff;
   }
+
+
+  /* VER_BADGE */
+  .ver-badge{
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 40;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.38);
+    color: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: .02em;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .guide-bubble{ max-width: min(82vw, 520px); }
+  .guide-bubble .text{ max-width: min(62vw, 380px); }
 </style>
 </head>
 
@@ -375,6 +395,7 @@
   </div>
 
 </div>
+  <div class="ver-badge">v15</div>
 
 <div id="pageFlip"></div>
 
@@ -416,7 +437,8 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-  // BUBBLE_ANCHOR v6: 🐰せんせい（トップ専用：iPhoneでも“ボタンに被らない”を最優先）
+  
+  // BUBBLE_ANCHOR v7: 🐰せんせい（トップ専用：帯の中に固定して“絶対にボタンに被らない”）
   (function(){
     const bubble = document.querySelector('.guide-bubble');
     const textEl = document.getElementById('teacherText');
@@ -438,17 +460,14 @@ window.addEventListener('pageshow', ()=>{
 
     function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
+    function rect(el){ return el.getBoundingClientRect(); }
+
     function anchorPos(t){
-      const rTap = btnTap.getBoundingClientRect();
-      const rUke = btnUke.getBoundingClientRect();
-      if(t === "tap") return { x0: rTap.left + rTap.width/2, top: rTap.top, bottom: rTap.bottom };
-      if(t === "uke") return { x0: rUke.left + rUke.width/2, top: rUke.top, bottom: rUke.bottom };
-      // center
-      return {
-        x0: (rTap.left + rTap.width/2 + rUke.left + rUke.width/2) / 2,
-        top: Math.min(rTap.top, rUke.top),
-        bottom: Math.max(rTap.bottom, rUke.bottom)
-      };
+      const rTap = rect(btnTap);
+      const rUke = rect(btnUke);
+      if(t === "tap") return { x0: rTap.left + rTap.width/2 };
+      if(t === "uke") return { x0: rUke.left + rUke.width/2 };
+      return { x0: (rTap.left + rTap.width/2 + rUke.left + rUke.width/2)/2 };
     }
 
     function setHint(t){
@@ -459,8 +478,8 @@ window.addEventListener('pageshow', ()=>{
     }
 
     function computeBand(){
-      const rTap = btnTap.getBoundingClientRect();
-      const rUke = btnUke.getBoundingClientRect();
+      const rTap = rect(btnTap);
+      const rUke = rect(btnUke);
       const rowTop = Math.min(rTap.top, rUke.top);
 
       // 上限：サブタイトルの下（なければ12px）
@@ -472,26 +491,26 @@ window.addEventListener('pageshow', ()=>{
       // 下限：ボタンの上（絶対にボタンに被せない）
       const bottomLimit = Math.max(12, rowTop - 10);
 
-      return { topLimit, bottomLimit, rowTop };
+      return { topLimit, bottomLimit };
     }
 
     function positionBubble(t){
       curTarget = t;
       setHint(t);
 
-      // 初期等倍で計測（transformはJSが持つのでCSSアニメ無し）
+      // 等倍で計測
       bubble.style.transform = 'translate(-50%, 0) scale(1)';
       const br0 = bubble.getBoundingClientRect();
       const bw0 = br0.width;
       const bh0 = br0.height;
 
-      const { topLimit, bottomLimit, rowTop } = computeBand();
+      const { topLimit, bottomLimit } = computeBand();
       const bandH = Math.max(1, bottomLimit - topLimit);
 
-      // 帯が狭い時は「読める範囲」で縮小（最低0.70）
+      // 帯に入らないときは縮小（最低0.68）
       let scale = 1;
       if(bh0 > bandH){
-        scale = clamp(bandH / bh0, 0.70, 1);
+        scale = clamp(bandH / bh0, 0.68, 1);
       }
 
       const bw = bw0 * scale;
@@ -502,32 +521,25 @@ window.addEventListener('pageshow', ()=>{
       // X：画面内に収める
       const x = clamp(ap.x0, 12 + bw/2, window.innerWidth - 12 - bw/2);
 
-      // Y：基本はアンカーの上。ただし「ボタンに被らない」を最優先
-      let y = ap.top - bh - 12;
-
-      // まずボタン上の上限（= bottomLimit - bh）を超えない
-      const yMaxNoOverlap = bottomLimit - bh;
-      if(y > yMaxNoOverlap) y = yMaxNoOverlap;
-
-      // 可能ならサブタイトルの下に収める（topLimit <= yMaxNoOverlap のとき）
-      if(topLimit <= yMaxNoOverlap){
-        y = clamp(y, topLimit, yMaxNoOverlap);
+      // Y：帯の中に固定（中心より少し上）
+      const yMin = topLimit;
+      const yMax = bottomLimit - bh;
+      let y;
+      if(yMax >= yMin){
+        y = yMin + (yMax - yMin) * 0.35;
       }else{
-        // 帯が成立しない＝タイトルが大きすぎる場合
-        // → ボタンに被らない位置を優先し、上は少し被ってもOK
-        y = clamp(y, 12, yMaxNoOverlap);
+        // 帯が成立しない場合でも、とにかく画面内上部に置く
+        y = 12;
       }
-
-      // 画面外防止
       y = clamp(y, 12, window.innerHeight - 12 - bh);
 
-      // 尻尾位置（アンカーに寄せる）
+      // 尻尾：アンカーに寄せる
       const tail = clamp((bw/2) + (ap.x0 - x), 18, bw - 18);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
-      bubble.classList.remove('tail-up'); // トップは常に“下向き尻尾”でOK
+      bubble.classList.remove('tail-up');
       bubble.style.setProperty('--tail-left', tail + 'px');
     }
 
@@ -552,6 +564,7 @@ window.addEventListener('pageshow', ()=>{
       swap(msgs[i]);
     }, 2600);
   })();
+;
 
 </script>
 

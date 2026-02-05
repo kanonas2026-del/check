@@ -167,10 +167,8 @@
   /* === 先生（ガイド） === */
 /* タイトルと被らないように、上からの固定位置（レスポンシブ）に配置 */
 .guide-bubble {
-  position: absolute;
-  left: 50%;
-  top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
-  transform: translate(-50%, 0);
+top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
+
   background: #fff;
   padding: 10px 22px;
   border-radius: 50px;
@@ -181,13 +179,15 @@
   z-index: 25; /* タイトルより手前で可読 */
   /* animation removed: JSがtransformを制御するため */
   animation: none;
-}
 
+  position: fixed;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, 0) scale(1);
+  max-width: min(92vw, 420px);
+  pointer-events: none;
+}
 /* スマホで高さが低い時は、さらに少し下へ */
-@media (max-height: 500px) {
-  .guide-bubble { top: clamp(110px, 26vh, 210px); }
-}
-
 .guide-bubble .bunny { font-size: 26px; }
 .guide-bubble .text  { font-size: 15px; font-weight: 900; color: #555; }
 .guide-bubble::after {
@@ -321,6 +321,12 @@
   }
   .guide-bubble{ max-width: min(82vw, 520px); }
   .guide-bubble .text{ max-width: min(62vw, 380px); }
+
+/* BUBBLE_V16_TEXT */
+.guide-bubble .text{ white-space: nowrap; }
+@media (max-width: 420px){
+  .guide-bubble .text{ white-space: normal; }
+}
 </style>
 </head>
 
@@ -395,7 +401,7 @@
   </div>
 
 </div>
-  <div class="ver-badge">v15</div>
+  <div class="ver-badge">v16</div>
 
 <div id="pageFlip"></div>
 
@@ -439,12 +445,15 @@ window.addEventListener('pageshow', ()=>{
 
   
   // BUBBLE_ANCHOR v7: 🐰せんせい（トップ専用：帯の中に固定して“絶対にボタンに被らない”）
+  
+  // BUBBLE_ANCHOR v16: タイトルにもボタンにも被らない（帯に固定＋尾だけ動かす）
   (function(){
-    const bubble = document.querySelector('.guide-bubble');
-    const textEl = document.getElementById('teacherText');
-    const btnTap = document.getElementById('btnTap');
-    const btnUke = document.getElementById('btnUke');
-    const subTitle = document.querySelector('.sub-title');
+    const bubble  = document.querySelector('.guide-bubble');
+    const textEl  = document.getElementById('teacherText');
+    const btnTap  = document.getElementById('btnTap');
+    const btnUke  = document.getElementById('btnUke');
+    const titleArea = document.querySelector('.title-area');
+    const subTitle  = document.querySelector('.sub-title');
 
     if(!bubble || !textEl || !btnTap || !btnUke) return;
 
@@ -452,118 +461,120 @@ window.addEventListener('pageshow', ()=>{
       { text: "どっちで あそぶ？", target: "center" },
       { text: "タップで すぐ あそべるよ！", target: "tap" },
       { text: "HITしたら おとが なるよ♪", target: "tap" },
-      { text: "ウクレレが あるなら こっち！", target: "uke" },
-      { text: "はじめては タップがおすすめ", target: "tap" },
+      { text: "ウクレレが あるなら こっち！", target: "uke" }
     ];
 
-    let curTarget = msgs[0].target;
+    let cur = 0;
 
-    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
-    function rect(el){ return el.getBoundingClientRect(); }
-
-    function anchorPos(t){
-      const rTap = rect(btnTap);
-      const rUke = rect(btnUke);
-      if(t === "tap") return { x0: rTap.left + rTap.width/2 };
-      if(t === "uke") return { x0: rUke.left + rUke.width/2 };
-      return { x0: (rTap.left + rTap.width/2 + rUke.left + rUke.width/2)/2 };
-    }
-
-    function setHint(t){
+    function clearHints(){
       btnTap.classList.remove('hint');
       btnUke.classList.remove('hint');
+    }
+    function setHint(t){
+      clearHints();
       if(t === "tap") btnTap.classList.add('hint');
       if(t === "uke") btnUke.classList.add('hint');
     }
 
-    function computeBand(){
-      const rTap = rect(btnTap);
-      const rUke = rect(btnUke);
-      const rowTop = Math.min(rTap.top, rUke.top);
-
-      // 上限：サブタイトルの下（なければ12px）
+    function computeLimits(){
+      // 上：タイトル/サブタイトルの下（絶対にタイトルへ行かせない）
       let topLimit = 12;
+      if(titleArea){
+        const r = titleArea.getBoundingClientRect();
+        topLimit = Math.max(topLimit, r.bottom + 10);
+      }
       if(subTitle){
-        topLimit = Math.max(topLimit, subTitle.getBoundingClientRect().bottom + 10);
+        const r = subTitle.getBoundingClientRect();
+        topLimit = Math.max(topLimit, r.bottom + 10);
       }
 
-      // 下限：ボタンの上（絶対にボタンに被せない）
-      const bottomLimit = Math.max(12, rowTop - 10);
+      // 下：ボタン上端より上（絶対にボタンへ被せない）
+      const rt = btnTap.getBoundingClientRect();
+      const ru = btnUke.getBoundingClientRect();
+      let bottomLimit = Math.min(rt.top, ru.top) - 10;
+
+      // 念のため（極端に狭い場合）
+      bottomLimit = Math.max(bottomLimit, topLimit + 18);
 
       return { topLimit, bottomLimit };
     }
 
-    function positionBubble(t){
-      curTarget = t;
-      setHint(t);
-
-      // 等倍で計測
+    function measureAtScale1(){
       bubble.style.transform = 'translate(-50%, 0) scale(1)';
-      const br0 = bubble.getBoundingClientRect();
-      const bw0 = br0.width;
-      const bh0 = br0.height;
+      const r = bubble.getBoundingClientRect();
+      return { w:r.width, h:r.height };
+    }
 
-      const { topLimit, bottomLimit } = computeBand();
-      const bandH = Math.max(1, bottomLimit - topLimit);
+    function layout(target){
+      setHint(target);
 
-      // 帯に入らないときは縮小（最低0.68）
+      const { topLimit, bottomLimit } = computeLimits();
+      const availH = Math.max(1, bottomLimit - topLimit);
+
+      const m = measureAtScale1();
       let scale = 1;
-      if(bh0 > bandH){
-        scale = clamp(bandH / bh0, 0.68, 1);
+      if(m.h > availH){
+        // 下限なしで必ず入れる（ただし小さすぎを防ぐため 0.46 まで）
+        scale = clamp(availH / m.h, 0.46, 1);
       }
 
-      const bw = bw0 * scale;
-      const bh = bh0 * scale;
+      const w = m.w * scale;
+      const h = m.h * scale;
 
-      const ap = anchorPos(t);
+      // X は常に中央。画面端で切れないようにクランプ。
+      const x0 = window.innerWidth * 0.5;
+      const x  = clamp(x0, 12 + w/2, window.innerWidth - 12 - w/2);
 
-      // X：画面内に収める
-      const x = clamp(ap.x0, 12 + bw/2, window.innerWidth - 12 - bw/2);
-
-      // Y：帯の中に固定（中心より少し上）
-      const yMin = topLimit;
-      const yMax = bottomLimit - bh;
-      let y;
-      if(yMax >= yMin){
-        y = yMin + (yMax - yMin) * 0.35;
-      }else{
-        // 帯が成立しない場合でも、とにかく画面内上部に置く
-        y = 12;
-      }
-      y = clamp(y, 12, window.innerHeight - 12 - bh);
-
-      // 尻尾：アンカーに寄せる
-      const tail = clamp((bw/2) + (ap.x0 - x), 18, bw - 18);
+      // Y は “帯” の中央に固定（安定して見える）
+      let y = topLimit + (availH - h) / 2;
+      y = clamp(y, topLimit, bottomLimit - h);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
-      bubble.classList.remove('tail-up');
-      bubble.style.setProperty('--tail-left', tail + 'px');
+      bubble.classList.remove('tail-up'); // 常に下向き（ボタン方向）
+
+      // 尾の位置だけ、どのボタンの話かで左右に振る
+      let ratio = 0.50;
+      if(target === "tap") ratio = 0.28;
+      if(target === "uke") ratio = 0.72;
+      bubble.style.setProperty('--tail-left', (w * ratio) + 'px');
     }
 
-    function swap(next){
+    function show(i){
+      const msg = msgs[i];
       bubble.classList.add('fade');
       setTimeout(()=>{
-        textEl.textContent = next.text;
+        textEl.textContent = msg.text;
         requestAnimationFrame(()=>{
-          positionBubble(next.target);
+          layout(msg.target);
           bubble.classList.remove('fade');
         });
-      }, 170);
+      }, 160);
     }
 
-    requestAnimationFrame(()=>positionBubble(msgs[0].target));
-    window.addEventListener('resize', ()=>positionBubble(curTarget));
-    window.addEventListener('orientationchange', ()=>setTimeout(()=>positionBubble(curTarget), 80));
+    function relayout(){
+      layout(msgs[cur].target);
+    }
 
-    let i = 0;
+    // 初期配置
+    requestAnimationFrame(()=>layout(msgs[0].target));
+
+    window.addEventListener('resize', relayout);
+    window.addEventListener('orientationchange', ()=>setTimeout(relayout, 120));
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', relayout);
+      window.visualViewport.addEventListener('scroll', relayout);
+    }
+
     setInterval(()=>{
-      i = (i + 1) % msgs.length;
-      swap(msgs[i]);
+      cur = (cur + 1) % msgs.length;
+      show(cur);
     }, 2600);
   })();
+
 ;
 
 </script>

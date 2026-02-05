@@ -91,11 +91,7 @@
 
   /* 先生（ガイド） */
   .guide-bubble {
-    position: absolute;
-    left: 50%;
-    top: clamp(48px, 9vh, 96px);
-    transform: translate(-50%, 0);
-    background: #fff;
+background: #fff;
     padding: 6px 18px;
     border-radius: 50px;
     box-shadow: 0 6px 15px rgba(0,0,0,0.15);
@@ -105,8 +101,16 @@
     z-index: 25;
     animation: popIn 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     transition: opacity .22s ease, transform .22s ease;
-  }
-  .guide-bubble .bunny { font-size: 24px; line-height: 1; }
+
+  position: fixed;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, 0) scale(1);
+  max-width: min(92vw, 420px);
+  pointer-events: none;
+  will-change: transform, top, left;
+}
+.guide-bubble .bunny { font-size: 24px; line-height: 1; }
   .guide-bubble .text {
     font-size: 14px;
     font-weight: 900;
@@ -223,9 +227,21 @@
   .play-btn.hint {
     animation: hintPulse 1.15s ease-in-out infinite;
   }
-  @keyframes hintPulse {
-    0%,100%{ transform: translateZ(0) scale(1); }
-    50%    { transform: translateZ(0) scale(1.03); }
+  @keyframes hintPulse{
+    0%,100%{
+      box-shadow:
+        0 10px 0 rgba(0,0,0,0.10),
+        0 20px 30px rgba(0,0,0,0.15);
+    }
+    50%{
+      box-shadow:
+        0 10px 0 rgba(0,0,0,0.10),
+        0 20px 30px rgba(0,0,0,0.15),
+        0 0 0 7px rgba(255,255,255,0.50),
+        0 0 26px rgba(255,255,255,0.45);
+    }
+  }
+50%    { transform: translateZ(0) scale(1.03); }
   }
 
   @media (max-width: 700px) {
@@ -340,6 +356,81 @@
     border-style: solid;
     border-color: transparent transparent #fff;
   }
+
+/* VERSION BADGE */
+.ver-badge{
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  padding: 6px 10px;
+  font-weight: 900;
+  font-size: 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  z-index: 9999;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+/* BUBBLE_TAIL_SIDE_UKE_V11: トンガリを左右/上/下で切替 */
+.guide-bubble::after{ /* default (下) */
+  content:"";
+  position:absolute;
+  bottom:-8px;
+  left: var(--tail-left, 50%);
+  transform: translateX(-50%);
+  width:0;height:0;
+  border-width: 8px 8px 0;
+  border-style: solid;
+  border-color: #fff transparent transparent transparent;
+}
+.guide-bubble.tail-left::after{
+  bottom:auto; top:50%;
+  left:-10px; right:auto;
+  transform: translateY(-50%);
+  border-width: 10px 10px 10px 0;
+  border-style: solid;
+  border-color: transparent #fff transparent transparent;
+}
+.guide-bubble.tail-right::after{
+  bottom:auto; top:50%;
+  right:-10px; left:auto;
+  transform: translateY(-50%);
+  border-width: 10px 0 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent transparent #fff;
+}
+.guide-bubble.tail-up::after{
+  top:-8px; bottom:auto;
+  left: var(--tail-left, 50%);
+  transform: translateX(-50%);
+  border-width: 0 8px 8px;
+  border-style: solid;
+  border-color: transparent transparent #fff transparent;
+}
+
+/* BTN_FOCUS_UKE_V11: どっちが主役か一瞬で分かる */
+.play-btn{ will-change: transform; }
+.play-btn.is-focus{
+  outline: 5px solid rgba(255,255,255,0.85);
+  outline-offset: -5px;
+}
+.play-btn.is-focus::after{
+  content:"";
+  position:absolute;
+  inset:-10px;
+  border-radius: 28px;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.35), rgba(255,255,255,0.0) 65%);
+  pointer-events:none;
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.play-btn.is-focus::after{
+  opacity: 1;
+  transform: scale(1);
+}
 </style>
 </head>
 <body>
@@ -459,175 +550,169 @@
   })();
 
 
-  // BUBBLE_ANCHOR v5: 🐰せんせい（“帯”に収めて被り防止）
+  // BUBBLE_ANCHOR_UKE v11: 真ん中固定 + トンガリ左右 + ボタンを派手にヌルッ
   (function(){
     const bubble = document.querySelector('.guide-bubble');
     const textEl = document.getElementById('teacherText');
-    const el_tune = document.getElementById("btnTune");
-    const el_game = document.getElementById("btnGame");
-    const el_top = document.getElementById("btnTop");
-    const row_0 = document.getElementById("btnTune");
-    const row_1 = document.getElementById("btnGame");
-    const rowEls = [row_0, row_1].filter(Boolean);
-    const header = null;
-    const avoidTop_0 = document.querySelector("#btnTop");
-    const avoidTopEls = [avoidTop_0].filter(Boolean);
+    const btnTune = document.getElementById('btnTune');
+    const btnGame = document.getElementById('btnGame');
+    const btnTop  = document.getElementById('btnTop');
 
-    if(!bubble || !textEl) return;
+    if(!bubble || !textEl || !btnTune || !btnGame) return;
 
     const msgs = [
       { text: "まずは チューニング！", target: "tune" },
       { text: "あわせたら ゲームへ！", target: "game" },
-      { text: "TOPへもどれるよ", target: "top" }
+      { text: "TOPへ もどれるよ", target: "top" }
     ];
+    let cur = 0;
 
-    let curTarget = msgs[0].target;
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-    function clearHints(){
-      el_tune && el_tune.classList.remove("hint");
-      el_game && el_game.classList.remove("hint");
-      el_top && el_top.classList.remove("hint");
+    function setFocus(t){
+      btnTune.classList.toggle('is-focus', t === 'tune');
+      btnGame.classList.toggle('is-focus', t === 'game');
     }
 
-    function setHint(t){
-      clearHints();
-      switch(t){
-        case "tune": el_tune && el_tune.classList.add("hint"); break;
-        case "game": el_game && el_game.classList.add("hint"); break;
-        case "top": el_top && el_top.classList.add("hint"); break;
-        default: break;
+    function runAnim(el, kf, dur=980){
+      if(!el) return;
+      try{ el.getAnimations().forEach(a=>a.cancel()); }catch(e){}
+      el.animate(kf, { duration: dur, easing: 'cubic-bezier(0.18, 1.35, 0.22, 1)', fill: 'none' });
+    }
+
+    function playBtnAnim(t){
+      // “主役は中央へ寄って拡大 / 脇役は逃げて少し縮小”
+      const kTuneMain = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(54px,-18px,0) scale(1.18)', offset:0.40 },
+        { transform:'translate3d(26px,-10px,0) scale(1.10)', offset:0.70 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+      const kGameMain = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(-54px,-18px,0) scale(1.18)', offset:0.40 },
+        { transform:'translate3d(-26px,-10px,0) scale(1.10)', offset:0.70 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+      const kSideAwayL = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(-14px,6px,0) scale(0.96)', offset:0.45 },
+        { transform:'translate3d(-6px,2px,0) scale(0.98)', offset:0.75 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+      const kSideAwayR = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(14px,6px,0) scale(0.96)', offset:0.45 },
+        { transform:'translate3d(6px,2px,0) scale(0.98)', offset:0.75 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+      const kTop = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(0,-8px,0) scale(1.08)', offset:0.45 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+
+      if(t === 'tune'){
+        runAnim(btnTune, kTuneMain);
+        runAnim(btnGame, kSideAwayR, 820);
+      }else if(t === 'game'){
+        runAnim(btnGame, kGameMain);
+        runAnim(btnTune, kSideAwayL, 820);
+      }else{
+        if(btnTop) runAnim(btnTop, kTop, 720);
       }
     }
 
-    function getAnchorEl(t){
-      switch(t){
-        case "tune": return el_tune;
-        case "game": return el_game;
-        case "top": return el_top;
-        default: return null;
-      }
-    }
-
-    function computeBandTop(){
+    function computeBand(){
+      // 上：TOPボタンの下（ある場合）を優先
       let top = 12;
-      if(header) top = Math.max(top, header.getBoundingClientRect().bottom + 12);
-      avoidTopEls.forEach(el=>{
-        const r = el.getBoundingClientRect();
-        // 上部にあるものだけ
-        if(r.top < window.innerHeight * 0.5){
-          top = Math.max(top, r.bottom + 12);
-        }
-      });
-      return top;
-    }
-
-    function computeBandBottom(fallbackTop){
-      // 大ボタン（カード）の上端を bandBottom にする（これより下へ行かない）
-      let rowTop = null;
-      rowEls.forEach(el=>{
-        const r = el.getBoundingClientRect();
-        rowTop = (rowTop === null) ? r.top : Math.min(rowTop, r.top);
-      });
-      if(rowTop === null) rowTop = fallbackTop;
-      return Math.min(window.innerHeight - 12, rowTop - 10);
-    }
-
-    function anchorPos(anchorEl){
-      if(anchorEl){
-        const r = anchorEl.getBoundingClientRect();
-        return { x0: r.left + r.width/2, top: r.top, bottom: r.bottom };
+      if(btnTop){
+        const r = btnTop.getBoundingClientRect();
+        top = Math.max(top, r.bottom + 12);
       }
-      // center fallback (2ボタン中間)
-      const a = el_tune;
-      const b = el_game;
-      if(a && b){
-        const ra = a.getBoundingClientRect();
-        const rb = b.getBoundingClientRect();
-        return {
-          x0: (ra.left + ra.width/2 + rb.left + rb.width/2)/2,
-          top: Math.min(ra.top, rb.top),
-          bottom: Math.max(ra.bottom, rb.bottom)
-        };
-      }
-      return { x0: window.innerWidth*0.5, top: window.innerHeight*0.35, bottom: window.innerHeight*0.35+1 };
+      // 下：大ボタンの上端
+      const rt = btnTune.getBoundingClientRect();
+      const rg = btnGame.getBoundingClientRect();
+      let bottom = Math.min(rt.top, rg.top) - 10;
+      bottom = Math.max(bottom, top + 18);
+      return { top, bottom };
     }
 
-    function positionBubble(t){
-      curTarget = t;
-      setHint(t);
-
-      const anchorEl = getAnchorEl(t);
-      const ap = anchorPos(anchorEl);
-
-      // まず“帯”を作る
-      const bandTop = computeBandTop();
-      const bandBottom = computeBandBottom(ap.top);
-
-      // いったん等倍で計測
-      bubble.style.setProperty('--bubble-scale', '1');
+    function measure(){
       bubble.style.transform = 'translate(-50%, 0) scale(1)';
-      const bRect0 = bubble.getBoundingClientRect();
-      let bw = bRect0.width;
-      let bh = bRect0.height;
+      const r = bubble.getBoundingClientRect();
+      return { w:r.width, h:r.height };
+    }
 
-      const bandH = Math.max(10, bandBottom - bandTop);
+    function layout(t){
+      setFocus(t);
 
-      // 帯に入らないなら縮小（下に逃がさず、縮めて入れる）
+      const band = computeBand();
+      const availH = Math.max(1, band.bottom - band.top);
+
+      const m = measure();
       let scale = 1;
-      if(bh > bandH){
-        scale = clamp(bandH / bh, 0.78, 1);
-      }
+      if(m.h > availH) scale = clamp(availH / m.h, 0.52, 1);
 
-      // 縮小を反映（サイズは概算で計算）
-      const bwS = bw * scale;
-      const bhS = bh * scale;
+      const w = m.w * scale;
+      const h = m.h * scale;
 
-      // X（端切れ防止）
-      const x = clamp(ap.x0, 12 + bwS/2, window.innerWidth - 12 - bwS/2);
+      // 中央固定（端切れ防止）
+      const x0 = window.innerWidth * 0.5;
+      const x  = clamp(x0, 12 + w/2, window.innerWidth - 12 - w/2);
 
-      // Y：基本はアンカーの上。必ず“帯”の中へクランプ
-      const desiredY = ap.top - bhS - 12;
-      const maxY = bandBottom - bhS;
-      const y = clamp(desiredY, bandTop, maxY);
-
-      // 尻尾：アンカーが上にあるなら下向き、アンカーが下なら上向き
-      const tailUp = (y > ap.bottom + 6);
+      let y = band.top + (availH - h)/2;
+      y = clamp(y, band.top, band.bottom - h);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
-      bubble.classList.toggle('tail-up', tailUp);
 
-      // 尻尾をアンカー側へ寄せる
-      const tail = clamp((bwS/2) + (ap.x0 - x), 18, bwS - 18);
-      bubble.style.setProperty('--tail-left', tail + 'px');
+      // トンガリ
+      bubble.classList.remove('tail-left','tail-right','tail-up');
+      if(t === 'tune'){
+        bubble.classList.add('tail-left');
+      }else if(t === 'game'){
+        bubble.classList.add('tail-right');
+      }else{
+        bubble.classList.add('tail-up');
+        bubble.style.setProperty('--tail-left', (w * 0.72) + 'px'); // 右上TOP寄り
+      }
+
+      playBtnAnim(t);
     }
 
-    function swap(next){
+    function show(i){
+      const msg = msgs[i];
       bubble.classList.add('fade');
       setTimeout(()=>{
-        textEl.textContent = next.text;
+        textEl.textContent = msg.text;
         requestAnimationFrame(()=>{
-          positionBubble(next.target);
+          layout(msg.target);
           bubble.classList.remove('fade');
         });
-      }, 170);
+      }, 160);
     }
 
-    requestAnimationFrame(()=>positionBubble(msgs[0].target));
+    function relayout(){ layout(msgs[cur].target); }
 
-    window.addEventListener('resize', ()=>positionBubble(curTarget));
-    window.addEventListener('orientationchange', ()=>setTimeout(()=>positionBubble(curTarget), 80));
+    requestAnimationFrame(()=>layout(msgs[0].target));
 
-    let i = 0;
+    window.addEventListener('resize', relayout);
+    window.addEventListener('orientationchange', ()=>setTimeout(relayout, 120));
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', relayout);
+      window.visualViewport.addEventListener('scroll', relayout);
+    }
+
     setInterval(()=>{
-      i = (i + 1) % msgs.length;
-      swap(msgs[i]);
-    }, 3200);
+      cur = (cur + 1) % msgs.length;
+      show(cur);
+    }, 3000);
   })();
 
 </script>
+
+  <div class="ver-badge">v11</div>
 </body>
 </html>

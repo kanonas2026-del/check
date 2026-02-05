@@ -236,10 +236,8 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   .guide-bubble.point-center::after{ left: var(--tail-left, 50%); }
 
   /* どっちのボタンか“光らせる” */
-  .play-btn.hint{
-    animation: hintPulse 1.15s ease-in-out infinite;
-  }
-  @keyframes hintPulse{
+  .play-btn.hint{ }
+@keyframes hintPulse{
     0%,100%{
       box-shadow:
         0 10px 0 rgba(0,0,0,0.10),
@@ -340,43 +338,10 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   .guide-bubble .text{ white-space: normal; }
 }
 
-/* BTN_ANIM_V17: コメントに合わせてボタンを“激しく”動かす */
-@keyframes btnBounceTapToCenter{
-  0%   { transform: translate3d(0,0,0) scale(1); }
-  30%  { transform: translate3d(34px,-12px,0) scale(1.10); }
-  55%  { transform: translate3d(20px,-8px,0) scale(1.06); }
-  100% { transform: translate3d(0,0,0) scale(1); }
-}
-@keyframes btnBounceUkeToCenter{
-  0%   { transform: translate3d(0,0,0) scale(1); }
-  30%  { transform: translate3d(-34px,-12px,0) scale(1.10); }
-  55%  { transform: translate3d(-20px,-8px,0) scale(1.06); }
-  100% { transform: translate3d(0,0,0) scale(1); }
-}
-@keyframes btnBounceUp{
-  0%   { transform: translate3d(0,0,0) scale(1); }
-  30%  { transform: translate3d(0,-12px,0) scale(1.08); }
-  55%  { transform: translate3d(0,-7px,0) scale(1.04); }
-  100% { transform: translate3d(0,0,0) scale(1); }
-}
-#btnTap.btn-anim-tap{ animation: btnBounceTapToCenter 0.95s cubic-bezier(.2,1.4,.3,1) 1; }
-#btnUke.btn-anim-uke{ animation: btnBounceUkeToCenter 0.95s cubic-bezier(.2,1.4,.3,1) 1; }
-#btnTap.btn-anim-both, #btnUke.btn-anim-both{ animation: btnBounceUp 0.85s cubic-bezier(.2,1.4,.3,1) 1; }
+/* BTN_V19_SMOOTH: transform最適化 */
+.play-btn{ will-change: transform; transition: transform 220ms cubic-bezier(.2,1,.2,1); }
 
-/* 右上の吹き出し/タイトルに被らないため、ボタンの当たり判定はそのまま */
-#btnTap, #btnUke { transform-origin: center; }
-
-/* BUBBLE_TAIL_SIDE_V18: トンガリを左右に切り替え（真左／真右） */
-.guide-bubble.tail-down::after{
-  bottom: -8px;
-  left: var(--tail-left, 50%);
-  right: auto;
-  top: auto;
-  transform: translateX(-50%);
-  border-width: 8px 8px 0;
-  border-style: solid;
-  border-color: #fff transparent transparent transparent;
-}
+/* BUBBLE_TAIL_V19: 吹き出しのトンガリを真左/真右に切替 */
 .guide-bubble.tail-left::after{
   bottom: auto;
   top: 50%;
@@ -397,9 +362,71 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   border-style: solid;
   border-color: transparent transparent transparent #fff;
 }
+.guide-bubble.tail-down::after{
+  bottom: -8px;
+  left: var(--tail-left, 50%);
+  right: auto;
+  top: auto;
+  transform: translateX(-50%);
+  border-width: 8px 8px 0;
+  border-style: solid;
+  border-color: #fff transparent transparent transparent;
+}
 
-/* BTN_SMOOTH_V18: ぬるっと動かすための最適化 */
-.play-btn{ will-change: transform; }
+/* BTN_ANIM_V19: 派手にヌルッ（CSSアニメ） */
+@keyframes btnSwooshTap{
+  0%   { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+  30%  { transform: translate3d(52px,-18px,0) scale(1.18) rotate(-2.0deg); }
+  55%  { transform: translate3d(22px,-10px,0) scale(1.08) rotate(1.0deg); }
+  75%  { transform: translate3d(8px,-4px,0) scale(1.03) rotate(-0.4deg); }
+  100% { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+}
+@keyframes btnSwooshUke{
+  0%   { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+  30%  { transform: translate3d(-52px,-18px,0) scale(1.18) rotate(2.0deg); }
+  55%  { transform: translate3d(-22px,-10px,0) scale(1.08) rotate(-1.0deg); }
+  75%  { transform: translate3d(-8px,-4px,0) scale(1.03) rotate(0.4deg); }
+  100% { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+}
+@keyframes btnSwooshBoth{
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  35%  { transform: translate3d(0,-14px,0) scale(1.14); }
+  60%  { transform: translate3d(0,-7px,0) scale(1.06); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+.play-btn.anim-tap{ animation: btnSwooshTap 980ms cubic-bezier(.18,1.35,.22,1) 1 both; }
+.play-btn.anim-uke{ animation: btnSwooshUke 980ms cubic-bezier(.18,1.35,.22,1) 1 both; }
+.play-btn.anim-both{ animation: btnSwooshBoth 880ms cubic-bezier(.18,1.35,.22,1) 1 both; }
+
+/* BTN_V21_GLOW: ヒントを“軽く・はっきり”見せる（ボタン移動と競合しない） */
+.play-btn{
+  position: relative;
+  overflow: hidden;
+}
+.play-btn::before{
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(255,255,255,0.80) 0%,
+    rgba(255,255,255,0.00) 62%);
+  opacity: 0;
+  transform: scale(0.70);
+  pointer-events: none;
+}
+.play-btn.hint::before{
+  animation: glowPulse 900ms ease-in-out infinite;
+}
+@keyframes glowPulse{
+  0%,100%{ opacity: 0.00; transform: scale(0.70); }
+  50%    { opacity: 0.85; transform: scale(1.05); }
+}
+
+/* どっちが“今の主役”かが一瞬で分かるように、枠線も強調 */
+.play-btn.focus{
+  outline: 6px solid rgba(255,255,255,0.70);
+  outline-offset: 2px;
+}
 </style>
 </head>
 
@@ -474,7 +501,7 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   </div>
 
 </div>
-  <div class="ver-badge">v18</div>
+  <div class="ver-badge">v21</div>
 
 <div id="pageFlip"></div>
 
@@ -505,21 +532,8 @@ window.addEventListener('pageshow', ()=>{
   document.getElementById('pageFlip').classList.remove('run');
 });
 
-(function(){
-  function apply(){
-    var portrait = window.innerHeight > window.innerWidth;
-    document.body.classList.toggle('needLandscape', portrait);
-  }
-  window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', apply);
-  apply();
-})();
 
-
-  
-  // BUBBLE_ANCHOR v7: 🐰せんせい（トップ専用：帯の中に固定して“絶対にボタンに被らない”）
-  
-  // BUBBLE_ANCHOR v18: タイトルにもボタンにも被らない（帯に固定＋尾だけ動かす）
+  // BUBBLE_ANCHOR v21: タイトル/ボタンに被らない帯。トンガリは真左/真右。ボタンは派手にヌルッ。
   (function(){
     const bubble  = document.querySelector('.guide-bubble');
     const textEl  = document.getElementById('teacherText');
@@ -551,59 +565,79 @@ window.addEventListener('pageshow', ()=>{
       if(t === "uke") btnUke.classList.add('hint');
     }
 
+    
+    // BTN_ANCHOR v21: iPhoneでも“派手にヌルッ”＋どっちか一目で分かる
     function playBtnAnim(target){
-      // WAAPIで“派手にヌルッ”と（transform競合を回避）
-      function run(el, keyframes){
+      const canWAAPI = !!(btnTap && btnTap.animate);
+      // 強調枠（focus）を切替
+      btnTap.classList.remove('focus');
+      btnUke.classList.remove('focus');
+      if(target === "tap") btnTap.classList.add('focus');
+      if(target === "uke") btnUke.classList.add('focus');
+
+      function cancel(el){
         if(!el) return;
-        // 走ってるアニメは止める
         try{ el.getAnimations().forEach(a=>a.cancel()); }catch(e){}
-        el.animate(keyframes, {
-          duration: 950,
-          easing: 'cubic-bezier(0.18, 1.35, 0.22, 1)',
+      }
+      function run(el, keyframes, opts){
+        if(!el) return;
+        if(!canWAAPI){
+          // フォールバック：軽めに
+          el.style.transform = '';
+          return;
+        }
+        cancel(el);
+        el.animate(keyframes, Object.assign({
+          duration: 1050,
+          easing: 'cubic-bezier(0.16, 1.20, 0.22, 1)',
           fill: 'none'
-        });
+        }, opts||{}));
       }
 
-      const kTap = [
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 0 },
-        { transform: 'translate3d(48px,-18px,0) scale(1.16) rotate(-1.8deg)', offset: 0.36 },
-        { transform: 'translate3d(22px,-10px,0) scale(1.08) rotate(0.8deg)',  offset: 0.64 },
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 1 }
+      // もっと“ハッキリ”分かる距離（左右に寄せる＋少し上げる）
+      const tapMain = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(22px,-6px,0) scale(1.05)', offset:0.18 },
+        { transform:'translate3d(90px,-28px,0) scale(1.22)', offset:0.48 },
+        { transform:'translate3d(58px,-18px,0) scale(1.14)', offset:0.72 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
       ];
-      const kUke = [
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 0 },
-        { transform: 'translate3d(-48px,-18px,0) scale(1.16) rotate(1.8deg)', offset: 0.36 },
-        { transform: 'translate3d(-22px,-10px,0) scale(1.08) rotate(-0.8deg)', offset: 0.64 },
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 1 }
+      const ukeMain = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(-22px,-6px,0) scale(1.05)', offset:0.18 },
+        { transform:'translate3d(-90px,-28px,0) scale(1.22)', offset:0.48 },
+        { transform:'translate3d(-58px,-18px,0) scale(1.14)', offset:0.72 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
       ];
-      const kBoth = [
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 0 },
-        { transform: 'translate3d(0,-14px,0) scale(1.12) rotate(0deg)', offset: 0.40 },
-        { transform: 'translate3d(0,-8px,0) scale(1.06) rotate(0deg)', offset: 0.70 },
-        { transform: 'translate3d(0,0,0) scale(1) rotate(0deg)', offset: 1 }
+
+      // “脇役”は少し逃げて小さく（主役がより目立つ）
+      const otherFromTap = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(14px,0,0) scale(0.97)', offset:0.48 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+      const otherFromUke = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(-14px,0,0) scale(0.97)', offset:0.48 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
+      ];
+
+      const both = [
+        { transform:'translate3d(0,0,0) scale(1)', offset:0 },
+        { transform:'translate3d(0,-18px,0) scale(1.12)', offset:0.45 },
+        { transform:'translate3d(0,-9px,0) scale(1.06)', offset:0.70 },
+        { transform:'translate3d(0,0,0) scale(1)', offset:1 }
       ];
 
       if(target === "tap"){
-        run(btnTap, kTap);
+        run(btnTap, tapMain);
+        run(btnUke, otherFromTap, { duration: 900, easing:'cubic-bezier(0.25, 0.90, 0.30, 1)' });
       }else if(target === "uke"){
-        run(btnUke, kUke);
+        run(btnUke, ukeMain);
+        run(btnTap, otherFromUke, { duration: 900, easing:'cubic-bezier(0.25, 0.90, 0.30, 1)' });
       }else{
-        run(btnTap, kBoth);
-        run(btnUke, kBoth);
-      }
-    }
-      // 一旦リセット
-      btnTap.classList.remove('btn-anim-tap','btn-anim-both');
-      btnUke.classList.remove('btn-anim-uke','btn-anim-both');
-
-      if(target === "tap"){
-        fire(btnTap, 'btn-anim-tap');
-      }else if(target === "uke"){
-        fire(btnUke, 'btn-anim-uke');
-      }else{
-        // center
-        fire(btnTap, 'btn-anim-both');
-        fire(btnUke, 'btn-anim-both');
+        run(btnTap, both, { duration: 900 });
+        run(btnUke, both, { duration: 900 });
       }
     }
 
@@ -636,6 +670,18 @@ window.addEventListener('pageshow', ()=>{
       return { w:r.width, h:r.height };
     }
 
+    function setTail(target){
+      bubble.classList.remove('tail-left','tail-right','tail-down');
+      if(target === "tap"){
+        bubble.classList.add('tail-left');
+      }else if(target === "uke"){
+        bubble.classList.add('tail-right');
+      }else{
+        bubble.classList.add('tail-down');
+        bubble.style.setProperty('--tail-left', '50%');
+      }
+    }
+
     function layout(target){
       setHint(target);
 
@@ -645,40 +691,26 @@ window.addEventListener('pageshow', ()=>{
       const m = measureAtScale1();
       let scale = 1;
       if(m.h > availH){
-        // 下限なしで必ず入れる（ただし小さすぎを防ぐため 0.46 まで）
         scale = clamp(availH / m.h, 0.46, 1);
       }
 
       const w = m.w * scale;
       const h = m.h * scale;
 
-      // X は常に中央。画面端で切れないようにクランプ。
-      const x0 = window.innerWidth * 0.5;
-      const x  = clamp(x0, 12 + w/2, window.innerWidth - 12 - w/2);
+      // X は基本中央（端切れ防止のクランプ）
+      const x = clamp(window.innerWidth*0.5, 12 + w/2, window.innerWidth - 12 - w/2);
 
-      // Y は “帯” の中央に固定（安定して見える）
-      let y = topLimit + (availH - h) / 2;
+      // Y は帯の中央（タイトルにもボタンにも被らない）
+      let y = topLimit + (availH - h)/2;
       y = clamp(y, topLimit, bottomLimit - h);
 
       bubble.style.left = x + 'px';
       bubble.style.top  = y + 'px';
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
-      bubble.classList.remove('tail-up'); // 常に下向き（ボタン方向）
 
-            // トンガリは“真左／真右”に切り替え（centerは下）
-      bubble.classList.remove('tail-left','tail-right','tail-down');
-      if(target === "tap"){
-        bubble.classList.add('tail-left');
-      }else if(target === "uke"){
-        bubble.classList.add('tail-right');
-      }else{
-        bubble.classList.add('tail-down');
-        bubble.style.setProperty('--tail-left', (w * 0.50) + 'px');
-      }
-
-      // コメントに合わせてボタンを“派手にヌルッ”と動かす
+      setTail(target);
       playBtnAnim(target);
-}
+    }
 
     function show(i){
       const msg = msgs[i];
@@ -711,6 +743,7 @@ window.addEventListener('pageshow', ()=>{
       show(cur);
     }, 2600);
   })();
+
 
 ;
 

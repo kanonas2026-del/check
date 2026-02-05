@@ -327,6 +327,32 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
 @media (max-width: 420px){
   .guide-bubble .text{ white-space: normal; }
 }
+
+/* BTN_ANIM_V17: コメントに合わせてボタンを“激しく”動かす */
+@keyframes btnBounceTapToCenter{
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  30%  { transform: translate3d(34px,-12px,0) scale(1.10); }
+  55%  { transform: translate3d(20px,-8px,0) scale(1.06); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+@keyframes btnBounceUkeToCenter{
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  30%  { transform: translate3d(-34px,-12px,0) scale(1.10); }
+  55%  { transform: translate3d(-20px,-8px,0) scale(1.06); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+@keyframes btnBounceUp{
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  30%  { transform: translate3d(0,-12px,0) scale(1.08); }
+  55%  { transform: translate3d(0,-7px,0) scale(1.04); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+#btnTap.btn-anim-tap{ animation: btnBounceTapToCenter 0.95s cubic-bezier(.2,1.4,.3,1) 1; }
+#btnUke.btn-anim-uke{ animation: btnBounceUkeToCenter 0.95s cubic-bezier(.2,1.4,.3,1) 1; }
+#btnTap.btn-anim-both, #btnUke.btn-anim-both{ animation: btnBounceUp 0.85s cubic-bezier(.2,1.4,.3,1) 1; }
+
+/* 右上の吹き出し/タイトルに被らないため、ボタンの当たり判定はそのまま */
+#btnTap, #btnUke { transform-origin: center; }
 </style>
 </head>
 
@@ -401,7 +427,7 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   </div>
 
 </div>
-  <div class="ver-badge">v16</div>
+  <div class="ver-badge">v17</div>
 
 <div id="pageFlip"></div>
 
@@ -446,7 +472,7 @@ window.addEventListener('pageshow', ()=>{
   
   // BUBBLE_ANCHOR v7: 🐰せんせい（トップ専用：帯の中に固定して“絶対にボタンに被らない”）
   
-  // BUBBLE_ANCHOR v16: タイトルにもボタンにも被らない（帯に固定＋尾だけ動かす）
+  // BUBBLE_ANCHOR v17: タイトルにもボタンにも被らない（帯に固定＋尾だけ動かす）
   (function(){
     const bubble  = document.querySelector('.guide-bubble');
     const textEl  = document.getElementById('teacherText');
@@ -476,6 +502,30 @@ window.addEventListener('pageshow', ()=>{
       clearHints();
       if(t === "tap") btnTap.classList.add('hint');
       if(t === "uke") btnUke.classList.add('hint');
+    }
+
+    function playBtnAnim(target){
+      // アニメを“毎回”発火させる（class付け直し）
+      function fire(el, cls){
+        if(!el) return;
+        el.classList.remove(cls);
+        // reflow
+        void el.offsetWidth;
+        el.classList.add(cls);
+      }
+      // 一旦リセット
+      btnTap.classList.remove('btn-anim-tap','btn-anim-both');
+      btnUke.classList.remove('btn-anim-uke','btn-anim-both');
+
+      if(target === "tap"){
+        fire(btnTap, 'btn-anim-tap');
+      }else if(target === "uke"){
+        fire(btnUke, 'btn-anim-uke');
+      }else{
+        // center
+        fire(btnTap, 'btn-anim-both');
+        fire(btnUke, 'btn-anim-both');
+      }
     }
 
     function computeLimits(){
@@ -536,12 +586,12 @@ window.addEventListener('pageshow', ()=>{
       bubble.style.transform = 'translate(-50%, 0) scale(' + scale.toFixed(3) + ')';
       bubble.classList.remove('tail-up'); // 常に下向き（ボタン方向）
 
-      // 尾の位置だけ、どのボタンの話かで左右に振る
-      let ratio = 0.50;
-      if(target === "tap") ratio = 0.28;
-      if(target === "uke") ratio = 0.72;
-      bubble.style.setProperty('--tail-left', (w * ratio) + 'px');
-    }
+            // 尾は“真下”に固定（どちらのボタンかはボタンの動きで示す）
+      bubble.style.setProperty('--tail-left', (w * 0.50) + 'px');
+
+      // コメントに合わせてボタンを動かす（少し“激しく”）
+      playBtnAnim(target);
+}
 
     function show(i){
       const msg = msgs[i];

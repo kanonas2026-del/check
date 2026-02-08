@@ -1063,6 +1063,41 @@ body.playing #menu-overlay{ display:none; }
     .speed-mini-note{ font-size: 9.5px; }
     .speed-pill{ padding: 5px 9px; font-size: 10.5px; }
     .mode-select{ margin-top: 6px; padding-top: 6px; }
+
+/* ==== w11 MENU LAYOUT FIX (no overlap / no cut) ==== */
+#menu-overlay{
+  padding: calc(14px + var(--ui-top)) calc(14px + var(--ui-right)) calc(14px + var(--ui-bottom)) calc(14px + var(--ui-left)) !important;
+}
+#menu-overlay .menu-card{
+  display:flex !important;
+  flex-direction:column !important;
+  width: min(980px, 100%) !important;
+  height: auto !important;
+  max-height: 100% !important;
+  overflow: hidden !important; /* keep rounded corners */
+}
+#menu-overlay .menu-grid{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+#menu-overlay .mode-select,
+#menu-overlay .tap-vol-wrap{
+  flex: 0 0 auto !important;
+}
+#menu-overlay .tap-vol-wrap{
+  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+}
+#menu-overlay .menu-btn{
+  min-height: 110px;
+}
+@media (max-height: 430px){
+  #menu-overlay .menu-btn{ min-height: 92px; }
+  #menu-overlay .menu-btn .label{ font-size: 18px; }
+  #menu-overlay .menu-btn .sub{ font-size: 13px; }
+  #menu-overlay .menu-grid{ gap: 12px !important; }
+}
+
 </style>
 </head>
 <body class="menuOpen">
@@ -2148,15 +2183,43 @@ function resumeGame(){
 
 // --- ゲーム開始フロー ---
 async function prepGame(type){
-  try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
-  // タップモードならマイク不要
-  if(isTapMode()){ startGameByType(type); return; }
+  // タイル側の呼び出し名ゆれを吸収
+  const normalizeType = (t)=>{
+    const x = String(t||'').trim();
+    if(x === 'chords_easy') return 'easy';
+    if(x === 'chords')      return 'hard';
+    if(x === 'kirakira')    return 'song';
+    return x;
+  };
+  const t = normalizeType(type);
+  const allowed = new Set(['scale','easy','hard','song']);
+  if(!allowed.has(t)){
+    console.warn('[prepGame] unknown type:', type);
+    return;
+  }
 
-  // マイク準備
-  document.getElementById('loading-overlay').style.display = 'flex';
-  try {
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended') await audioCtx.resume();
+  try{
+    document.body.classList.add('playing');
+    document.body.classList.remove('menuOpen');
+  }catch(e){}
+
+  // タップで遊ぶ＝マイク不要
+  if(isTapMode()){
+    startGameByType(t);
+    return;
+  }
+
+  // ウクレレで遊ぶ＝マイク準備（iOSで固まりにくい順序）
+  const loading = document.getElementById('loading-overlay');
+  if(loading) loading.style.display = 'flex';
+
+  try{
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){
+      await audioCtx.resume();
+    }
 
     if(!micStream){
       micStream = await navigator.mediaDevices.getUserMedia({
@@ -2164,32 +2227,25 @@ async function prepGame(type){
       });
       const src = audioCtx.createMediaStreamSource(micStream);
       micAnalyser = audioCtx.createAnalyser();
-      const gain = audioCtx.createGain();
-      gain.gain.value = IS_IOS ? 3.9 : 1.0;
-      micAnalyser.fftSize = IS_IOS ? 4096 : 2048;
-      src.connect(gain).connect(micAnalyser);
+      micAnalyser.fftSize = 2048;
+      src.connect(micAnalyser);
+      dataArray = new Uint8Array(micAnalyser.fftSize);
     }
 
-    // チューニング結果（あれば）
-    const stored = loadGameThresholds();
-
-    // ノイズ計測（約1秒）
-    await new Promise(r => setTimeout(r, 200)); // 立ち上がり待ち
-    NOISE_RMS = await measureNoiseRms(950, 95);
-
-    // 閾値：チューニング結果を基本に、今のノイズ床で補正
-    applyThresholdsFrom(NOISE_RMS, stored);
-
-    document.getElementById('loading-overlay').style.display = 'none';
-    startGameByType(type);
-
-  } catch(e) {
-    alert('マイクが使えません。タップモードで開始します。');
-    entryKind = 'tap'; uiMode = 'WAIT'; playMode = 'TAP_WAIT';
-    document.getElementById('loading-overlay').style.display = 'none';
-    startGameByType(type);
+    startGameByType(t);
+  }catch(err){
+    console.error(err);
+    alert('マイクが使えませんでした。\nSafariの設定で「マイク」を許可して、もう一度お試しください。');
+    // メニューに戻す（真っ白防止）
+    try{
+      document.body.classList.remove('playing');
+      document.body.classList.add('menuOpen');
+    }catch(e){}
+  }finally{
+    if(loading) loading.style.display = 'none';
   }
 }
+
 
 function startGameByType(type){
   lastStartParams = type;
@@ -2958,8 +3014,8 @@ window.addEventListener('pageshow', ()=>{
   overflow:hidden;
   text-overflow:ellipsis;
 "></div>
-<div id="verBadge">v08</div>
+<div id="verBadge">v11</div>
 
-  <div class="ver-badge" aria-hidden="true">v10</div>
+  <div class="ver-badge" aria-hidden="true">v11</div>
 </body>
 </html>

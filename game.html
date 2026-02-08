@@ -913,85 +913,167 @@ body.playing #menu-overlay{ display:none; }
 @media (max-height: 340px){
   .menu-card{ overflow-y: auto; -webkit-overflow-scrolling: touch; }
 }
+
+
+/* =========================
+   v08 FIX: iPhone横(セーフエリア)・下切れ対策 / きらきら速度UIをカード内に固定
+   ========================= */
+#menu-overlay{
+  padding:
+    calc(12px + env(safe-area-inset-top))
+    calc(12px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom))
+    calc(12px + env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+.menu-card{
+  max-height: 100%;
+  padding: 14px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+.menu-btn{
+  min-height: clamp(96px, 22vh, 150px);
+  padding: clamp(12px, 2.0vh, 18px);
+}
+.menu-icon{
+  width: clamp(54px, 8vw, 76px);
+  height: clamp(54px, 8vw, 76px);
+}
+.menu-title{ font-size: clamp(22px, 2.6vw, 34px); }
+.menu-sub{ font-size: clamp(12px, 1.6vw, 18px); }
+
+/* きらきらぼし：速度UIをボタン内の下部に“固定表示”して、全体メニューに見えないようにする */
+.menu-btn.kirakira{
+  position: relative;
+  overflow: hidden;
+}
+.menu-btn.kirakira .menu-text{
+  padding-bottom: 44px; /* 速度UIのぶん、文字と重ならない余白 */
+}
+.menu-btn.kirakira .speed-mini{
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.menu-btn.kirakira .speed-mini-label{
+  margin: 0;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.95);
+  white-space: nowrap;
+}
+.menu-btn.kirakira .speed-pills{
+  flex-wrap: nowrap;
+}
+.menu-btn.kirakira .speed-pills .mode-pill{
+  background: rgba(255,255,255,0.88);
+}
+.menu-btn.kirakira .speed-pills .mode-pill.active{
+  background: #fff;
+}
+
+/* さらに高さが低い端末向け */
+@media (max-height: 420px){
+  .menu-card{ padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .menu-btn{ min-height: clamp(84px, 21vh, 130px); }
+  .menu-btn.kirakira .menu-text{ padding-bottom: 40px; }
+  .menu-btn.kirakira .speed-mini-label{ display: none; }
+  .menu-btn.kirakira .speed-mini{ justify-content: center; }
+}
+
+
+/* v08: コンパクト化（横画面で下切れをさらに抑える） */
+.mode-select{ margin-top: 8px; padding-top: 8px; }
+.tap-vol-wrap{ margin-top: 10px; padding: 10px 12px; }
+.tap-vol-label{ font-size: 13px; margin-bottom: 6px; }
+
+@media (max-height: 420px){
+  .tap-vol-wrap{ margin-top: 8px; padding: 8px 10px; }
+  .tap-vol-label{ font-size: 12px; }
+}
 </style>
 </head>
 <body class="menuOpen">
 <div id="app">
-<div id="menu-overlay" aria-hidden="false">
-  <div class="menu-card" role="dialog" aria-label="ゲームメニュー">
-    <div class="menu-header">
-      <button id="navBackBtn" class="nav-pill" onclick="goBackFromGameMenu()">← もどる</button>
-      <h1 id="menuTitle">ウクレレであそぶ</h1>
-      <button id="navTopBtn" class="nav-pill" onclick="goFlip('index.html')">🏝️ TOPへ</button>
-    </div>
-
-    <div class="menu-main" id="menuMain">
-      <button class="menu-btn mode1" onclick="prepGame('scale')" aria-label="ドレミファソラシド（だんだん速くなるよ）">
-        <div class="menu-icon" aria-hidden="true">🐤</div>
-        <div class="menu-text">
-          <div class="menu-title">ドレミファソラシド</div>
-          <div class="menu-sub">だんだん速くなるよ</div>
-        </div>
-      </button>
-
-      <button class="menu-btn mode2" onclick="prepGame('easy')" aria-label="コード かんたん（C / F / G7 / Am）">
-        <div class="menu-icon" aria-hidden="true">😺</div>
-        <div class="menu-text">
-          <div class="menu-title">コード かんたん</div>
-          <div class="menu-sub">C / F / G7 / Am</div>
-        </div>
-      </button>
-
-      <button class="menu-btn mode3" onclick="prepGame('hard')" aria-label="コード ちょいむず（いろいろなコード）">
-        <div class="menu-icon" aria-hidden="true">🐼</div>
-        <div class="menu-text">
-          <div class="menu-title">コード ちょいむず</div>
-          <div class="menu-sub">いろいろなコード</div>
-        </div>
-      </button>
-
-      <button class="menu-btn mode4" onclick="prepGame('song')" aria-label="きらきらぼし（メロディ＋コード）">
-        <div class="menu-icon" aria-hidden="true">🦁</div>
-        <div class="menu-text">
-          <div class="menu-title">きらきらぼし</div>
-          <div class="menu-sub">メロディ＋コード</div>
-
-          <div class="speed-mini" aria-label="きらきらぼしのスピード">
-            <div class="speed-mini-label">スピード</div>
-            <div id="song-speed-pills" class="speed-pills" role="group" aria-label="スピード選択">
-              <button type="button" class="mode-pill" data-ss="SLOW">ゆっくり</button>
-              <button type="button" class="mode-pill" data-ss="NORMAL">ふつう</button>
-              <button type="button" class="mode-pill" data-ss="FAST">はやい</button>
-            </div>
-          </div>
-        </div>
-      </button>
-    </div>
-
-    <div class="mode-select" id="modeSelectWrap">
-      <div class="mode-row">
-        <div class="mode-label">プレイ</div>
-        <div class="mode-pills" role="group" aria-label="プレイモード">
-          <button class="mode-pill" id="modeNormal" onclick="setPlayMode('NORMAL')">ノーマル</button>
-          <button class="mode-pill" id="modeWait" onclick="setPlayMode('WAIT')">サポート付き</button>
-        </div>
-      </div>
-
-      <div id="tap-vol-wrap" class="tap-vol" hidden>
-        <div class="mode-row">
-          <div class="mode-label">タップ音</div>
-          <div class="vol-inline">
-            <input id="tapVol" type="range" min="0" max="1" step="0.05" value="0.45" aria-label="タップ音の大きさ" />
-            <span id="tapVolLabel" class="vol-label">45%</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="mode-help" id="modeHelp">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
-    </div>
-  </div>
+<div aria-hidden="false" id="menu-overlay">
+<div aria-label="ゲームメニュー" class="menu-card" role="dialog">
+<div class="menu-header">
+<button class="nav-pill" id="navBackBtn" onclick="goBackFromGameMenu()">← もどる</button>
+<h1 id="menuTitle">ウクレレであそぶ</h1>
+<button class="nav-pill" id="navTopBtn" onclick="goFlip('index.html')">🏝️ TOPへ</button>
 </div>
-
+<div class="menu-main" id="menuMain">
+<button aria-label="ドレミファソラシド（だんだん速くなるよ）" class="menu-btn mode1" onclick="prepGame('scale')">
+<div aria-hidden="true" class="menu-icon">🐤</div>
+<div class="menu-text">
+<div class="menu-title">ドレミファソラシド</div>
+<div class="menu-sub">だんだん速くなるよ</div>
+</div>
+</button>
+<button aria-label="コード かんたん（C / F / G7 / Am）" class="menu-btn mode2" onclick="prepGame('easy')">
+<div aria-hidden="true" class="menu-icon">😺</div>
+<div class="menu-text">
+<div class="menu-title">コード かんたん</div>
+<div class="menu-sub">C / F / G7 / Am</div>
+</div>
+</button>
+<button aria-label="コード ちょいむず（いろいろなコード）" class="menu-btn mode3" onclick="prepGame('hard')">
+<div aria-hidden="true" class="menu-icon">🐼</div>
+<div class="menu-text">
+<div class="menu-title">コード ちょいむず</div>
+<div class="menu-sub">いろいろなコード</div>
+</div>
+</button>
+<button aria-label="きらきらぼし（メロディ＋コード）" class="menu-btn mode4" onclick="prepGame('song')">
+<div aria-hidden="true" class="menu-icon">🦁</div>
+<div class="menu-text">
+<div class="menu-title">きらきらぼし</div>
+<div class="menu-sub">メロディ＋コード</div>
+<div aria-label="きらきらぼしのスピード" class="speed-mini">
+<div class="speed-mini-label">スピード</div>
+<div aria-label="スピード選択" class="speed-pills" id="song-speed-pills" role="group">
+<button class="mode-pill" data-ss="SLOW" type="button">ゆっくり</button>
+<button class="mode-pill" data-ss="NORMAL" type="button">ふつう</button>
+<button class="mode-pill" data-ss="FAST" type="button">はやい</button>
+</div>
+</div>
+</div>
+</button>
+</div>
+<div class="mode-select" id="modeSelectWrap">
+<div class="mode-row">
+<div class="mode-label">プレイ</div>
+<div aria-label="プレイモード" class="mode-pills" role="group">
+<button class="mode-pill" id="modeNormal" onclick="setPlayMode('NORMAL')">ノーマル</button>
+<button class="mode-pill" id="modeWait" onclick="setPlayMode('WAIT')">サポート付き</button>
+</div>
+</div>
+<div class="tap-vol" hidden="" id="tap-vol-wrap">
+<div class="mode-row">
+<div class="mode-label">タップ音</div>
+<div class="vol-inline">
+<input aria-label="タップ音の大きさ" id="tapVol" max="1" min="0" step="0.05" type="range" value="0.45"/>
+<span class="vol-label" id="tapVolLabel">45%</span>
+</div>
+</div>
+</div>
+<div class="mode-help" id="modeHelp">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
+</div>
+</div>
+</div>
 <canvas id="gameCanvas"></canvas>
 </div>
 <script>
@@ -2800,6 +2882,6 @@ window.addEventListener('pageshow', ()=>{
   overflow:hidden;
   text-overflow:ellipsis;
 "></div>
-<div id="verBadge">v07</div>
+<div id="verBadge">v08</div>
 </body>
 </html>

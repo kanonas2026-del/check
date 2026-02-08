@@ -1004,6 +1004,65 @@ body.playing #menu-overlay{ display:none; }
   .tap-vol-wrap{ margin-top: 8px; padding: 8px 10px; }
   .tap-vol-label{ font-size: 12px; }
 }
+
+    .ver-badge{
+      position: fixed;
+      right: calc(12px + env(safe-area-inset-right));
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      padding: 6px 10px;
+      font-weight: 900;
+      font-size: 13px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.35);
+      color: #fff;
+      z-index: 9999;
+      letter-spacing: 0.5px;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .tap-vol.is-hidden{ display:none; }
+
+    /* MENU_LAYOUT_V09: 下が切れない + iOSでスクロールできる */
+    .menu-card{
+      max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      padding-left: calc(16px + env(safe-area-inset-left));
+      padding-right: calc(16px + env(safe-area-inset-right));
+    }
+    .mode-select{
+      position: sticky;
+      bottom: 0;
+      background: var(--card);
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      box-shadow: 0 -12px 18px rgba(0,0,0,0.06);
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* MENU_BTN_CLAMP_V09: 4つのボタンの高さを揃える */
+    .menu-btn{ min-height: clamp(110px, 24vh, 160px); }
+    .menu-icon{ font-size: clamp(28px, 4.6vh, 42px); }
+    .menu-title{ font-size: clamp(16px, 2.4vh, 20px); }
+    .menu-sub{ font-size: clamp(11px, 1.9vh, 14px); }
+
+    /* MENU_TIGHT_V10: 収まり重視（iPhone横でも下が見える） */
+    .menu-card{ padding-top: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+    .menu-header{ margin-bottom: 2px; }
+    .menu-card h1{ font-size: 20px; margin-bottom: 2px; }
+    .menu-main{ gap: 8px; }
+    .menu-btn{
+      height: clamp(112px, 22vh, 152px);
+      overflow: hidden;
+      padding: 10px 12px;
+    }
+    .menu-text{ overflow:hidden; }
+    .speed-mini{ margin-top: 4px; padding-top: 4px; gap: 4px; }
+    .speed-mini-label{ font-size: 10.5px; }
+    .speed-mini-note{ font-size: 9.5px; }
+    .speed-pill{ padding: 5px 9px; font-size: 10.5px; }
+    .mode-select{ margin-top: 6px; padding-top: 6px; }
 </style>
 </head>
 <body class="menuOpen">
@@ -1043,11 +1102,11 @@ body.playing #menu-overlay{ display:none; }
 <div class="menu-title">きらきらぼし</div>
 <div class="menu-sub">メロディ＋コード</div>
 <div aria-label="きらきらぼしのスピード" class="speed-mini">
-<div class="speed-mini-label">スピード</div>
+<div class="speed-mini-label">♪ きらきらぼしだけ：はやさ</div><div class="speed-mini-note">※この曲だけに効きます</div>
 <div aria-label="スピード選択" class="speed-pills" id="song-speed-pills" role="group">
-<button class="mode-pill" data-ss="SLOW" type="button">ゆっくり</button>
-<button class="mode-pill" data-ss="NORMAL" type="button">ふつう</button>
-<button class="mode-pill" data-ss="FAST" type="button">はやい</button>
+<span class="speed-pill" data-ss="SLOW" role="button" tabindex="0">ゆっくり</span>
+<span class="speed-pill" data-ss="NORMAL" role="button" tabindex="0">ふつう</span>
+<span class="speed-pill" data-ss="FAST" role="button" tabindex="0">はやい</span>
 </div>
 </div>
 </div>
@@ -1061,7 +1120,7 @@ body.playing #menu-overlay{ display:none; }
 <button class="mode-pill" id="modeWait" onclick="setPlayMode('WAIT')">サポート付き</button>
 </div>
 </div>
-<div class="tap-vol" hidden="" id="tap-vol-wrap">
+<div class="tap-vol is-hidden" id="tap-vol-wrap">
 <div class="mode-row">
 <div class="mode-label">タップ音</div>
 <div class="vol-inline">
@@ -1081,7 +1140,7 @@ body.playing #menu-overlay{ display:none; }
 // --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
 (function preventPageScroll(){
   const opts = { passive: false };
-  const stop = (e)=>{ try{ e.preventDefault(); }catch(_){} };
+  const stop = (e)=>{ if(gameState!=='PLAY') return; try{ e.preventDefault(); }catch(_){} };
   document.addEventListener('touchmove', stop, opts);
   document.addEventListener('gesturestart', stop, opts);
   document.addEventListener('gesturechange', stop, opts);
@@ -1157,7 +1216,7 @@ function setSongSpeedId(id){
   // UI reflect
   const wrap = document.getElementById('song-speed-pills');
   if(wrap){
-    [...wrap.querySelectorAll('.mode-pill')].forEach(p=>p.classList.toggle('active', p.dataset.ss===id));
+    [...wrap.querySelectorAll('.speed-pill')].forEach(p=>p.classList.toggle('active', p.dataset.ss===id));
   }
 }
 function getSongSpeedBase(){
@@ -1167,16 +1226,33 @@ function bindSongSpeedUI(){
   const wrap = document.getElementById('song-speed-pills');
   if(!wrap) return;
   wrap.addEventListener('click', (ev)=>{
-    const pill = ev.target.closest('.mode-pill');
+    const pill = ev.target.closest('.speed-pill');
     if(!pill) return;
     // prevent starting the song when selecting speed (pills are inside the song button)
     ev.preventDefault();
     ev.stopPropagation();
     setSongSpeedId(pill.dataset.ss);
   });
+  // keyboard
+  wrap.addEventListener('keydown', (ev)=>{
+    const pill = ev.target.closest('.speed-pill');
+    if(!pill) return;
+    if(ev.key === 'Enter' || ev.key === ' '){
+      ev.preventDefault();
+      ev.stopPropagation();
+      setSongSpeedId(pill.dataset.ss);
+    }
+  });
+
   // iOS: stop tap on pills from triggering the parent song button
+  wrap.addEventListener('pointerdown', (ev)=>{
+    const pill = ev.target.closest('.speed-pill');
+    if(!pill) return;
+    ev.stopPropagation();
+  }, {passive:true});
+
   wrap.addEventListener('touchstart', (ev)=>{
-    const pill = ev.target.closest('.mode-pill');
+    const pill = ev.target.closest('.speed-pill');
     if(!pill) return;
     ev.stopPropagation();
   }, {passive:true});
@@ -2883,5 +2959,7 @@ window.addEventListener('pageshow', ()=>{
   text-overflow:ellipsis;
 "></div>
 <div id="verBadge">v08</div>
+
+  <div class="ver-badge" aria-hidden="true">v10</div>
 </body>
 </html>

@@ -852,6 +852,13 @@ body.is-uke #bottomUke{ display:flex !important; }
   padding: 6px 8px !important;
 }
 
+
+/* ===== v16: ensure UKE top button is visible ===== */
+body.is-uke #bottomUke{ display:flex !important; justify-content:center; }
+body.is-uke #bottomTap{ display:none !important; }
+body.is-tap #bottomTap{ display:flex !important; }
+body.is-tap #bottomUke{ display:none !important; }
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -1960,6 +1967,15 @@ function isWaitMode(){
   return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
+
+// v16: always sync entryKind -> body class (failsafe)
+function syncEntryKindClass(){
+  try{
+    document.body.classList.toggle('is-uke', entryKind === 'uke');
+    document.body.classList.toggle('is-tap', entryKind === 'tap');
+  }catch(e){}
+}
+
 function applyUiMode(mode){
   // v15: mark entry kind on body for CSS
   document.body.classList.toggle('is-uke', entryKind === 'uke');
@@ -2040,7 +2056,9 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
-})(); 
+})();
+
+syncEntryKindClass();
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';

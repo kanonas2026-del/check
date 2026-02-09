@@ -822,6 +822,14 @@ body.playing #menu-overlay{ display:none; }
   display: none !important;
 }
 
+
+/* ===== v10: hide tap volume in ukulele menu ===== */
+body.is-uke .bottom-inline,
+body.is-uke .vol-inline,
+body.is-uke #tapVolume {
+  display: none !important;
+}
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -1925,6 +1933,10 @@ function isWaitMode(){
 }
 
 function applyUiMode(mode){
+  // v10: mark entry kind on body for CSS
+  document.body.classList.toggle('is-uke', entryKind === 'uke');
+  document.body.classList.toggle('is-tap', entryKind === 'tap');
+
   uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
   // map to internal playMode
   if(entryKind === 'tap'){

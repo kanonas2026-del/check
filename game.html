@@ -859,6 +859,26 @@ body.is-uke #bottomTap{ display:none !important; }
 body.is-tap #bottomTap{ display:flex !important; }
 body.is-tap #bottomUke{ display:none !important; }
 
+
+/* ===== v17: visible build badge ===== */
+#buildBadge{
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+
+/* ===== v17: bottomUke layout ===== */
+#bottomUke{ justify-content:center !important; }
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -930,6 +950,7 @@ body.is-tap #bottomUke{ display:none !important; }
 
 </head>
 <body class="menuOpen">
+<div id=\"buildBadge\">v17</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -1969,6 +1990,17 @@ function isWaitMode(){
 
 
 // v16: always sync entryKind -> body class (failsafe)
+
+// v17: force show/hide bottom buttons without relying on body classes
+function forceBottomButtons(){
+  try{
+    const tapEl = document.getElementById('bottomTap');
+    const ukeEl = document.getElementById('bottomUke');
+    if (tapEl) tapEl.style.display = (entryKind === 'tap') ? 'flex' : 'none';
+    if (ukeEl) ukeEl.style.display = (entryKind === 'uke') ? 'flex' : 'none';
+  }catch(e){}
+}
+
 function syncEntryKindClass(){
   try{
     document.body.classList.toggle('is-uke', entryKind === 'uke');
@@ -2059,6 +2091,7 @@ function setMode(el, mode){
 })();
 
 syncEntryKindClass();
+forceBottomButtons();
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
@@ -2891,6 +2924,8 @@ window.addEventListener('pageshow', ()=>{
   if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
 });
 
+
+window.addEventListener('DOMContentLoaded', ()=>{ forceBottomButtons(); });
 </script>
 <div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>

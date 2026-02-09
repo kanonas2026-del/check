@@ -913,6 +913,7 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
+<div id=\"buildBadge\">v24</div>
 <div id=\"buildBadge\">v23</div>
 <div id="app">
 <div id="menu-overlay">
@@ -1409,6 +1410,35 @@ function ensureTapAudio(){
     }
   }catch(e){}
 }
+
+// v24: iOS対策（ユーザー操作の瞬間にAudioContextを確実に起こす）
+let tapUnlocked = false;
+function unlockTapAudio(){
+  if(tapUnlocked) return;
+  try{
+    ensureTapAudio();
+    if(tapAudioCtx && tapAudioCtx.state === 'suspended'){
+      tapAudioCtx.resume();
+    }
+    // tiny silent blip to unlock output on iOS
+    if(tapAudioCtx && tapMaster){
+      const now = tapAudioCtx.currentTime;
+      const o = tapAudioCtx.createOscillator();
+      const g = tapAudioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(440, now);
+      g.gain.setValueAtTime(0.00001, now);
+      o.connect(g).connect(tapMaster);
+      o.start(now);
+      o.stop(now + 0.02);
+    }
+    tapUnlocked = true;
+  }catch(e){}
+}
+// global gesture hook (tap mode only)
+window.addEventListener('touchstart', ()=>{ if(isTapMode()) unlockTapAudio(); }, {passive:true});
+window.addEventListener('pointerdown', ()=>{ if(isTapMode()) unlockTapAudio(); }, {passive:true});
+
 function noteFreqFromTarget(t){
   try{
     if(t && t.noteKey){

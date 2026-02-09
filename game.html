@@ -830,6 +830,21 @@ body.is-uke #tapVolume {
   display: none !important;
 }
 
+
+/* ===== v11: TOP button visibility control ===== */
+.uke-top-btn-wrap{ margin-top:10px; text-align:center; }
+body.is-tap .uke-top-btn-wrap{ display:none !important; }
+body.is-uke .uke-top-btn-wrap{ display:block !important; }
+
+
+/* ===== v12: 固定TOPへもどる ===== */
+.uke-top-fixed{
+  text-align:center;
+  margin:6px 0 10px;
+}
+body.is-uke .uke-top-fixed{ display:block !important; }
+body.is-tap .uke-top-fixed{ display:none !important; }
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -905,6 +920,12 @@ body.is-uke #tapVolume {
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
+
+<!-- v12: 固定TOPへもどる（ウクレレ用・ヘッダー直下） -->
+<div class="uke-top-fixed">
+  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>
+</h1>
 <div id="verTag">v7</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
@@ -995,6 +1016,12 @@ body.is-uke #tapVolume {
 <p id="result-msg">Good Job!</p>
 <button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
 <button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
+
+<!-- v11: TOPへもどる（ウクレレ用） -->
+<div id="uke-top-btn-wrap" class="uke-top-btn-wrap">
+  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>
+
 </div>
 </div>
 <canvas id="gameCanvas"></canvas>

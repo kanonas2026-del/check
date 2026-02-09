@@ -491,7 +491,46 @@ body.playing #menu-overlay{ display:none; }
 /* Tap sound volume */
 .tap-vol-wrap{ margin-top: 14px; padding: 12px 14px; border-radius: 14px; background:#f6f7fb; }
 .tap-vol-label{ font-weight: 900; font-size: 14px; margin-bottom: 8px; color:#333; }
-#tapVol{ width: 100%; }
+#tapVol{
+  width: 100%;
+  height: 30px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  touch-action: none; /* drag smoothly */
+}
+#tapVol::-webkit-slider-runnable-track{
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.14);
+}
+#tapVol::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.12);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  margin-top: -12px; /* center thumb on track */
+}
+#tapVol:active::-webkit-slider-thumb{
+  transform: scale(1.04);
+}
+#tapVol::-moz-range-track{
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.14);
+}
+#tapVol::-moz-range-thumb{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.12);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+}
 
     /* MENU_COLOR_PATCH v12 */
     .menu-btn.mode1{ background: linear-gradient(135deg, rgba(122,177,204,0.95), rgba(168,230,207,0.95)); }
@@ -662,12 +701,27 @@ body.playing #menu-overlay{ display:none; }
 // --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
 (function preventPageScroll(){
   const opts = { passive: false };
-  const stop = (e)=>{ try{ e.preventDefault(); }catch(_){} };
+
+  // Allow native interactions for range sliders (tap volume, etc.)
+  const allowNative = (e)=>{
+    const t = e && e.target;
+    if(!t || !t.closest) return false;
+    return !!t.closest('input[type="range"]');
+  };
+
+  const stop = (e)=>{
+    if(allowNative(e)) return;
+    try{ e.preventDefault(); }catch(_){}
+  };
+
   document.addEventListener('touchmove', stop, opts);
   document.addEventListener('gesturestart', stop, opts);
   document.addEventListener('gesturechange', stop, opts);
   document.addEventListener('gestureend', stop, opts);
-  document.addEventListener('wheel', (e)=>{ if(gameState==='PLAY') stop(e); }, opts);
+  document.addEventListener('wheel', (e)=>{
+    if(allowNative(e)) return;
+    if(gameState==='PLAY') stop(e);
+  }, opts);
 })();
 
 
@@ -1085,11 +1139,64 @@ function playTapHitSound(target){
   }catch(e){}
 }
 
+
+function enhanceRangeSlider(el){
+  if(!el) return;
+
+  const clamp01 = (v)=>Math.max(0, Math.min(1, v));
+  const setByClientX = (clientX)=>{
+    const r = el.getBoundingClientRect();
+    const x = Math.max(r.left, Math.min(r.right, clientX));
+    const ratio = (x - r.left) / Math.max(1, r.width);
+    const min = Number(el.min || 0);
+    const max = Number(el.max || 100);
+    const val = min + (max - min) * ratio;
+    el.value = String(Math.round(val));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  // Pointer Events (iOS Safari 13+ mostly OK)
+  let dragging = false;
+  el.addEventListener('pointerdown', (e)=>{
+    dragging = true;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+    setByClientX(e.clientX);
+  }, { passive:false });
+
+  el.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    e.preventDefault();
+    setByClientX(e.clientX);
+  }, { passive:false });
+
+  const end = (e)=>{
+    dragging = false;
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+
+  // Touch fallback (older iOS)
+  el.addEventListener('touchstart', (e)=>{
+    if(!e.touches || !e.touches[0]) return;
+    e.preventDefault();
+    setByClientX(e.touches[0].clientX);
+  }, { passive:false });
+
+  el.addEventListener('touchmove', (e)=>{
+    if(!e.touches || !e.touches[0]) return;
+    e.preventDefault();
+    setByClientX(e.touches[0].clientX);
+  }, { passive:false });
+}
+
 function bindTapVolUI(){
   loadTapVol();
   const el = document.getElementById('tapVol');
   if(!el) return;
   el.value = String(Math.round(tapVol * 100));
+  enhanceRangeSlider(el);
   const apply = ()=>{
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
     if(tapMaster) tapMaster.gain.value = tapVol;

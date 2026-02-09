@@ -371,14 +371,8 @@ body.menuOpen #menu-overlay{ display:flex; z-index:10000; pointer-events:auto; }
 body.menuOpen #menu-overlay *{ pointer-events:auto; }
 body.playing #menu-overlay{ display:none; }
 
-#back-btn{ display:none !important; }
-
-
 /* v7: hide top-left badges/buttons */
 .verBadge{display:none !important;}
-#back-btn{display:none !important;}
-
-
 /* Hide chord debug HUD (user request) */
 #chordHud{display:none !important;}
 
@@ -706,8 +700,6 @@ body.playing #menu-overlay{ display:none; }
       try { Function(oc).call(btn); } catch(e) {}
     }
   }
-
-  menu.addEventListener('pointerup', handler, true);
   menu.addEventListener('click', handler, true);
 
   // Wrap goMenu / prepGame to toggle menuOpen state reliably
@@ -1590,13 +1582,13 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
+})(); 
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
   goFlip(url);
 }
-
-})();
+;
 
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）

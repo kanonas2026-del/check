@@ -823,75 +823,33 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* ===== v10: hide tap volume in ukulele menu ===== */
-body.is-uke .bottom-inline,
-body.is-uke .vol-inline,
-body.is-uke #tapVolume {
-  display: none !important;
+/* ===== v15: restore TAP layout, UKE uses same bottom row without volume ===== */
+/* show/hide by mode */
+body.is-tap #bottomTap{ display:flex !important; }
+body.is-tap #bottomUke{ display:none !important; }
+
+body.is-uke #bottomTap{ display:none !important; }
+body.is-uke #bottomUke{ display:flex !important; }
+
+/* ensure bottom rows sit naturally (NOT fixed) to avoid overlap */
+#bottomTap, #bottomUke{
+  position: static !important;
+  transform: none !important;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+#bottomUke{ justify-content: center; }
+
+/* compact slider so it fits without scroll */
+#bottomTap #tapVolume{
+  max-width: 220px;
 }
 
-
-/* ===== v11: TOP button visibility control ===== */
-.uke-top-btn-wrap{ margin-top:10px; text-align:center; }
-body.is-tap .uke-top-btn-wrap{ display:none !important; }
-body.is-uke .uke-top-btn-wrap{ display:block !important; }
-
-
-/* ===== v12: 固定TOPへもどる ===== */
-.uke-top-fixed{
-  text-align:center;
-  margin:6px 0 10px;
-}
-body.is-uke .uke-top-fixed{ display:block !important; }
-body.is-tap .uke-top-fixed{ display:none !important; }
-
-
-/* ===== v13: bottom nav unified & light ===== */
-.bottom-inline,
-.uke-top-fixed,
-.uke-top-btn-wrap{
+/* lighten look (B) */
+#bottomTap, #bottomUke{
   background: transparent !important;
   box-shadow: none !important;
-}
-
-.bottom-inline{
   padding: 6px 8px !important;
-}
-
-.top-inline-btn{
-  background: rgba(255,255,255,0.85);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-}
-
-/* ensure same bottom position for both modes */
-body.is-uke .bottom-inline{ display:none !important; }
-body.is-uke .uke-top-fixed{
-  position: fixed;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-}
-body.is-tap .bottom-inline{
-  position: fixed;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-50%);
-}
-
-
-/* ===== v14: prevent overlap with bottom nav ===== */
-.menu-main{
-  padding-bottom: 72px !important; /* space for fixed bottom button */
-}
-
-body.is-uke .uke-top-fixed{
-  bottom: 16px;
-  z-index: 50;
-}
-
-body.is-tap .bottom-inline{
-  bottom: 16px;
-  z-index: 50;
 }
 
 </style>
@@ -969,12 +927,6 @@ body.is-tap .bottom-inline{
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-
-<!-- v12: 固定TOPへもどる（ウクレレ用・ヘッダー直下） -->
-<div class="uke-top-fixed">
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
-</div>
-</h1>
 <div id="verTag">v7</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
@@ -1025,9 +977,15 @@ body.is-tap .bottom-inline{
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
 <!-- ▼ v8 音量＋TOP 横並び -->
-<div class="bottom-inline">
+<div id="bottomTap" class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
+
+<!-- ▼ v15 ウクレレ用：TOPだけ（タップと同じ位置） -->
+<div id="bottomUke" class="bottom-inline">
+  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>
+
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
@@ -1065,12 +1023,6 @@ body.is-tap .bottom-inline{
 <p id="result-msg">Good Job!</p>
 <button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
 <button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
-
-<!-- v11: TOPへもどる（ウクレレ用） -->
-<div id="uke-top-btn-wrap" class="uke-top-btn-wrap">
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
-</div>
-
 </div>
 </div>
 <canvas id="gameCanvas"></canvas>
@@ -2009,7 +1961,7 @@ function isWaitMode(){
 }
 
 function applyUiMode(mode){
-  // v10: mark entry kind on body for CSS
+  // v15: mark entry kind on body for CSS
   document.body.classList.toggle('is-uke', entryKind === 'uke');
   document.body.classList.toggle('is-tap', entryKind === 'tap');
 

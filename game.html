@@ -42,13 +42,19 @@
     /* メニューオーバーレイ */
     #menu-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.32);
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
       z-index: 100; backdrop-filter: blur(2px);
+      box-sizing: border-box;
+      padding: calc(env(safe-area-inset-top) + 8px) 8px calc(env(safe-area-inset-bottom) + 8px);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .menu-card {
       background: var(--card); width: min(560px, 96vw);
-      max-height: calc(100% - 24px); overflow-y: auto;
+      max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+      overflow-y: auto;
       border-radius: 26px; padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
       box-shadow: 0 10px 0 rgba(122,177,204,0.28), 0 16px 32px var(--shadow);
       display: flex; flex-direction: column; gap: 10px;
     }
@@ -323,7 +329,67 @@
 // === INIT (safe) ===
 window.addEventListener('load', ()=>{
   try{ goMenu(); }catch(e){}
-  try{ bindSongSpeedUI(); }catch(e){}
+  try{ bindSongSpeedUI();
+
+// ===== TAP VOLUME SLIDER: drag smoothly on iPhone =====
+function bindTapVolSlider(){
+  const slider = document.getElementById('tapVol');
+  const wrap = document.getElementById('tap-vol-wrap');
+  if(!slider || !wrap) return;
+
+  // init from storage
+  const v = getTapVol(); // 0..1
+  slider.value = String(Math.round(v * 100));
+
+  const commit = (val01)=>{
+    const v = Math.max(0, Math.min(1, val01));
+    setTapVol(v);
+  };
+
+  const setFromClientX = (clientX)=>{
+    const r = slider.getBoundingClientRect();
+    const x = Math.max(r.left, Math.min(r.right, clientX));
+    const t = (x - r.left) / Math.max(1, r.width);
+    slider.value = String(Math.round(t * 100));
+    commit(t);
+  };
+
+  // normal input
+  slider.addEventListener('input', ()=> commit(parseFloat(slider.value)/100), {passive:true});
+
+  // allow dragging on track smoothly
+  const onDown = (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    setFromClientX(cx);
+    try{ slider.setPointerCapture && slider.setPointerCapture(e.pointerId); }catch(_){}
+    dragging = true;
+  };
+  const onMove = (e)=>{
+    if(!dragging) return;
+    e.preventDefault();
+    const cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    setFromClientX(cx);
+  };
+  const onUp = (e)=>{
+    if(!dragging) return;
+    dragging = false;
+  };
+  let dragging = false;
+
+  // pointer events (iOS 13+)
+  slider.addEventListener('pointerdown', onDown, {passive:false});
+  slider.addEventListener('pointermove', onMove, {passive:false});
+  slider.addEventListener('pointerup', onUp, {passive:true});
+  slider.addEventListener('pointercancel', onUp, {passive:true});
+
+  // fallback touch events
+  slider.addEventListener('touchstart', onDown, {passive:false});
+  slider.addEventListener('touchmove', onMove, {passive:false});
+  slider.addEventListener('touchend', onUp, {passive:true});
+}
+ }catch(e){}
   try{ bindTapVolUI(); }catch(e){}
 });
 
@@ -702,11 +768,17 @@ body.playing #menu-overlay{ display:none; }
 (function preventPageScroll(){
   const opts = { passive: false };
 
-  // Allow native interactions for range sliders (tap volume, etc.)
+  // Allow native interactions for range sliders / menu controls
   const allowNative = (e)=>{
     const t = e && e.target;
-    if(!t || !t.closest) return false;
-    return !!t.closest('input[type="range"]');
+    if(!t) return false;
+    // range itself or anything inside tap volume UI should be native
+    try{
+      if(t.matches && t.matches('input[type="range"], input[type="range"] *')) return true;
+      if(t.closest && t.closest('#tap-vol-wrap')) return true;
+      if(t.closest && t.closest('#menu-overlay')) return true; // menu should not be blocked
+    }catch(_){}
+    return false;
   };
 
   const stop = (e)=>{
@@ -714,12 +786,17 @@ body.playing #menu-overlay{ display:none; }
     try{ e.preventDefault(); }catch(_){}
   };
 
-  document.addEventListener('touchmove', stop, opts);
+  // During MENU, allow normal interactions; during PLAY, block page scroll.
+  document.addEventListener('touchmove', (e)=>{
+    if(gameState !== 'PLAY') return;
+    stop(e);
+  }, opts);
+
   document.addEventListener('gesturestart', stop, opts);
   document.addEventListener('gesturechange', stop, opts);
   document.addEventListener('gestureend', stop, opts);
+
   document.addEventListener('wheel', (e)=>{
-    if(allowNative(e)) return;
     if(gameState==='PLAY') stop(e);
   }, opts);
 })();
@@ -1652,6 +1729,11 @@ function applyUiMode(mode){
   if(mt){
     mt.textContent = (entryKind === 'tap') ? '👆 タップであそぶ' : '🪕 ウクレレであそぶ';
   }
+
+
+  // UI: TOPへ戻るボタン（タップ入口のみ）
+  const topBack = document.getElementById('topBackBtn');
+  if(topBack){ topBack.style.display = (entryKind === 'tap') ? 'block' : 'none'; }
 
   // UI: back button text
   const backBtn = document.getElementById('menuBackBtn');

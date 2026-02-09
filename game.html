@@ -41,6 +41,7 @@
 
     /* メニューオーバーレイ */
     #menu-overlay {
+      touch-action: pan-y;
       position: fixed; inset: 0; background: rgba(0,0,0,0.32);
       display: flex; align-items: flex-start; justify-content: center;
       z-index: 100; backdrop-filter: blur(2px);
@@ -53,6 +54,9 @@
       background: var(--card); width: min(560px, 96vw);
       max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
       border-radius: 26px; padding: 16px;
       padding-bottom: calc(16px + env(safe-area-inset-bottom));
       box-shadow: 0 10px 0 rgba(122,177,204,0.28), 0 16px 32px var(--shadow);
@@ -330,6 +334,67 @@
 window.addEventListener('load', ()=>{
   try{ goMenu(); }catch(e){}
   try{ bindSongSpeedUI();
+
+// ===== TAP VOLUME SLIDER DRAG FIX (iOS) v5 =====
+(function(){
+  const slider = document.getElementById('tapVol');
+  if(!slider) return;
+
+  // init from saved
+  try{
+    const v = parseFloat(localStorage.getItem('uk_tap_vol')||'0.35');
+    if(Number.isFinite(v)){
+      slider.value = String(Math.round(Math.max(0,Math.min(1,v))*100));
+    }
+  }catch(e){}
+
+  function applyFromX(clientX){
+    const r = slider.getBoundingClientRect();
+    const x = Math.max(r.left, Math.min(r.right, clientX));
+    const ratio = (x - r.left) / Math.max(1, (r.right - r.left));
+    const val = Math.round(ratio * 100);
+    slider.value = String(val);
+    slider.dispatchEvent(new Event('input', {bubbles:true}));
+  }
+
+  slider.addEventListener('input', (e)=>{
+    const v = parseFloat(slider.value||'0');
+    const vol = Math.max(0, Math.min(1, v/100));
+    try{ localStorage.setItem('uk_tap_vol', String(vol)); }catch(_){}
+    e.stopPropagation();
+  }, {passive:true});
+
+  // prevent page/menu scroll while dragging and make it follow finger
+  const onDown = (e)=>{
+    try{ e.preventDefault(); }catch(_){}
+    e.stopPropagation();
+    const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    applyFromX(p.clientX);
+    slider._drag = true;
+  };
+  const onMove = (e)=>{
+    if(!slider._drag) return;
+    try{ e.preventDefault(); }catch(_){}
+    e.stopPropagation();
+    const p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    applyFromX(p.clientX);
+  };
+  const onUp = (e)=>{
+    slider._drag = false;
+  };
+
+  slider.addEventListener('touchstart', onDown, {passive:false});
+  slider.addEventListener('touchmove', onMove, {passive:false});
+  slider.addEventListener('touchend', onUp, {passive:true});
+  slider.addEventListener('touchcancel', onUp, {passive:true});
+
+  slider.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+
+})();
+
+
 
 // ===== TAP VOLUME SLIDER: drag smoothly on iPhone =====
 function bindTapVolSlider(){
@@ -609,6 +674,11 @@ body.playing #menu-overlay{ display:none; }
     /* keep menu inside viewport on iPhone landscape */
     .menu-card{ max-height: calc(100dvh - 24px); max-height: calc(var(--vh) * 100 - 24px); overflow-y: auto; }
 
+
+/* SLIDER TOUCH FIX v5 */
+#tapVol, input[type=range]{ touch-action: pan-x; }
+#menuBackBtn{ position: sticky; bottom: 0; }
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -671,6 +741,11 @@ body.playing #menu-overlay{ display:none; }
     .rabbit{ font-size: 38px; }
     .phone{ font-size: 36px; }
   }
+
+/* SLIDER TOUCH FIX v5 */
+#tapVol, input[type=range]{ touch-action: pan-x; }
+#menuBackBtn{ position: sticky; bottom: 0; }
+
 </style>
 
 </head>
@@ -725,7 +800,7 @@ body.playing #menu-overlay{ display:none; }
 </div>
 
 </div>
-<button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ もどる</button>
+<button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 </div>
 </div>
 <div id="screenFlash"></div>

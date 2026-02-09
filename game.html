@@ -777,6 +777,42 @@ body.playing #menu-overlay{ display:none; }
   #verTag{ top: 10px; right: 10px; font-size: 11px; }
 }
 
+
+/* ===== v8: 音量＋TOP 横並び（1画面収め） ===== */
+.bottom-inline{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:8px;
+}
+.vol-inline{
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.vol-label{
+  font-weight:900;
+  font-size:12px;
+  white-space:nowrap;
+}
+#tapVolume{
+  flex:1;
+  max-width:240px; /* 短く */
+  height:24px;
+  touch-action:pan-x;
+}
+.top-inline-btn{
+  flex-shrink:0;
+  padding:8px 14px;
+  border-radius:999px;
+  border:none;
+  background:rgba(255,255,255,0.92);
+  font-weight:900;
+  font-size:13px;
+  box-shadow:0 6px 14px rgba(0,0,0,.12);
+}
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -900,6 +936,16 @@ body.playing #menu-overlay{ display:none; }
 
 </div>
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
+
+<!-- ▼ v8 音量＋TOP 横並び -->
+<div class="bottom-inline">
+  <div class="vol-inline">
+    <div class="vol-label">🔊 タップ音</div>
+    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
+  </div>
+  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>
+</button>
 </div>
 </div>
 <div id="screenFlash"></div>

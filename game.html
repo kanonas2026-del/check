@@ -823,7 +823,7 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* ===== v18 build badge ===== */
+/* ===== v20 build badge ===== */
 #buildBadge{
   position: fixed;
   top: 10px;
@@ -839,19 +839,19 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* ===== v18: mode switch (tap/uke) & light bottom ===== */
-#bottomTap, #bottomUke{
-  position: static !important;
-  transform: none !important;
-  margin-top: 10px;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 6px 8px !important;
+/* ===== v20: show TOP in UKE, keep TAP layout intact ===== */
+#bottomUkeFixed{
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: none; /* default off, JS toggles */
 }
-#bottomUke{ justify-content: center; }
-
-/* default: hide both until JS decides (prevents wrong flash) */
-#bottomTap, #bottomUke{ display: none; }
+/* add breathing room so fixed button never hides content */
+.menu-main{
+  padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+}
 
 </style>
 
@@ -924,7 +924,7 @@ body.playing #menu-overlay{ display:none; }
 
 </head>
 <body class="menuOpen">
-<div id=\"buildBadge\">v18</div>
+<div id=\"buildBadge\">v20</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -982,12 +982,6 @@ body.playing #menu-overlay{ display:none; }
 <div id="bottomTap" class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-
-<!-- ▼ v18 ウクレレ用：TOPだけ（タップ下部と同じ位置） -->
-<div id="bottomUke" class="bottom-inline">
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
-</div>
-
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
@@ -2872,26 +2866,23 @@ window.addEventListener('pageshow', ()=>{
 });
 
 
-// ===== v18: robust mode detection & bottom button visibility =====
-function getEntryKindFromURL(){
+// ===== v20: robust menu kind toggle (mode=TAP => tap, else uke) =====
+function v20_kind(){
   try{
     const p = new URLSearchParams(location.search);
-    const m = (p.get('mode') || '').toUpperCase();
-    if (m === 'TAP') return 'tap';
-    return 'uke';
-  }catch(e){
-    return 'uke';
-  }
+    return (p.get('mode')||'').toUpperCase()==='TAP' ? 'tap' : 'uke';
+  }catch(e){ return 'uke'; }
 }
-function applyBottomVisibility(){
-  const kind = getEntryKindFromURL();
-  const tapEl = document.getElementById('bottomTap');
-  const ukeEl = document.getElementById('bottomUke');
-  if (tapEl) tapEl.style.display = (kind === 'tap') ? 'flex' : 'none';
-  if (ukeEl) ukeEl.style.display = (kind === 'uke') ? 'flex' : 'none';
+function v20_apply(){
+  const kind = v20_kind();
+  const ukeFixed = document.getElementById('bottomUkeFixed');
+  const tapRow = document.getElementById('bottomTap');
+  if (ukeFixed) ukeFixed.style.display = (kind==='uke') ? 'block' : 'none';
+  // TAPの既存レイアウトを崩さない：UKEのときだけtap下部行を隠す
+  if (tapRow) tapRow.style.display = (kind==='tap') ? '' : 'none';
 }
-window.addEventListener('DOMContentLoaded', applyBottomVisibility);
-window.addEventListener('pageshow', applyBottomVisibility);
+window.addEventListener('DOMContentLoaded', v20_apply);
+window.addEventListener('pageshow', v20_apply);
 
 </script>
 <div class="verBadge">v12</div>
@@ -2959,3 +2950,8 @@ window.addEventListener('pageshow', applyBottomVisibility);
 
 </body>
 </html>
+
+<!-- ▼ v20 ウクレレ用：TOPへもどる（固定・必ず見える） -->
+<div id="bottomUkeFixed">
+  <button id="ukeTopBtn" class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>

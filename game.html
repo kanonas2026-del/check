@@ -3,6 +3,13 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
+
+<!-- PWA_LANDSCAPE v1 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ウクレレ">
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
@@ -53,9 +60,7 @@
       cursor: pointer; display: flex; gap: 12px; align-items: center;
       box-shadow: 0 6px 0 rgba(122,177,204,0.26);
       transition: transform 0.08s; text-align: left;
-  min-height: 128px;
-  will-change: transform;
-}
+    }
     .menu-btn:active { transform: translateY(2px); box-shadow: none; }
     .badge { flex: 0 0 38px; height: 38px; border-radius: 12px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
     .menu-btn.mode2 .badge{ background: #ffde59; color:#4a3728; }
@@ -491,681 +496,169 @@ body.playing #menu-overlay{ display:none; }
 
 /* Tap sound volume */
 .tap-vol-wrap{ margin-top: 14px; padding: 12px 14px; border-radius: 14px; background:#f6f7fb; }
-.tap-vol-label{ font-weight: 900; font-size: 14px; margin-bottom: 8px; color:#333;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
+.tap-vol-label{ font-weight: 900; font-size: 14px; margin-bottom: 8px; color:#333; }
 #tapVol{ width: 100%; }
 
-
-/* ===== UI refresh: match index/ukulele button feel ===== */
-.menu-card{
-  width: min(560px, 92vw);
-  padding: 22px 18px;
-  border-radius: 22px;
-}
-.menu-card h1{
-  font-size: 28px;
-  letter-spacing: 0.2px;
-}
-.menu-btn{
-  border-radius: 18px;
-  padding: 18px 16px;
-}
-.badge{
-  flex: 0 0 46px;
-  height: 46px;
-  border-radius: 14px;
-  font-size: 22px;
-}
-.menu-text .title{ font-size: 18px; }
-.menu-text small{ font-size: 12px; }
-
-.mode-pill{
-  font-size: 14px;
-  padding: 10px 14px;
-  border-radius: 22px;
-}
-.mode-desc{
-  margin-top: 8px;
-  text-align: center;
-  color: #333;
-  font-weight: 900;
-  font-size: 14px;
-}
-
-.action-btn{ font-size: 16px; border-radius: 18px; padding: 14px 14px; }
-
-@media (orientation: landscape) and (max-height: 430px){
-  .menu-card{ width: min(720px, 98vw); padding: 14px 12px; border-radius: 20px; }
-  .menu-card h1{ font-size: 22px; }
-  .menu-btn{ padding: 14px 12px; }
-  .badge{ flex: 0 0 40px; height: 40px; font-size: 20px; }
-  .menu-text .title{ font-size: 16px; }
-  .mode-pill{ font-size: 12px; padding: 8px 12px; }
-  .action-btn{ font-size: 14px; padding: 12px 12px; }
-}
-
-    /* ===== v05: safe-area + top-like colorful menu + header nav ===== */
-    #menu-overlay{
-      padding:
-        calc(10px + env(safe-area-inset-top))
-        calc(12px + env(safe-area-inset-right))
-        calc(10px + env(safe-area-inset-bottom))
-        calc(12px + env(safe-area-inset-left));
-      box-sizing: border-box;
-    }
-    .menu-card{
-      width: min(980px, 100%);
-      position: relative; /* keep nav inside card */
-    }
-    .menu-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom: 8px;
-    }
-    .menu-head .menu-title{
-      flex: 1 1 auto;
-      text-align:center;
-      font-weight: 900;
-      font-size: 22px;
-      margin: 0;
-      color: #3b2a20;
-      letter-spacing: 0.4px;
-      text-shadow: 0 2px 0 rgba(255,255,255,0.6);
-      min-width: 0;
-    }
-    .nav-pill{
-      flex: 0 0 auto;
-      border: none;
-      border-radius: 18px;
-      padding: 10px 14px;
-      font-weight: 900;
-      font-size: 14px;
-      color: #fff;
-      background: rgba(0,0,0,0.35);
-      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .nav-pill:active{ transform: scale(0.98); }
-    /* remove old h1 spacing if any */
-    .menu-card h1#menuTitle{ display:none; }
-
-    /* Colorful menu buttons (match top vibe) */
-    .menu-btn{
-      border-radius: 26px;
-      padding: 18px 18px;
-      color: #fff;
-      box-shadow: 0 12px 0 rgba(122,177,204,0.22), 0 18px 34px rgba(0,0,0,0.18);
-      transition: transform 180ms ease, filter 180ms ease;
-    }
-    .menu-btn:hover{ filter: brightness(1.03); }
-    .menu-btn:active{ transform: translateY(1px) scale(0.99); }
-
-    .menu-btn .title{ font-size: 22px; color:#fff; text-shadow: 0 2px 0 rgba(0,0,0,0.15); }
-    .menu-btn small{ color: rgba(255,255,255,0.92); font-size: 14px; font-weight: 800; }
-
-    .menu-btn .badge{
-      width: 54px; height: 54px; flex: 0 0 54px;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.24);
-      border: 2px solid rgba(255,255,255,0.35);
-      box-shadow: inset 0 2px 0 rgba(255,255,255,0.22);
-      font-size: 26px;
-    }
-
-    .menu-btn.mode1{ background: linear-gradient(135deg, #ffb65e, #ff7a3d); }
-    .menu-btn.mode2{ background: linear-gradient(135deg, #2ad2ff, #2f6bff); }
-    .menu-btn.mode3{ background: linear-gradient(135deg, #29e07a, #12b7d6); }
-    .menu-btn.mode4{ background: linear-gradient(135deg, #ff5ad6, #ffb85a); }
-
-    /* Layout tuning to resemble screenshot */
-    .menu-main{ grid-template-columns: 1fr 1fr; gap: 12px; }
-    .menu-btn.mode1{ grid-column: 1; grid-row: 1; }
-    .menu-btn.mode2{ grid-column: 2; grid-row: 1; }
-    .menu-btn.mode3{ grid-column: 1; grid-row: 2 / span 2; min-height: 170px; }
-    .song-block{ grid-column: 2; grid-row: 2 / span 2; }
-
-    /* Keep song speed area readable */
-    .song-speed-inline{
-      margin-top: 10px;
-      background: rgba(255,255,255,0.75);
-      border-radius: 18px;
-      padding: 10px 10px 12px;
-    }
-
-    /* Version badge */
-    #verBadge{
-      position: fixed;
-      right: calc(12px + env(safe-area-inset-right));
-      bottom: calc(10px + env(safe-area-inset-bottom));
-      z-index: 9999;
-      background: rgba(0,0,0,0.45);
-      color:#fff;
-      border-radius: 16px;
-      padding: 6px 10px;
-      font-weight: 900;
-      font-size: 14px;
-      letter-spacing: 0.4px;
-    }
-
-
-/* ===== v07: iPhone/iPad/PCで「下の操作パネルが消える」問題を解消（等サイズ4ボタン＋コンパクトフッター） ===== */
-#menuBackBtn{ display:none !important; } /* もどるは上のボタンで統一 */
-
-/* セーフエリア対応（ノッチ対策） */
-#menu-overlay{
-  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-  padding-left: calc(env(safe-area-inset-left, 0px) + 10px);
-  padding-right: calc(env(safe-area-inset-right, 0px) + 10px);
-  box-sizing: border-box;
-}
-
-/* メニュー全体を「ヘッダー + 4ボタン + フッター」で確実に収める */
-#menu-overlay .menu-card{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:10px !important;
-  width: min(980px, 98vw) !important;
-  max-height: calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 12px) !important;
-  overflow:hidden !important;
-  padding: 12px 14px !important;
-}
-
-/* リスト内に余計な余白があると下が消えるので圧縮 */
-#menu-overlay .menu-list{
-  display:flex !important;
-  flex-direction:column !important;
-  gap:10px !important;
-  margin:0 !important;
-  padding:0 !important;
-}
-
-/* 4ボタンは「同じ大きさ」で2x2 */
-#menu-overlay .menu-main{
-  display:grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 10px !important;
-  margin:0 !important;
-}
-
-/* 旧: ちょいむずだけ2段（row-span）を無効化 */
-#menu-overlay .song-block{ grid-row: auto !important; }
-#menu-overlay .menu-btn.mode3{ min-height: 0 !important; height: auto !important; padding: 14px !important; }
-
-/* iPhone横で下の操作が必ず見える高さにする（iPad/PCは自然に伸びる） */
-#menu-overlay .menu-btn{
-  height: clamp(92px, 18vh, 150px) !important;
-  min-height: 92px !important;
-}
-#menu-overlay .menu-btn .label{
-  font-size: clamp(12px, 1.5vw, 15px) !important;
-}
-#menu-overlay .menu-btn .title{
-  font-size: clamp(20px, 2.2vw, 30px) !important;
-}
-#menu-overlay .menu-btn .desc{
-  font-size: clamp(12px, 1.4vw, 16px) !important;
-}
-
-/* フッター（曲スピード / モード / 音量）をコンパクトにまとめる */
-#song-speed-panel, .mode-select, .tap-vol-wrap{
-  margin:0 !important;
-  padding: 8px 10px !important;
-  border-radius: 18px !important;
-}
-#song-speed-panel{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  gap:10px !important;
-  flex-wrap:wrap !important;
-}
-#song-speed-panel .speed-title{
-  font-size: 14px !important;
-  margin:0 !important;
-}
-#songSpeedBtns{
-  display:flex !important;
-  gap:8px !important;
-  align-items:center !important;
-  justify-content:center !important;
-}
-.speed-pill{
-  padding: 8px 14px !important;
-  border-radius: 999px !important;
-  font-size: 14px !important;
-}
-.mode-select{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  gap:10px !important;
-  flex-wrap:wrap !important;
-}
-.mode-select .mode-pill{
-  padding: 9px 16px !important;
-  border-radius: 999px !important;
-  font-size: 14px !important;
-}
-.tap-vol-wrap{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  gap:10px !important;
-  flex-wrap:wrap !important;
-}
-.tap-vol-wrap label{
-  font-size: 14px !important;
-  margin:0 !important;
-}
-.tap-vol-wrap input[type="range"]{
-  width: min(360px, 60vw) !important;
-}
-#tapVolVal{
-  font-size: 13px !important;
-  opacity: .9 !important;
-}
-
-/* 説明文は1行に圧縮（iPhone横でのはみ出し防止） */
-.mode-desc{
-  margin:0 !important;
-  padding: 2px 4px !important;
-  font-size: 12px !important;
-  line-height: 1.2 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  text-align:center !important;
-}
-
-/* iPhone横のときはさらに少し圧縮 */
-@media (orientation: landscape) and (max-height: 430px){
-  #menu-overlay .menu-card{ gap:8px !important; padding: 10px 12px !important; }
-  #menu-overlay .menu-btn{ height: clamp(88px, 17vh, 120px) !important; }
-  #song-speed-panel, .mode-select, .tap-vol-wrap{ padding: 7px 9px !important; }
-  .speed-pill, .mode-select .mode-pill{ padding: 7px 12px !important; font-size: 13px !important; }
-  .tap-vol-wrap input[type="range"]{ width: min(320px, 58vw) !important; }
-  .mode-desc{ font-size: 11px !important; }
-}
-
-
-/* === v07 menu layout fixes (equal buttons / safe-area / no cut-off) === */
-#menu-overlay{
-  padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
-           calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
-  box-sizing: border-box;
-  touch-action: pan-y;
-}
-.menu-card{
-  width: min(980px, 100%);
-  height: min(640px, 100%);
-  max-height: 100%;
-  overflow: hidden; /* prevent bottom cut; internal areas will shrink */
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 10px;
-}
-.menu-header{
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 10px;
-}
-#menuTitle{
-  margin: 0;
-  text-align: center;
-  line-height: 1.1;
-}
-.menu-main{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: repeat(2, minmax(92px, 1fr));
-  gap: 10px;
-  min-height: 0;
-}
-.menu-btn{
-  min-height: 0;
-  height: 100%;
-  padding: 14px 16px;
-}
-.menu-btn.mode3,
-.menu-btn.mode4{
-  grid-row: auto !important;
-  grid-column: auto !important;
-}
-.speed-mini{
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255,255,255,0.35);
-}
-.speed-mini-label{
-  font-size: 14px;
-  font-weight: 800;
-  opacity: 0.95;
-  margin-bottom: 6px;
-}
-.speed-pills{
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.speed-pills .mode-pill{
-  padding: 8px 10px;
-  font-size: 14px;
-  border-radius: 999px;
-}
-.mode-select{
-  padding: 12px 14px;
-  margin-top: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-.mode-row{
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.mode-label{
-  font-weight: 900;
-  font-size: 14px;
-  opacity: 0.8;
-}
-.mode-pills{
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.tap-vol[hidden]{ display:none !important; }
-.vol-inline{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 220px;
-}
-#tapVol{ width: min(320px, 60vw); }
-.vol-label{ font-weight: 900; opacity: 0.9; }
-
-@media (max-height: 430px){
-  .menu-card{ height: 100%; }
-  .menu-btn{ padding: 12px 14px; }
-  .menu-title{ font-size: 26px; }
-  .menu-sub{ font-size: 14px; }
-  .speed-mini{ margin-top: 8px; padding-top: 6px; }
-  .speed-mini-label{ display:none; }
-  .mode-help{ display:none; }
-  .mode-select{ padding: 10px 12px; }
-}
-@media (max-height: 360px){
-  .speed-mini{ display:none; } /* extreme landscape fallback */
-}
-/* allow scroll inside menu on very small screens */
-@media (max-height: 340px){
-  .menu-card{ overflow-y: auto; -webkit-overflow-scrolling: touch; }
-}
-
-
-/* =========================
-   v08 FIX: iPhone横(セーフエリア)・下切れ対策 / きらきら速度UIをカード内に固定
-   ========================= */
-#menu-overlay{
-  padding:
-    calc(12px + env(safe-area-inset-top))
-    calc(12px + env(safe-area-inset-right))
-    calc(12px + env(safe-area-inset-bottom))
-    calc(12px + env(safe-area-inset-left));
-  box-sizing: border-box;
-}
-.menu-card{
-  max-height: 100%;
-  padding: 14px;
-  padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  -webkit-overflow-scrolling: touch;
-}
-.menu-btn{
-  min-height: clamp(96px, 22vh, 150px);
-  padding: clamp(12px, 2.0vh, 18px);
-}
-.menu-icon{
-  width: clamp(54px, 8vw, 76px);
-  height: clamp(54px, 8vw, 76px);
-}
-.menu-title{ font-size: clamp(22px, 2.6vw, 34px); }
-.menu-sub{ font-size: clamp(12px, 1.6vw, 18px); }
-
-/* きらきらぼし：速度UIをボタン内の下部に“固定表示”して、全体メニューに見えないようにする */
-.menu-btn.kirakira{
-  position: relative;
-  overflow: hidden;
-}
-.menu-btn.kirakira .menu-text{
-  padding-bottom: 44px; /* 速度UIのぶん、文字と重ならない余白 */
-}
-.menu-btn.kirakira .speed-mini{
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 12px;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  background: rgba(255,255,255,0.16);
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 16px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.menu-btn.kirakira .speed-mini-label{
-  margin: 0;
-  font-size: 12px;
-  font-weight: 900;
-  color: rgba(255,255,255,0.95);
-  white-space: nowrap;
-}
-.menu-btn.kirakira .speed-pills{
-  flex-wrap: nowrap;
-}
-.menu-btn.kirakira .speed-pills .mode-pill{
-  background: rgba(255,255,255,0.88);
-}
-.menu-btn.kirakira .speed-pills .mode-pill.active{
-  background: #fff;
-}
-
-/* さらに高さが低い端末向け */
-@media (max-height: 420px){
-  .menu-card{ padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-  .menu-btn{ min-height: clamp(84px, 21vh, 130px); }
-  .menu-btn.kirakira .menu-text{ padding-bottom: 40px; }
-  .menu-btn.kirakira .speed-mini-label{ display: none; }
-  .menu-btn.kirakira .speed-mini{ justify-content: center; }
-}
-
-
-/* v08: コンパクト化（横画面で下切れをさらに抑える） */
-.mode-select{ margin-top: 8px; padding-top: 8px; }
-.tap-vol-wrap{ margin-top: 10px; padding: 10px 12px; }
-.tap-vol-label{ font-size: 13px; margin-bottom: 6px; }
-
-@media (max-height: 420px){
-  .tap-vol-wrap{ margin-top: 8px; padding: 8px 10px; }
-  .tap-vol-label{ font-size: 12px; }
-}
-
-    .ver-badge{
-      position: fixed;
-      right: calc(12px + env(safe-area-inset-right));
-      bottom: calc(10px + env(safe-area-inset-bottom));
-      padding: 6px 10px;
-      font-weight: 900;
-      font-size: 13px;
-      border-radius: 999px;
-      background: rgba(0,0,0,0.35);
-      color: #fff;
-      z-index: 9999;
-      letter-spacing: 0.5px;
-      user-select: none;
-      pointer-events: none;
-    }
-
-    .tap-vol.is-hidden{ display:none; }
-
-    /* MENU_LAYOUT_V09: 下が切れない + iOSでスクロールできる */
-    .menu-card{
-      max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: calc(16px + env(safe-area-inset-bottom));
-      padding-left: calc(16px + env(safe-area-inset-left));
-      padding-right: calc(16px + env(safe-area-inset-right));
-    }
-    .mode-select{
-      position: sticky;
-      bottom: 0;
-      background: var(--card);
-      padding-bottom: calc(8px + env(safe-area-inset-bottom));
-      box-shadow: 0 -12px 18px rgba(0,0,0,0.06);
-      border-top: 1px solid rgba(0,0,0,0.06);
-    }
-
-    /* MENU_BTN_CLAMP_V09: 4つのボタンの高さを揃える */
-    .menu-btn{ min-height: clamp(110px, 24vh, 160px); }
-    .menu-icon{ font-size: clamp(28px, 4.6vh, 42px); }
-    .menu-title{ font-size: clamp(16px, 2.4vh, 20px); }
-    .menu-sub{ font-size: clamp(11px, 1.9vh, 14px); }
-
-    /* MENU_TIGHT_V10: 収まり重視（iPhone横でも下が見える） */
-    .menu-card{ padding-top: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
-    .menu-header{ margin-bottom: 2px; }
-    .menu-card h1{ font-size: 20px; margin-bottom: 2px; }
-    .menu-main{ gap: 8px; }
-    .menu-btn{
-      height: clamp(112px, 22vh, 152px);
-      overflow: hidden;
-      padding: 10px 12px;
-    }
-    .menu-text{ overflow:hidden; }
-    .speed-mini{ margin-top: 4px; padding-top: 4px; gap: 4px; }
-    .speed-mini-label{ font-size: 10.5px; }
-    .speed-mini-note{ font-size: 9.5px; }
-    .speed-pill{ padding: 5px 9px; font-size: 10.5px; }
-    .mode-select{ margin-top: 6px; padding-top: 6px; }
-
-/* ==== w11 MENU LAYOUT FIX (no overlap / no cut) ==== */
-#menu-overlay{
-  padding: calc(14px + var(--ui-top)) calc(14px + var(--ui-right)) calc(14px + var(--ui-bottom)) calc(14px + var(--ui-left)) !important;
-}
-#menu-overlay .menu-card{
-  display:flex !important;
-  flex-direction:column !important;
-  width: min(980px, 100%) !important;
-  height: auto !important;
-  max-height: 100% !important;
-  overflow: hidden !important; /* keep rounded corners */
-}
-#menu-overlay .menu-grid{
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow: auto !important;
-}
-#menu-overlay .mode-select,
-#menu-overlay .tap-vol-wrap{
-  flex: 0 0 auto !important;
-}
-#menu-overlay .tap-vol-wrap{
-  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
-}
-#menu-overlay .menu-btn{
-  min-height: 110px;
-}
-@media (max-height: 430px){
-  #menu-overlay .menu-btn{ min-height: 92px; }
-  #menu-overlay .menu-btn .label{ font-size: 18px; }
-  #menu-overlay .menu-btn .sub{ font-size: 13px; }
-  #menu-overlay .menu-grid{ gap: 12px !important; }
-}
+    /* MENU_COLOR_PATCH v12 */
+    .menu-btn.mode1{ background: linear-gradient(135deg, rgba(122,177,204,0.95), rgba(168,230,207,0.95)); }
+    .menu-btn.mode2{ background: linear-gradient(135deg, rgba(255,222,89,0.96), rgba(255,183,71,0.94)); }
+    .menu-btn.mode3{ background: linear-gradient(135deg, rgba(255,170,200,0.94), rgba(186,146,255,0.92)); }
+    .menu-btn.mode4{ background: linear-gradient(135deg, rgba(178,235,127,0.92), rgba(255,222,89,0.92)); }
+    .menu-btn{ color:#3b2a1f; box-shadow: 0 8px 0 rgba(0,0,0,0.10); }
+    .menu-btn:active{ transform: translateY(2px); }
+    .song-only-note{ font-size: 12px; opacity: 0.9; }
+    /* keep menu inside viewport on iPhone landscape */
+    .menu-card{ max-height: calc(100dvh - 24px); max-height: calc(var(--vh) * 100 - 24px); overflow-y: auto; }
 
 </style>
+
+<!-- LANDSCAPE_LOCK v1 -->
+<style>
+  /* Force-landscape UX: block portrait with a friendly overlay */
+  #landscapeLock{
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 2147483647;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 18px;
+    box-sizing: border-box;
+  }
+  body.needLandscape #landscapeLock{ display:flex; }
+  .landscapeCard{
+    width: min(560px, 92vw);
+    border-radius: 22px;
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    padding: 18px 18px 16px;
+    text-align: center;
+    color: #2b2b2b;
+  }
+  .landscapeRow{
+    display:flex; gap: 14px; align-items:center; justify-content:center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .rabbit{
+    font-size: 44px; line-height: 1;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  }
+  .phone{
+    font-size: 42px; line-height: 1;
+    transform: rotate(-18deg);
+  }
+  .landscapeTitle{
+    font-weight: 1000;
+    font-size: 24px;
+    margin: 6px 0 8px;
+  }
+  .landscapeText{
+    font-weight: 900;
+    font-size: 18px;
+    margin: 0;
+    opacity: .92;
+  }
+  .landscapeHint{
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    opacity: .75;
+  }
+  @media (max-height: 430px){
+    .landscapeTitle{ font-size: 20px; }
+    .landscapeText{ font-size: 16px; }
+    .rabbit{ font-size: 38px; }
+    .phone{ font-size: 36px; }
+  }
+</style>
+
 </head>
 <body class="menuOpen">
 <div id="app">
-<div aria-hidden="false" id="menu-overlay">
-<div aria-label="ゲームメニュー" class="menu-card" role="dialog">
-<div class="menu-header">
-<button class="nav-pill" id="navBackBtn" onclick="goBackFromGameMenu()">← もどる</button>
-<h1 id="menuTitle">ウクレレであそぶ</h1>
-<button class="nav-pill" id="navTopBtn" onclick="goFlip('index.html')">🏝️ TOPへ</button>
-</div>
-<div class="menu-main" id="menuMain">
-<button aria-label="ドレミファソラシド（だんだん速くなるよ）" class="menu-btn mode1" onclick="prepGame('scale')">
-<div aria-hidden="true" class="menu-icon">🐤</div>
+<div id="menu-overlay">
+<div class="menu-card">
+<h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
+<div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
+<div class="menu-main">
+<button class="menu-btn mode1" onclick="prepGame('scale')">
+<div class="badge">🐤</div>
 <div class="menu-text">
-<div class="menu-title">ドレミファソラシド</div>
-<div class="menu-sub">だんだん速くなるよ</div>
-</div>
+  <div class="title">ドレミファソラシド</div>
+  <small>だんだん速くなるよ</small>
+  </div>
 </button>
-<button aria-label="コード かんたん（C / F / G7 / Am）" class="menu-btn mode2" onclick="prepGame('easy')">
-<div aria-hidden="true" class="menu-icon">😺</div>
-<div class="menu-text">
-<div class="menu-title">コード かんたん</div>
-<div class="menu-sub">C / F / G7 / Am</div>
-</div>
+<button class="menu-btn mode2" onclick="prepGame('easy')">
+<div class="badge">🐱</div>
+<div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
 </button>
-<button aria-label="コード ちょいむず（いろいろなコード）" class="menu-btn mode3" onclick="prepGame('hard')">
-<div aria-hidden="true" class="menu-icon">🐼</div>
-<div class="menu-text">
-<div class="menu-title">コード ちょいむず</div>
-<div class="menu-sub">いろいろなコード</div>
-</div>
+<button class="menu-btn mode3" onclick="prepGame('hard')">
+<div class="badge">🐼</div>
+<div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
 </button>
-<button aria-label="きらきらぼし（メロディ＋コード）" class="menu-btn mode4" onclick="prepGame('song')">
-<div aria-hidden="true" class="menu-icon">🦁</div>
-<div class="menu-text">
-<div class="menu-title">きらきらぼし</div>
-<div class="menu-sub">メロディ＋コード</div>
-<div aria-label="きらきらぼしのスピード" class="speed-mini">
-<div class="speed-mini-label">♪ きらきらぼしだけ：はやさ</div><div class="speed-mini-note">※この曲だけに効きます</div>
-<div aria-label="スピード選択" class="speed-pills" id="song-speed-pills" role="group">
-<span class="speed-pill" data-ss="SLOW" role="button" tabindex="0">ゆっくり</span>
-<span class="speed-pill" data-ss="NORMAL" role="button" tabindex="0">ふつう</span>
-<span class="speed-pill" data-ss="FAST" role="button" tabindex="0">はやい</span>
+<div class="song-block">
+  <button class="menu-btn mode4 song-start" onclick="prepGame('song')" aria-label="きらきらぼしをはじめる">
+    <div class="badge">🦁</div>
+    <div class="menu-text"><div class="title song-title">きらきらぼし</div><small>メロディ＋コード</small></div>
+  </button>
+  <div class="song-speed-inline" id="song-speed-wrap">
+    <div class="song-speed-title">♪ きらきらぼしの速さ <span class="song-only-note">(この曲だけ)</span></div>
+    <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start; flex-wrap:wrap; gap:6px;">
+      <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
+      <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
+      <div class="mode-pill" data-ss="FAST">はやい</div>
+    </div>
+    <div id="song-speed-note" class="song-speed-note">※この設定は「きらきらぼし」だけに効きます</div>
+  </div>
 </div>
 </div>
 </div>
-</button>
+<div class="mode-select">
+<div class="mode-pills" id="play-mode-pills">
+  <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+  <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
 </div>
-<div class="mode-select" id="modeSelectWrap">
-<div class="mode-row">
-<div class="mode-label">プレイ</div>
-<div aria-label="プレイモード" class="mode-pills" role="group">
-<button class="mode-pill" id="modeNormal" onclick="setPlayMode('NORMAL')">ノーマル</button>
-<button class="mode-pill" id="modeWait" onclick="setPlayMode('WAIT')">サポート付き</button>
+<div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
+<div class="tap-vol-wrap" id="tap-vol-wrap">
+  <div class="tap-vol-label">🔊 タップ音の大きさ</div>
+  <input id="tapVol" type="range" min="0" max="100" value="35" />
 </div>
+
 </div>
-<div class="tap-vol is-hidden" id="tap-vol-wrap">
-<div class="mode-row">
-<div class="mode-label">タップ音</div>
-<div class="vol-inline">
-<input aria-label="タップ音の大きさ" id="tapVol" max="1" min="0" step="0.05" type="range" value="0.45"/>
-<span class="vol-label" id="tapVolLabel">45%</span>
+<button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ もどる</button>
 </div>
 </div>
+<div id="screenFlash"></div>
+<div id="fxMsg"></div>
+<div id="comboBig"></div>
+<div id="lyrics-area"></div>
+<div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
+<div id="score-panel">⭐ <span id="score">0</span></div>
+<div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
+<div aria-hidden="true" id="chordHud"></div>
+<div id="back-btn"><button onclick="goMenu()">🏝️ メニュー</button></div>
+<button id="stopBtn" type="button">ストップ</button>
+<div class="overlay-card" id="loading-overlay">
+<div class="card-content">
+<h2>マイクじゅんび中...</h2>
+<p id="loading-msg">静かにしてね（ノイズをはかっています）</p>
 </div>
-<div class="mode-help" id="modeHelp">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 </div>
+<div class="overlay-card" id="pause-overlay">
+<div class="card-content">
+<h2>ストップ中</h2>
+<button class="action-btn btn-primary" onclick="resumeGame()">つづける</button>
+<button class="action-btn btn-secondary" onclick="goMenu()">メニューへ</button>
+</div>
+</div>
+<div class="overlay-card" id="result-overlay">
+<div class="card-content">
+<h2>Finish!</h2>
+<div class="result-score">⭐ <span id="result-score">0</span> pts</div>
+<p id="result-msg">Good Job!</p>
+<button class="action-btn btn-primary" onclick="restartLast()">もう１回</button>
+<button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
 </div>
 </div>
 <canvas id="gameCanvas"></canvas>
@@ -1175,7 +668,7 @@ body.playing #menu-overlay{ display:none; }
 // --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
 (function preventPageScroll(){
   const opts = { passive: false };
-  const stop = (e)=>{ if(gameState!=='PLAY') return; try{ e.preventDefault(); }catch(_){} };
+  const stop = (e)=>{ try{ e.preventDefault(); }catch(_){} };
   document.addEventListener('touchmove', stop, opts);
   document.addEventListener('gesturestart', stop, opts);
   document.addEventListener('gesturechange', stop, opts);
@@ -1251,7 +744,7 @@ function setSongSpeedId(id){
   // UI reflect
   const wrap = document.getElementById('song-speed-pills');
   if(wrap){
-    [...wrap.querySelectorAll('.speed-pill')].forEach(p=>p.classList.toggle('active', p.dataset.ss===id));
+    [...wrap.querySelectorAll('.mode-pill')].forEach(p=>p.classList.toggle('active', p.dataset.ss===id));
   }
 }
 function getSongSpeedBase(){
@@ -1261,33 +754,16 @@ function bindSongSpeedUI(){
   const wrap = document.getElementById('song-speed-pills');
   if(!wrap) return;
   wrap.addEventListener('click', (ev)=>{
-    const pill = ev.target.closest('.speed-pill');
+    const pill = ev.target.closest('.mode-pill');
     if(!pill) return;
     // prevent starting the song when selecting speed (pills are inside the song button)
     ev.preventDefault();
     ev.stopPropagation();
     setSongSpeedId(pill.dataset.ss);
   });
-  // keyboard
-  wrap.addEventListener('keydown', (ev)=>{
-    const pill = ev.target.closest('.speed-pill');
-    if(!pill) return;
-    if(ev.key === 'Enter' || ev.key === ' '){
-      ev.preventDefault();
-      ev.stopPropagation();
-      setSongSpeedId(pill.dataset.ss);
-    }
-  });
-
   // iOS: stop tap on pills from triggering the parent song button
-  wrap.addEventListener('pointerdown', (ev)=>{
-    const pill = ev.target.closest('.speed-pill');
-    if(!pill) return;
-    ev.stopPropagation();
-  }, {passive:true});
-
   wrap.addEventListener('touchstart', (ev)=>{
-    const pill = ev.target.closest('.speed-pill');
+    const pill = ev.target.closest('.mode-pill');
     if(!pill) return;
     ev.stopPropagation();
   }, {passive:true});
@@ -1580,7 +1056,7 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  // Only for TAP mode (ウクレレ無しで遊ぶ)
+  // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
   if(!tapAudioCtx || !tapMaster) return;
@@ -1618,23 +1094,14 @@ function playTapHitSound(target){
 }
 
 function bindTapVolUI(){
-  let _lastTapPreview = 0;
   loadTapVol();
   const el = document.getElementById('tapVol');
-  const valEl = document.getElementById('tapVolVal');
   if(!el) return;
   el.value = String(Math.round(tapVol * 100));
   const apply = ()=>{
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
     if(tapMaster) tapMaster.gain.value = tapVol;
     saveTapVol();
-    if(valEl) valEl.textContent = String(Math.round(tapVol*100));
-    // preview (ヌルッと音量確認)
-    const nowMs = Date.now();
-    if(nowMs - _lastTapPreview > 140){
-      _lastTapPreview = nowMs;
-      try{ playTapHitSound('A'); }catch(_e){}
-    }
     // user gesture => allow audio on iOS
     ensureTapAudio();
   };
@@ -2041,75 +1508,65 @@ let spawnInterval = 2800; // ← 間隔（ms）: 全メニュー共通
 let lastStartParams = null; // リトライ用
 
 // --- UI操作 ---
-/* ===== play mode mapping (tap / ukulele) ===== */
-let entryKind = 'uke'; // 'tap' | 'uke'
-let uiMode = 'WAIT';   // 'NORMAL' | 'WAIT'
+// ===== UI MODE / ENTRY KIND (v12) =====
+let entryKind = 'uke'; // 'tap' or 'uke'
+let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
-  return playMode === 'TAP' || playMode === 'TAP_WAIT' || playMode === 'TAP_NORMAL';
+  return String(playMode||'').toUpperCase().startsWith('TAP');
 }
-function isWaitStyle(){
-  // "WAIT系"（止まって待つ/サポート付き）
-  return playMode === 'WAIT' || playMode === 'TAP' || playMode === 'TAP_WAIT';
+function isWaitMode(){
+  return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
 function applyUiMode(mode){
-  uiMode = (mode === 'NORMAL') ? 'NORMAL' : 'WAIT';
-
-  // entryKind に応じて内部モードへ変換
+  uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
+  // map to internal playMode
   if(entryKind === 'tap'){
     playMode = (uiMode === 'NORMAL') ? 'TAP_NORMAL' : 'TAP_WAIT';
   }else{
-    playMode = (uiMode === 'NORMAL') ? 'NORMAL' : 'WAIT';
+    playMode = uiMode; // 'NORMAL' or 'WAIT'
   }
 
-  // UI: pill active
+  // UI: pills active (only data-mode pills)
   document.querySelectorAll('.mode-pill[data-mode]').forEach(b => {
-    const m = (b.getAttribute('data-mode') || '').toUpperCase();
+    const m = (b.getAttribute('data-mode')||'').toUpperCase();
     b.classList.toggle('active', m === uiMode);
   });
 
-  // UI: 説明文
+  // UI: explanation
   const desc = document.getElementById('mode-desc');
   if(desc){
-    if(uiMode === 'NORMAL'){
-      desc.textContent = 'ノーマル：ながれてくるよ（ふつう）';
-    }else{
-      desc.textContent = 'サポート付き（まちモード）：とまって まつよ（はじめてにおすすめ）';
-    }
+    desc.textContent = (uiMode === 'NORMAL')
+      ? 'ノーマル：ながれてくるよ（ふつう）'
+      : 'サポート付き：とまって まつよ（はじめてにおすすめ）';
   }
 
-  // UI: タップ音量（ヒット音）は「タップで遊ぶ」時だけ
+  // UI: tap volume is only for tap entry
   const tapWrap = document.getElementById('tap-vol-wrap');
   if(tapWrap){
     tapWrap.style.display = (entryKind === 'tap') ? 'block' : 'none';
   }
 
-  // UI: タイトル（入口に合わせる）
+  // UI: menu title
   const mt = document.getElementById('menuTitle');
-  const mtt = document.getElementById('menuTitleText');
-  const titleText = (entryKind === 'tap') ? '👆 タップであそぶ' : '🪕 ウクレレであそぶ';
-  if(mt){ mt.textContent = titleText; }
-  if(mtt){ mtt.textContent = titleText; }
+  if(mt){
+    mt.textContent = (entryKind === 'tap') ? '👆 タップであそぶ' : '🪕 ウクレレであそぶ';
+  }
 
-// UI: 戻るボタン（入口に合わせる）
+  // UI: back button text
   const backBtn = document.getElementById('menuBackBtn');
-  const topBackBtn = document.getElementById('navBackBtn');
-  const topTopBtn = document.getElementById('navTopBtn');
-
   if(backBtn){
     backBtn.textContent = (entryKind === 'tap') ? '🏝️ TOPへもどる' : '🪕 ウクレレへもどる';
   }
-  if(topBackBtn){ topBackBtn.textContent = '← もどる'; }
-  if(topTopBtn){ topTopBtn.textContent = '🏝️ TOPへ'; }
-
 }
 
 function setMode(el, mode){
   applyUiMode(mode);
 }
 
-// URLパラメータ mode=TAP/NORMAL/WAIT を入口として反映
+// URLパラメータ mode=TAP/NORMAL/WAIT を反映
+// URLパラメータ mode=TAP/NORMAL/WAIT を入口として反映（v12）
 (function applyModeFromQuery(){
   try{
     const p = new URLSearchParams(location.search);
@@ -2117,7 +1574,7 @@ function setMode(el, mode){
 
     if(m === 'TAP'){
       entryKind = 'tap';
-      applyUiMode('WAIT'); // まずはサポート付き
+      applyUiMode('WAIT'); // 初期はサポート付き
       return;
     }
     if(m === 'NORMAL' || m === 'WAIT'){
@@ -2133,16 +1590,14 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
-})();
 
 function goBackFromGameMenu(){
-  // 一つ前（タップ/ウクレレ選択画面）へ戻る：履歴に依存せず確実に戻す
-  if(entryKind==='uke'){
-    location.href = 'ukulele.html';
-  }else{
-    location.href = 'index.html';
-  }
+  const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
+  goFlip(url);
 }
+
+})();
+
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
@@ -2183,43 +1638,15 @@ function resumeGame(){
 
 // --- ゲーム開始フロー ---
 async function prepGame(type){
-  // タイル側の呼び出し名ゆれを吸収
-  const normalizeType = (t)=>{
-    const x = String(t||'').trim();
-    if(x === 'chords_easy') return 'easy';
-    if(x === 'chords')      return 'hard';
-    if(x === 'kirakira')    return 'song';
-    return x;
-  };
-  const t = normalizeType(type);
-  const allowed = new Set(['scale','easy','hard','song']);
-  if(!allowed.has(t)){
-    console.warn('[prepGame] unknown type:', type);
-    return;
-  }
+  try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
+  // タップモードならマイク不要
+  if(isTapMode()){ startGameByType(type); return; }
 
-  try{
-    document.body.classList.add('playing');
-    document.body.classList.remove('menuOpen');
-  }catch(e){}
-
-  // タップで遊ぶ＝マイク不要
-  if(isTapMode()){
-    startGameByType(t);
-    return;
-  }
-
-  // ウクレレで遊ぶ＝マイク準備（iOSで固まりにくい順序）
-  const loading = document.getElementById('loading-overlay');
-  if(loading) loading.style.display = 'flex';
-
-  try{
-    if(!audioCtx){
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if(audioCtx.state === 'suspended'){
-      await audioCtx.resume();
-    }
+  // マイク準備
+  document.getElementById('loading-overlay').style.display = 'flex';
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
 
     if(!micStream){
       micStream = await navigator.mediaDevices.getUserMedia({
@@ -2227,25 +1654,32 @@ async function prepGame(type){
       });
       const src = audioCtx.createMediaStreamSource(micStream);
       micAnalyser = audioCtx.createAnalyser();
-      micAnalyser.fftSize = 2048;
-      src.connect(micAnalyser);
-      dataArray = new Uint8Array(micAnalyser.fftSize);
+      const gain = audioCtx.createGain();
+      gain.gain.value = IS_IOS ? 3.9 : 1.0;
+      micAnalyser.fftSize = IS_IOS ? 4096 : 2048;
+      src.connect(gain).connect(micAnalyser);
     }
 
-    startGameByType(t);
-  }catch(err){
-    console.error(err);
-    alert('マイクが使えませんでした。\nSafariの設定で「マイク」を許可して、もう一度お試しください。');
-    // メニューに戻す（真っ白防止）
-    try{
-      document.body.classList.remove('playing');
-      document.body.classList.add('menuOpen');
-    }catch(e){}
-  }finally{
-    if(loading) loading.style.display = 'none';
+    // チューニング結果（あれば）
+    const stored = loadGameThresholds();
+
+    // ノイズ計測（約1秒）
+    await new Promise(r => setTimeout(r, 200)); // 立ち上がり待ち
+    NOISE_RMS = await measureNoiseRms(950, 95);
+
+    // 閾値：チューニング結果を基本に、今のノイズ床で補正
+    applyThresholdsFrom(NOISE_RMS, stored);
+
+    document.getElementById('loading-overlay').style.display = 'none';
+    startGameByType(type);
+
+  } catch(e) {
+    alert('マイクが使えません。タップモードで開始します。');
+    entryKind = 'tap'; applyUiMode('WAIT');
+    document.getElementById('loading-overlay').style.display = 'none';
+    startGameByType(type);
   }
 }
-
 
 function startGameByType(type){
   lastStartParams = type;
@@ -2434,7 +1868,7 @@ function gameLoop(time){
       try{ if(!IS_IOS && typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
 
       try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
-if(isWaitStyle()){
+if(isWaitMode()){
         // 従来どおり：止めて弾き直し（同じ符号を正解位置で点滅）
         waitHold = true;
         scrollSpeed = 0;
@@ -2592,7 +2026,7 @@ function handleAction(){
       showFx(missMsg, 'miss', { durationMs: 2600 });
       try{ if(typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
       try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
-if(isWaitStyle()){
+if(isWaitMode()){
         // 従来どおり：止めて弾き直し
         if(!waitHold){
           waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
@@ -2990,7 +2424,7 @@ window.addEventListener('pageshow', ()=>{
 });
 
 </script>
-<div class="verBadge">v2</div>
+<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;
@@ -3014,8 +2448,44 @@ window.addEventListener('pageshow', ()=>{
   overflow:hidden;
   text-overflow:ellipsis;
 "></div>
-<div id="verBadge">v11</div>
 
-  <div class="ver-badge" aria-hidden="true">v11</div>
+<!-- LANDSCAPE_LOCK v1 -->
+<div id="landscapeLock" aria-hidden="true">
+  <div class="landscapeCard" role="dialog" aria-label="横画面にしてね">
+    <div class="landscapeRow">
+      <div class="rabbit">🐰</div>
+      <div class="phone">📱↔️</div>
+    </div>
+    <div class="landscapeTitle">よこがめんに してね！</div>
+    <p class="landscapeText">このアプリは よこがめんで あそぶよ</p>
+    <div class="landscapeHint">（iPhoneは画面回転ロックをOFFにしてね）</div>
+  </div>
+</div>
+
+
+<!-- LANDSCAPE_LOCK v1 -->
+<script>
+(function(){
+  function apply(){
+    var portrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('needLandscape', portrait);
+    var lock = document.getElementById('landscapeLock');
+    if(lock){
+      lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
+    }
+  }
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
+  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
+  // try to lock orientation when supported (PWA/Android)
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(function(){});
+    }
+  }catch(e){}
+  apply();
+})();
+</script>
+
 </body>
 </html>

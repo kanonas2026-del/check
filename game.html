@@ -823,48 +823,11 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* ===== v15: restore TAP layout, UKE uses same bottom row without volume ===== */
-/* show/hide by mode */
-body.is-tap #bottomTap{ display:flex !important; }
-body.is-tap #bottomUke{ display:none !important; }
-
-body.is-uke #bottomTap{ display:none !important; }
-body.is-uke #bottomUke{ display:flex !important; }
-
-/* ensure bottom rows sit naturally (NOT fixed) to avoid overlap */
-#bottomTap, #bottomUke{
-  position: static !important;
-  transform: none !important;
-  margin-top: 10px;
-  justify-content: flex-end;
-}
-#bottomUke{ justify-content: center; }
-
-/* compact slider so it fits without scroll */
-#bottomTap #tapVolume{
-  max-width: 220px;
-}
-
-/* lighten look (B) */
-#bottomTap, #bottomUke{
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 6px 8px !important;
-}
-
-
-/* ===== v16: ensure UKE top button is visible ===== */
-body.is-uke #bottomUke{ display:flex !important; justify-content:center; }
-body.is-uke #bottomTap{ display:none !important; }
-body.is-tap #bottomTap{ display:flex !important; }
-body.is-tap #bottomUke{ display:none !important; }
-
-
-/* ===== v17: visible build badge ===== */
+/* ===== v18 build badge ===== */
 #buildBadge{
   position: fixed;
   top: 10px;
-  right: 12px;
+  left: 12px;
   z-index: 9999;
   padding: 4px 10px;
   border-radius: 999px;
@@ -876,8 +839,19 @@ body.is-tap #bottomUke{ display:none !important; }
 }
 
 
-/* ===== v17: bottomUke layout ===== */
-#bottomUke{ justify-content:center !important; }
+/* ===== v18: mode switch (tap/uke) & light bottom ===== */
+#bottomTap, #bottomUke{
+  position: static !important;
+  transform: none !important;
+  margin-top: 10px;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 6px 8px !important;
+}
+#bottomUke{ justify-content: center; }
+
+/* default: hide both until JS decides (prevents wrong flash) */
+#bottomTap, #bottomUke{ display: none; }
 
 </style>
 
@@ -950,7 +924,7 @@ body.is-tap #bottomUke{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id=\"buildBadge\">v17</div>
+<div id=\"buildBadge\">v18</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -1009,7 +983,7 @@ body.is-tap #bottomUke{ display:none !important; }
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
 
-<!-- ▼ v15 ウクレレ用：TOPだけ（タップと同じ位置） -->
+<!-- ▼ v18 ウクレレ用：TOPだけ（タップ下部と同じ位置） -->
 <div id="bottomUke" class="bottom-inline">
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
@@ -1988,31 +1962,7 @@ function isWaitMode(){
   return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
-
-// v16: always sync entryKind -> body class (failsafe)
-
-// v17: force show/hide bottom buttons without relying on body classes
-function forceBottomButtons(){
-  try{
-    const tapEl = document.getElementById('bottomTap');
-    const ukeEl = document.getElementById('bottomUke');
-    if (tapEl) tapEl.style.display = (entryKind === 'tap') ? 'flex' : 'none';
-    if (ukeEl) ukeEl.style.display = (entryKind === 'uke') ? 'flex' : 'none';
-  }catch(e){}
-}
-
-function syncEntryKindClass(){
-  try{
-    document.body.classList.toggle('is-uke', entryKind === 'uke');
-    document.body.classList.toggle('is-tap', entryKind === 'tap');
-  }catch(e){}
-}
-
 function applyUiMode(mode){
-  // v15: mark entry kind on body for CSS
-  document.body.classList.toggle('is-uke', entryKind === 'uke');
-  document.body.classList.toggle('is-tap', entryKind === 'tap');
-
   uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
   // map to internal playMode
   if(entryKind === 'tap'){
@@ -2088,10 +2038,7 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
-})();
-
-syncEntryKindClass();
-forceBottomButtons();
+})(); 
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
@@ -2925,7 +2872,27 @@ window.addEventListener('pageshow', ()=>{
 });
 
 
-window.addEventListener('DOMContentLoaded', ()=>{ forceBottomButtons(); });
+// ===== v18: robust mode detection & bottom button visibility =====
+function getEntryKindFromURL(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const m = (p.get('mode') || '').toUpperCase();
+    if (m === 'TAP') return 'tap';
+    return 'uke';
+  }catch(e){
+    return 'uke';
+  }
+}
+function applyBottomVisibility(){
+  const kind = getEntryKindFromURL();
+  const tapEl = document.getElementById('bottomTap');
+  const ukeEl = document.getElementById('bottomUke');
+  if (tapEl) tapEl.style.display = (kind === 'tap') ? 'flex' : 'none';
+  if (ukeEl) ukeEl.style.display = (kind === 'uke') ? 'flex' : 'none';
+}
+window.addEventListener('DOMContentLoaded', applyBottomVisibility);
+window.addEventListener('pageshow', applyBottomVisibility);
+
 </script>
 <div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>

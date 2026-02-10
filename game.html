@@ -796,7 +796,7 @@ body.playing #menu-overlay{ display:none; }
   font-size:12px;
   white-space:nowrap;
 }
-#tapVolume{
+#tapVol{
   flex:1;
   max-width:240px; /* 短く */
   height:24px;
@@ -956,7 +956,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
+    <input id="tapVol" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
@@ -1394,6 +1394,128 @@ function ensureTapAudio(){
     }
   }catch(e){}
 }
+
+// ===== v27: TAP音（単音＋和音） + 音量スライドの「ピューーー」プレビュー =====
+function semitone(freq, n){ return freq * Math.pow(2, n/12); }
+
+function chordFreqsFromName(name){
+  try{
+    const n = String(name||'').trim();
+    const upper = n.toUpperCase();
+    // root letter
+    const m = upper.match(/^([A-G])(M|MIN|MAJ|MI|M?)(7)?/);
+    // We'll parse simpler: first letter is root, then check 'M' (minor) via 'AM' pattern or 'MIN'
+    const rootLetter = upper.replace(/[^A-G]/g,'').charAt(0);
+    const rootMap = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
+    const root = rootMap[rootLetter] || 440.0;
+
+    const isMinor = /(^|[^A-Z])AM($|[^A-Z])/.test(upper) || /MIN/.test(upper) || /(^[A-G])M(?!AJ)/.test(upper) && !/G7/.test(upper);
+    const isDom7  = /7/.test(upper);
+
+    const intervals = isMinor ? [0,3,7] : [0,4,7];
+    let freqs = intervals.map(i=>semitone(root, i));
+    if(isDom7){
+      freqs.push(semitone(root, 10)); // b7
+    }
+    return freqs;
+  }catch(e){}
+  return [440.0];
+}
+
+function playTapTone(freq, now, len){
+  const o = tapAudioCtx.createOscillator();
+  const g = tapAudioCtx.createGain();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(freq, now);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + len);
+  o.connect(g).connect(tapMaster);
+  o.start(now);
+  o.stop(now + len + 0.02);
+}
+
+function playTapChord(freqs, now){
+  // gain compensation: more notes => each note smaller
+  const per = 1/Math.max(3, freqs.length);
+  freqs.forEach((f)=>{
+    const o = tapAudioCtx.createOscillator();
+    const g = tapAudioCtx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(f, now);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9 * per * 2.2, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+    o.connect(g).connect(tapMaster);
+    o.start(now);
+    o.stop(now + 0.26);
+  });
+}
+
+// --- slider preview tone ("ピューーー") ---
+let v27_previewOsc = null;
+let v27_previewGain = null;
+
+function v27_startPreviewTone(){
+  try{
+    ensureTapAudio(); // must be called in user gesture
+    if(!tapAudioCtx || !tapMaster) return;
+    if(v27_previewOsc) return;
+    const now = tapAudioCtx.currentTime;
+    v27_previewOsc = tapAudioCtx.createOscillator();
+    v27_previewGain = tapAudioCtx.createGain();
+    v27_previewOsc.type='sine';
+    v27_previewGain.gain.setValueAtTime(0.0001, now);
+    v27_previewGain.gain.exponentialRampToValueAtTime(0.35, now + 0.01); // constant, master handles volume
+    v27_previewOsc.connect(v27_previewGain).connect(tapMaster);
+    v27_previewOsc.start(now);
+  }catch(e){}
+}
+
+function v27_stopPreviewTone(){
+  try{
+    if(v27_previewOsc){
+      const now = tapAudioCtx ? tapAudioCtx.currentTime : 0;
+      if(v27_previewGain && tapAudioCtx){
+        v27_previewGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+      }
+      v27_previewOsc.stop((tapAudioCtx?tapAudioCtx.currentTime:0) + 0.04);
+    }
+  }catch(e){}
+  v27_previewOsc = null;
+  v27_previewGain = null;
+}
+
+function v27_updatePreviewToneFromSlider(){
+  try{
+    const el = document.getElementById('tapVol');
+    if(!el) return;
+    const v = Number(el.value);
+    const min = Number(el.min||0), max = Number(el.max||100);
+    const ratio = (v-min)/Math.max(1,(max-min));
+    // pitch: left low -> right high
+    const f = 220 + ratio * 660; // 220..880
+    if(v27_previewOsc){
+      v27_previewOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.01);
+    }
+  }catch(e){}
+}
+
+function v27_bindPreviewToSlider(){
+  const el = document.getElementById('tapVol');
+  if(!el) return;
+
+  const start = (e)=>{ if(!isTapMode()) return; v27_startPreviewTone(); v27_updatePreviewToneFromSlider(); };
+  const end   = (e)=>{ v27_stopPreviewTone(); };
+
+  el.addEventListener('pointerdown', start, {passive:true});
+  el.addEventListener('touchstart', start, {passive:true});
+  window.addEventListener('pointerup', end, {passive:true});
+  window.addEventListener('touchend', end, {passive:true});
+  el.addEventListener('input', ()=>{ v27_updatePreviewToneFromSlider(); }, {passive:true});
+}
+
+window.addEventListener('DOMContentLoaded', v27_bindPreviewToSlider);
 function noteFreqFromTarget(t){
   try{
     if(t && t.noteKey){
@@ -1414,44 +1536,31 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  
-  // v26: fallback audible hit
-// Only for TAP entry (タップであそぶ)
+  // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
-  ensureTapAudio();
-  try{ const s=document.getElementById('tapVolume'); const vol01=s?Number(s.value)/100:0.5; v26_playBeep(vol01); }catch(e){}
-  if(!tapAudioCtx || !tapMaster) return;
-  const now = tapAudioCtx.currentTime;
-  const f = noteFreqFromTarget(target);
-  try{
-    // main pluck
-    const o = tapAudioCtx.createOscillator();
-    const g = tapAudioCtx.createGain();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(f, now);
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    o.connect(g).connect(tapMaster);
-    o.start(now);
-    o.stop(now + 0.24);
 
-    // little "pick" click
-    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
-    const d = nbuf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
-    const ns = tapAudioCtx.createBufferSource();
-    ns.buffer = nbuf;
-    const nf = tapAudioCtx.createBiquadFilter();
-    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
-    const ng = tapAudioCtx.createGain();
-    ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
-    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-    ns.connect(nf).connect(ng).connect(tapMaster);
-    ns.start(now);
-    ns.stop(now + 0.06);
-  }catch(e){}
+  ensureTapAudio(); // user gesture / resumed
+  if(!tapAudioCtx || !tapMaster) return;
+
+  const now = tapAudioCtx.currentTime;
+
+  // ドレミなど（単音）
+  if(target && target.noteKey){
+    const f = noteFreqFromTarget(target);
+    playTapTone(f, now, 0.22);
+    return;
+  }
+
+  // コード（和音）: 例 C, F, G7, Am など
+  const cname = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+  if(cname){
+    const freqs = chordFreqsFromName(cname);
+    playTapChord(freqs, now);
+    return;
+  }
+
+  // fallback
+  playTapTone(440.0, now, 0.18);
 }
 
 
@@ -2856,88 +2965,6 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v26: iOSでも分かる「ピュ」確認音（HTMLAudio版） =====
-let v26_beepUrl = null;
-let v26_ready = false;
-
-function v26_makeWavUrl(){
-  // 44.1kHz, mono, 16-bit PCM, ~0.12s sine sweep
-  const sr = 44100;
-  const dur = 0.12;
-  const n = Math.floor(sr * dur);
-  const data = new Int16Array(n);
-  for(let i=0;i<n;i++){
-    const t = i / sr;
-    // sweep 880 -> 440
-    const f = 880 * Math.pow(440/880, t/dur);
-    const s = Math.sin(2*Math.PI*f*t);
-    // quick envelope
-    const env = Math.sin(Math.min(1, t/0.01)*Math.PI/2) * Math.sin(Math.min(1, (dur-t)/0.02)*Math.PI/2);
-    data[i] = Math.max(-1, Math.min(1, s*env)) * 0.9 * 32767;
-  }
-  const bytesPerSample = 2;
-  const blockAlign = 1 * bytesPerSample;
-  const byteRate = sr * blockAlign;
-  const dataSize = data.length * bytesPerSample;
-
-  const buf = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buf);
-  let o = 0;
-  function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
-  function u32(v){ view.setUint32(o, v, true); o+=4; }
-  function u16(v){ view.setUint16(o, v, true); o+=2; }
-
-  writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
-  writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
-  writeStr('data'); u32(dataSize);
-
-  // PCM data
-  for(let i=0;i<data.length;i++){
-    view.setInt16(o, data[i], true); o+=2;
-  }
-
-  const blob = new Blob([buf], {type:'audio/wav'});
-  return URL.createObjectURL(blob);
-}
-
-function v26_prepareAudioOnce(){
-  if(v26_ready) return;
-  try{
-    v26_beepUrl = v26_makeWavUrl();
-    v26_ready = true;
-  }catch(e){}
-}
-
-function v26_playBeep(vol01){
-  try{
-    v26_prepareAudioOnce();
-    if(!v26_beepUrl) return;
-    const a = new Audio(v26_beepUrl);
-    a.volume = Math.max(0, Math.min(1, vol01));
-    // iOS: must be in user gesture (slider input / tap)
-    a.play().catch(()=>{});
-  }catch(e){}
-}
-
-// volume slider "ピュ" preview
-(function(){
-  function hook(){
-    const slider = document.getElementById('tapVolume');
-    if(!slider) return;
-    let last = 0;
-    slider.addEventListener('input', ()=>{
-      const now = Date.now();
-      if(now - last < 120) return; // throttle
-      last = now;
-      const v = Number(slider.value);
-      const min = Number(slider.min || 0);
-      const max = Number(slider.max || 100);
-      const vol01 = (v - min) / (max - min || 1);
-      v26_playBeep(vol01);
-    }, {passive:true});
-  }
-  window.addEventListener('DOMContentLoaded', hook);
-})();
 
 </script>
 <div class="verBadge">v12</div>

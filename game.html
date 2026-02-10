@@ -2854,117 +2854,132 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v30: slider drag continuous "ピューーー" (tap mode only) =====
-let v30_ctx = null, v30_master = null, v30_osc = null, v30_gain = null, v30_running = false;
+// ===== v31: slider drag continuous "ピューーー" (HTMLAudio loop版) =====
+let v31_toneAudio = null;
+let v31_toneUrl = null;
 
-function v30_isTapMode(){
+function v31_isTapMode(){
   try{
     const p = new URLSearchParams(location.search);
     return (p.get('mode')||'').toUpperCase()==='TAP';
   }catch(e){ return false; }
 }
 
-function v30_ensureAudio(){
-  if(v30_ctx) return;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if(!AC) return;
-  v30_ctx = new AC();
-  v30_master = v30_ctx.createGain();
-  v30_master.gain.value = 1.0;
-  v30_master.connect(v30_ctx.destination);
-}
-
-function v30_getVol01(){
+function v31_getVol01(){
   const s = document.getElementById('tapVolume');
   if(!s) return 0.5;
   const v = Number(s.value);
   const min = Number(s.min || 0);
-  const max = Number(s.max || 100);
+  const max = Number(s.max || 1);
   const vol01 = (v - min) / (max - min || 1);
   return Math.max(0, Math.min(1, vol01));
 }
 
-function v30_getFreq(){
-  const vol01 = v30_getVol01();
-  // 右ほど高音: 220 -> 880
-  return 220 + (880-220) * vol01;
+function v31_getPlaybackRate(){
+  const vol01 = v31_getVol01();
+  // 右ほど高音（pitch up）: 0.5x -> 2.0x
+  return 0.5 + 1.5 * vol01;
 }
 
-function v30_startTone(){
-  if(!v30_isTapMode()) return;
-  v30_ensureAudio();
-  if(!v30_ctx || !v30_master) return;
-  if(v30_ctx.state === 'suspended'){
-    v30_ctx.resume().catch(()=>{});
+function v31_makeWavUrl(){
+  // 44.1kHz, mono, 16-bit PCM, 1.0s sine @440Hz (pitchはplaybackRateで変える)
+  const sr = 44100;
+  const dur = 1.0;
+  const n = Math.floor(sr * dur);
+  const data = new Int16Array(n);
+  for(let i=0;i<n;i++){
+    const t = i / sr;
+    const s = Math.sin(2*Math.PI*440*t);
+    // slight fade at ends to reduce click
+    const fade = Math.min(1, t/0.01, (dur-t)/0.01);
+    data[i] = Math.max(-1, Math.min(1, s*fade)) * 0.9 * 32767;
   }
-  if(v30_running) return;
 
-  v30_osc = v30_ctx.createOscillator();
-  v30_gain = v30_ctx.createGain();
-  v30_osc.type = 'sine';
-  const now = v30_ctx.currentTime;
-  v30_osc.frequency.setValueAtTime(v30_getFreq(), now);
-  const vol01 = v30_getVol01();
-  // small volumes still audible, but proportional
-  const amp = 0.35 * Math.pow(vol01, 0.8);
-  v30_gain.gain.setValueAtTime(0.00001, now);
-  v30_gain.gain.exponentialRampToValueAtTime(amp + 0.00001, now + 0.01);
+  const bytesPerSample = 2;
+  const blockAlign = bytesPerSample;
+  const byteRate = sr * blockAlign;
+  const dataSize = data.length * bytesPerSample;
 
-  v30_osc.connect(v30_gain).connect(v30_master);
-  v30_osc.start(now);
-  v30_running = true;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  let o = 0;
+  function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
+  function u32(v){ view.setUint32(o, v, true); o+=4; }
+  function u16(v){ view.setUint16(o, v, true); o+=2; }
+
+  writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
+  writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
+  writeStr('data'); u32(dataSize);
+
+  for(let i=0;i<data.length;i++){
+    view.setInt16(o, data[i], true); o+=2;
+  }
+  const blob = new Blob([buf], {type:'audio/wav'});
+  return URL.createObjectURL(blob);
 }
 
-function v30_updateTone(){
-  if(!v30_running || !v30_ctx || !v30_osc || !v30_gain) return;
-  const now = v30_ctx.currentTime;
-  v30_osc.frequency.setTargetAtTime(v30_getFreq(), now, 0.02);
-  const vol01 = v30_getVol01();
-  const amp = 0.35 * Math.pow(vol01, 0.8);
-  v30_gain.gain.setTargetAtTime(amp + 0.00001, now, 0.02);
-}
-
-function v30_stopTone(){
-  if(!v30_running) return;
+function v31_prepareTone(){
+  if(v31_toneAudio) return;
   try{
-    const now = v30_ctx.currentTime;
-    v30_gain.gain.setTargetAtTime(0.00001, now, 0.02);
-    v30_osc.stop(now + 0.05);
+    v31_toneUrl = v31_makeWavUrl();
+    v31_toneAudio = new Audio(v31_toneUrl);
+    v31_toneAudio.loop = true;
+    v31_toneAudio.volume = 0;
+    v31_toneAudio.playbackRate = 1.0;
   }catch(e){}
-  v30_running = false;
-  v30_osc = null;
-  v30_gain = null;
 }
 
-function v30_hookSliderTone(){
+function v31_startTone(){
+  if(!v31_isTapMode()) return;
+  v31_prepareTone();
+  if(!v31_toneAudio) return;
+  // set volume + pitch
+  const vol01 = v31_getVol01();
+  v31_toneAudio.volume = vol01;
+  v31_toneAudio.playbackRate = v31_getPlaybackRate();
+  // must be called in user gesture
+  v31_toneAudio.play().catch(()=>{});
+}
+
+function v31_updateTone(){
+  if(!v31_toneAudio) return;
+  const vol01 = v31_getVol01();
+  v31_toneAudio.volume = vol01;
+  v31_toneAudio.playbackRate = v31_getPlaybackRate();
+}
+
+function v31_stopTone(){
+  if(!v31_toneAudio) return;
+  try{
+    v31_toneAudio.pause();
+    v31_toneAudio.currentTime = 0;
+  }catch(e){}
+}
+
+function v31_hookSliderTone(){
   const s = document.getElementById('tapVolume');
   if(!s) return;
 
-  const start = ()=>{ v30_startTone(); v30_updateTone(); };
-  const move  = ()=>{ v30_updateTone(); };
-  const stop  = ()=>{ v30_stopTone(); };
+  const start = ()=>{ v31_startTone(); v31_updateTone(); };
+  const move  = ()=>{ v31_updateTone(); };
+  const stop  = ()=>{ v31_stopTone(); };
 
-  // Pointer events
   s.addEventListener('pointerdown', start);
   s.addEventListener('pointerup', stop);
   s.addEventListener('pointercancel', stop);
   s.addEventListener('pointermove', move);
 
-  // Touch fallback
   s.addEventListener('touchstart', start, {passive:true});
   s.addEventListener('touchend', stop, {passive:true});
   s.addEventListener('touchcancel', stop, {passive:true});
   s.addEventListener('touchmove', move, {passive:true});
 
-  // Input updates while dragging
   s.addEventListener('input', move, {passive:true});
-
-  // Safety
   window.addEventListener('blur', stop);
   window.addEventListener('visibilitychange', ()=>{ if(document.hidden) stop(); });
 }
 
-window.addEventListener('DOMContentLoaded', v30_hookSliderTone);
+window.addEventListener('DOMContentLoaded', v31_hookSliderTone);
 
 </script>
 <div class="verBadge">v12</div>

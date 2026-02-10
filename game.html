@@ -828,6 +828,20 @@ body.is-uke .vol-inline{ display:none !important; }
 
 
 /* v23 build badge (cache check) */
+#buildBadge{
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  pointer-events: none;
+}
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -1925,12 +1939,6 @@ let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
-  // v39: TAP判定を強化（リンクBでもタップ選択後に確実にTAP扱い）
-  try{
-    const p = new URLSearchParams(location.search);
-    if ((p.get('mode')||'').toUpperCase() === 'TAP') return true;
-  }catch(e){}
-  if (String(entryKind||'').toLowerCase() === 'tap') return true;
   return String(playMode||'').toUpperCase().startsWith('TAP');
 }
 function isWaitMode(){
@@ -2860,46 +2868,45 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v39: iPhoneでも確実に鳴る(HTMLAudio) サウンド =====
+// ===== v40: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
 (function(){
-  // --- tapVol sync (0..1) ---
+  // --- helpers ---
   function clamp01(x){
     x = Number(x);
     if(!Number.isFinite(x)) return 0.5;
     return Math.max(0, Math.min(1, x));
   }
+  function getSlider(){
+    return document.getElementById('tapVolume');
+  }
   function getTapVolFromSlider(){
-    const s = document.getElementById('tapVolume');
+    const s = getSlider();
     if(!s) return clamp01(tapVol);
     return clamp01(s.value);
   }
   function syncTapVol(){
-    const v = getTapVolFromSlider();
-    tapVol = v;
+    tapVol = getTapVolFromSlider();
     try{ saveTapVol(); }catch(e){}
+    // keep existing engine in sync (even if we don't rely on WebAudio)
+    try{ ensureTapAudio(); }catch(e){}
   }
 
-  // --- WAV generator (data URL) ---
-  function makeWavDataUrl(freqs, durSec){
+  // --- WAV generator (Blob URL) ---
+  function makeWavUrl(freqs, durSec){
     const sr = 44100;
     const n = Math.max(1, Math.floor(sr * durSec));
     const data = new Int16Array(n);
-    // simple ADSR-ish envelope
-    const atk = 0.008, rel = 0.04;
+    const atk = 0.006, rel = 0.040;
     for(let i=0;i<n;i++){
       const t = i / sr;
       let env = 1.0;
       if(t < atk) env = t/atk;
       else if(t > durSec - rel) env = Math.max(0, (durSec - t)/rel);
-      // sum sines
       let s = 0;
-      for(const f of freqs){
-        s += Math.sin(2*Math.PI*f*t);
-      }
+      for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
       s /= Math.max(1, freqs.length);
       data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * 32767;
     }
-    // WAV header
     const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
     const dataSize = data.length * bytesPerSample;
     const buf = new ArrayBuffer(44 + dataSize);
@@ -2912,139 +2919,101 @@ window.addEventListener('pageshow', ()=>{
     writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
     writeStr('data'); u32(dataSize);
     for(let i=0;i<data.length;i++){ view.setInt16(o, data[i], true); o+=2; }
-    const blob = new Blob([buf], {type:'audio/wav'});
-    return URL.createObjectURL(blob);
+    return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
   }
 
-  // --- Notes (Hz) ---
-  const NOTE = {
-    C4:261.6256, D4:293.6648, E4:329.6276, F4:349.2282, G4:391.9954,
-    A4:440.0, B4:493.8833,
-    C5:523.2511, D5:587.3295, E5:659.2551, F5:698.4565, G5:783.9909
-  };
-
-  // Build urls once
+  const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
   const urls = {
-    // single notes (short)
-    C: makeWavDataUrl([NOTE.C4], 0.18),
-    D: makeWavDataUrl([NOTE.D4], 0.18),
-    E: makeWavDataUrl([NOTE.E4], 0.18),
-    F: makeWavDataUrl([NOTE.F4], 0.18),
-    G: makeWavDataUrl([NOTE.G4], 0.18),
-    A: makeWavDataUrl([NOTE.A4], 0.18),
-    B: makeWavDataUrl([NOTE.B4], 0.18),
-    // chords (slightly longer)
-    Cmaj: makeWavDataUrl([NOTE.C4, NOTE.E4, NOTE.G4], 0.22),
-    Fmaj: makeWavDataUrl([NOTE.F4, NOTE.A4, NOTE.C5], 0.22),
-    G7:   makeWavDataUrl([NOTE.G4, NOTE.B4, NOTE.D5, NOTE.F5], 0.22),
-    Am:   makeWavDataUrl([NOTE.A4, NOTE.C5, NOTE.E5], 0.22),
-    // continuous tone base (1s @ 440) for slider, looped
-    Tone: makeWavDataUrl([NOTE.A4], 1.0),
+    // preview beep (fixed pitch, volume shows loudness)
+    preview: makeWavUrl([440], 0.12),
+    do: makeWavUrl([NOTE.do], 0.18),
+    re: makeWavUrl([NOTE.re], 0.18),
+    mi: makeWavUrl([NOTE.mi], 0.18),
+    fa: makeWavUrl([NOTE.fa], 0.18),
+    so: makeWavUrl([NOTE.so], 0.18),
+    la: makeWavUrl([NOTE.la], 0.18),
+    si: makeWavUrl([NOTE.si], 0.18),
+    do2: makeWavUrl([NOTE.do2], 0.18),
+    // chords
+    C:  makeWavUrl([261.63,329.63,392.00], 0.22),
+    F:  makeWavUrl([349.23,440.00,523.25], 0.22),
+    G7: makeWavUrl([392.00,493.88,587.33,698.46], 0.22),
+    Am: makeWavUrl([440.00,523.25,659.26], 0.22),
   };
 
-  // audio pool helper
   function playUrl(url, vol01){
     try{
       const a = new Audio(url);
       a.volume = clamp01(vol01);
+      // play must be user gesture for iOS; slider input / hit tap qualifies
       a.play().catch(()=>{});
     }catch(e){}
   }
 
-  // --- Slider continuous "ピューーー" ---
-  let toneAudio = null;
-  function ensureToneAudio(){
-    if(toneAudio) return;
-    toneAudio = new Audio(urls.Tone);
-    toneAudio.loop = true;
-    toneAudio.preload = 'auto';
-  }
-  function sliderRate(){
-    const v = getTapVolFromSlider(); // also used as pitch map
-    return 0.7 + 1.3 * v; // right => higher
-  }
-  function startSliderTone(){
-    if(!isTapMode()) return;
+  // --- Slider: non-continuous preview (no glitches) ---
+  let lastPreviewAt = 0;
+  function sliderPreview(){
+    const now = Date.now();
+    if(now - lastPreviewAt < 120) return; // throttle
+    lastPreviewAt = now;
     syncTapVol();
-    ensureToneAudio();
-    toneAudio.volume = tapVol;
-    toneAudio.playbackRate = sliderRate();
-    try{ toneAudio.currentTime = 0; }catch(e){}
-    // MUST be in user gesture
-    toneAudio.play().catch(()=>{});
-  }
-  function updateSliderTone(){
-    if(!toneAudio) return;
-    syncTapVol();
-    toneAudio.volume = tapVol;
-    toneAudio.playbackRate = sliderRate();
-  }
-  function stopSliderTone(){
-    if(!toneAudio) return;
-    try{ toneAudio.pause(); toneAudio.currentTime = 0; }catch(e){}
+    playUrl(urls.preview, tapVol);
   }
 
   function hookSlider(){
-    const s = document.getElementById('tapVolume');
+    const s = getSlider();
     if(!s) return;
 
-    // load saved, but if 0 and slider has default >0, prefer slider
+    // initial sync: if saved tapVol is 0 but slider default isn't, prefer slider value
     try{ loadTapVol(); }catch(e){}
-    if(clamp01(tapVol) === 0 && clamp01(s.value) > 0) tapVol = clamp01(s.value);
+    const sliderV = clamp01(s.value);
+    if(clamp01(tapVol) === 0 && sliderV > 0) tapVol = sliderV;
     s.value = String(clamp01(tapVol));
     syncTapVol();
 
     s.addEventListener('input', ()=>{
       if(!isTapMode()) return;
-      updateSliderTone();
+      sliderPreview();
     }, {passive:true});
 
-    // start/stop on pointer/touch
-    s.addEventListener('pointerdown', (e)=>{
-      try{ s.setPointerCapture(e.pointerId); }catch(_){}
-      startSliderTone();
+    // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
+    s.addEventListener('pointerup', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
     }, {passive:true});
-    window.addEventListener('pointerup', ()=>{ stopSliderTone(); }, {passive:true});
-    window.addEventListener('pointercancel', ()=>{ stopSliderTone(); }, {passive:true});
-
-    s.addEventListener('touchstart', ()=>{ startSliderTone(); }, {passive:true});
-    window.addEventListener('touchend', ()=>{ stopSliderTone(); }, {passive:true});
-    window.addEventListener('touchcancel', ()=>{ stopSliderTone(); }, {passive:true});
+    s.addEventListener('touchend', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
   }
 
-  // --- Hit sound override (tap mode) ---
-  // If original playTapHitSound exists, wrap it but prefer our HTMLAudio sound so it always plays on tap.
-  const origPlay = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
-  window.playTapHitSound = function(targetLabel){
-    // targetLabel can be 'C','D','E','F','G','A','B' or chord names like 'C','F','G7','Am'
-    try{
-      if(isTapMode()){
-        syncTapVol();
-        const vol = tapVol;
+  // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
+  const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
 
-        const key = String(targetLabel||'').trim();
-        // map
-        if(key === 'C') playUrl(urls.C, vol);
-        else if(key === 'D') playUrl(urls.D, vol);
-        else if(key === 'E') playUrl(urls.E, vol);
-        else if(key === 'F') playUrl(urls.F, vol);
-        else if(key === 'G') playUrl(urls.G, vol);
-        else if(key === 'A') playUrl(urls.A, vol);
-        else if(key === 'B') playUrl(urls.B, vol);
-        else if(key.toUpperCase() === 'G7') playUrl(urls.G7, vol);
-        else if(key.toUpperCase() === 'AM') playUrl(urls.Am, vol);
-        else if(key.toUpperCase() === 'CMAJ') playUrl(urls.Cmaj, vol);
-        else if(key.toUpperCase() === 'FMAJ') playUrl(urls.Fmaj, vol);
-        else {
-          // fallback: try chord names directly
-          if(key.toUpperCase() === 'C') playUrl(urls.Cmaj, vol);
-          else if(key.toUpperCase() === 'F') playUrl(urls.Fmaj, vol);
-          else playUrl(urls.C, vol);
-        }
+  window.playTapHitSound = function(target){
+    if(!isTapMode()) return;
+    syncTapVol();
+
+    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    try{
+      if(target && target.noteKey && urls[target.noteKey]){
+        playUrl(urls[target.noteKey], tapVol);
+        return; // don't fall through to original (to avoid 1音だけになる)
       }
     }catch(e){}
-    // keep original behavior (visual/score etc.) if it does more than sound
-    try{ if(origPlay) return origPlay.apply(this, arguments); }catch(e){}
+
+    // Chords: target.chord.name like 'C','F','G7','Am'
+    try{
+      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const up = n.trim().toUpperCase();
+      if(up === 'C') { playUrl(urls.C, tapVol); return; }
+      if(up === 'F') { playUrl(urls.F, tapVol); return; }
+      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
+      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+    }catch(e){}
+
+    // fallback: keep original behavior if we couldn't identify
+    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
 
   window.addEventListener('DOMContentLoaded', hookSlider);

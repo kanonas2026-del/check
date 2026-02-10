@@ -1409,6 +1409,103 @@ function ensureTapAudio(){
     }
   }catch(e){}
 }
+
+
+// v37: unlock tap audio on iOS (must be in user gesture)
+let v37_unlocked = false;
+function v37_unlockTapAudio(){
+  if(v37_unlocked) return;
+  try{
+    ensureTapAudio();
+    if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
+    // tiny silent blip
+    if(tapAudioCtx && tapMaster){
+      const now = tapAudioCtx.currentTime;
+      const o = tapAudioCtx.createOscillator();
+      const g = tapAudioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(440, now);
+      g.gain.setValueAtTime(0.00001, now);
+      o.connect(g).connect(tapMaster);
+      o.start(now);
+      o.stop(now + 0.02);
+    }
+    v37_unlocked = true;
+  }catch(e){}
+}
+
+// v37: connect volume slider -> tapVol (0..1)
+function v37_hookTapVolume(){
+  const s = document.getElementById('tapVolume');
+  if(!s) return;
+  try{ loadTapVol(); s.value = String(tapVol); }catch(e){}
+  s.addEventListener('input', ()=>{
+    if(!isTapMode()) return;
+    v37_unlockTapAudio();
+    const v = Number(s.value);
+    if(!Number.isNaN(v)){
+      tapVol = Math.max(0, Math.min(1, v));
+      saveTapVol();
+      ensureTapAudio();
+    }
+  }, {passive:true});
+}
+
+// v37: continuous "ピューーー" while dragging slider (no preventDefault)
+let v37_toneOsc=null, v37_toneGain=null;
+function v37_startSliderTone(){
+  if(!isTapMode()) return;
+  v37_unlockTapAudio();
+  ensureTapAudio();
+  if(!tapAudioCtx || !tapMaster) return;
+  if(v37_toneOsc) return;
+  const now = tapAudioCtx.currentTime;
+  v37_toneOsc = tapAudioCtx.createOscillator();
+  v37_toneGain = tapAudioCtx.createGain();
+  v37_toneOsc.type = 'sine';
+  v37_toneGain.gain.setValueAtTime(0.00001, now);
+  v37_toneGain.gain.exponentialRampToValueAtTime(1.0, now + 0.02);
+  v37_toneOsc.connect(v37_toneGain).connect(tapMaster);
+  v37_toneOsc.start(now);
+  v37_updateSliderTone();
+}
+function v37_updateSliderTone(){
+  if(!v37_toneOsc || !tapAudioCtx) return;
+  const s = document.getElementById('tapVolume');
+  if(!s) return;
+  const vol01 = Math.max(0, Math.min(1, Number(s.value)||0));
+  // 右ほど高音: 220 -> 880
+  const f = 220 + (880-220)*vol01;
+  const now = tapAudioCtx.currentTime;
+  v37_toneOsc.frequency.setTargetAtTime(f, now, 0.02);
+  // tapMaster.gain = tapVol なのでここは音色だけ
+}
+function v37_stopSliderTone(){
+  if(!v37_toneOsc || !tapAudioCtx) return;
+  try{
+    const now = tapAudioCtx.currentTime;
+    v37_toneGain.gain.setTargetAtTime(0.00001, now, 0.02);
+    v37_toneOsc.stop(now + 0.06);
+  }catch(e){}
+  v37_toneOsc=null; v37_toneGain=null;
+}
+function v37_hookSliderTone(){
+  const s = document.getElementById('tapVolume');
+  if(!s) return;
+  s.addEventListener('pointerdown', (e)=>{ try{s.setPointerCapture(e.pointerId);}catch(_){ } v37_startSliderTone(); }, {passive:true});
+  s.addEventListener('pointerup', ()=>v37_stopSliderTone(), {passive:true});
+  s.addEventListener('pointercancel', ()=>v37_stopSliderTone(), {passive:true});
+  s.addEventListener('input', ()=>{ v37_updateSliderTone(); }, {passive:true});
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  v37_hookTapVolume();
+  v37_hookSliderTone();
+});
+
+// global gesture unlock (tap mode only)
+window.addEventListener('pointerdown', ()=>{ if(isTapMode()) v37_unlockTapAudio(); }, {passive:true});
+window.addEventListener('touchstart', ()=>{ if(isTapMode()) v37_unlockTapAudio(); }, {passive:true});
 function noteFreqFromTarget(t){
   try{
     if(t && t.noteKey){
@@ -1939,7 +2036,7 @@ let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
-  // v36: TAP判定を強化（リンクBでも「タップであそぶ」選択後に確実にTAP扱い）
+  // v37: TAP判定を強化（リンクBでも「タップであそぶ」選択後に確実にTAP扱い）
   try{
     const p = new URLSearchParams(location.search);
     if ((p.get('mode')||'').toUpperCase() === 'TAP') return true;

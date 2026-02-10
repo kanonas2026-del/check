@@ -2868,7 +2868,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v41: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+// ===== v42: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2976,20 +2976,11 @@ window.addEventListener('pageshow', ()=>{
     s.value = String(clamp01(tapVol));
     syncTapVol();
 
-    s.addEventListener('input', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
+    s.addEventListener('input', ()=>{ sliderPreview(); }, {passive:true});
 
     // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
-    s.addEventListener('pointerup', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
-    s.addEventListener('touchend', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
+    s.addEventListener('pointerup', ()=>{ sliderPreview(); }, {passive:true});
+    s.addEventListener('touchend', ()=>{ sliderPreview(); }, {passive:true});
   }
 
   // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---

@@ -828,6 +828,20 @@ body.is-uke .vol-inline{ display:none !important; }
 
 
 /* v23 build badge (cache check) */
+#buildBadge{
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  pointer-events: none;
+}
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -1925,6 +1939,12 @@ let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
+  // v36: TAP判定を強化（リンクBでも「タップであそぶ」選択後に確実にTAP扱い）
+  try{
+    const p = new URLSearchParams(location.search);
+    if ((p.get('mode')||'').toUpperCase() === 'TAP') return true;
+  }catch(e){}
+  if (String(entryKind||'').toLowerCase() === 'tap') return true;
   return String(playMode||'').toUpperCase().startsWith('TAP');
 }
 function isWaitMode(){
@@ -2851,125 +2871,6 @@ window.addEventListener('pageshow', ()=>{
   }catch(e){
     document.body.classList.add('is-uke');
   }
-})();
-
-
-// ===== v35: TAP判定の安定化 + 音量スライダー連続音（壊さない最小差分） =====
-(function(){
-  function fixTapPlayMode(){
-    try{
-      // entryKindがtapなのに playMode がTAP_* になっていないケースを補正
-      if(entryKind === 'tap' && !String(playMode||'').toUpperCase().startsWith('TAP')){
-        // uiModeは既存の状態を尊重（NORMAL/WAIT）
-        const m = (String(uiMode||'').toUpperCase()==='NORMAL') ? 'NORMAL' : 'WAIT';
-        applyUiMode(m); // 既存関数で playMode をTAP_*へマップ
-      }
-    }catch(e){}
-  }
-
-  // 連続「ピューーー」：押している間だけWebAudioで鳴らす（tapMaster=tapVolを使用）
-  let osc=null, gain=null, active=false;
-
-  function vol01(){
-    const s = document.getElementById('tapVolume');
-    if(!s) return (typeof tapVol==='number'?tapVol:0.5);
-    const v = Number(s.value);
-    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : (typeof tapVol==='number'?tapVol:0.5);
-  }
-  function freq(v){
-    return 220 + (880-220) * v; // 右ほど高音
-  }
-  function startTone(){
-    try{
-      fixTapPlayMode();
-      if(!isTapMode()) return; // 既存判定を尊重
-      ensureTapAudio();
-      if(!tapAudioCtx || !tapMaster) return;
-
-      if(tapAudioCtx.state === 'suspended'){ tapAudioCtx.resume().catch(()=>{}); }
-      if(active) return;
-
-      const now = tapAudioCtx.currentTime;
-      const v = vol01();
-
-      osc = tapAudioCtx.createOscillator();
-      gain = tapAudioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq(v), now);
-
-      gain.gain.setValueAtTime(0.00001, now);
-      gain.gain.exponentialRampToValueAtTime(1.0, now + 0.02);
-
-      osc.connect(gain).connect(tapMaster);
-      osc.start(now);
-      active = true;
-      // ここでtapVolも同期（ヒット音も同音量へ）
-      tapVol = v; saveTapVol(); tapMaster.gain.value = tapVol;
-    }catch(e){}
-  }
-  function updateTone(){
-    try{
-      if(!active || !osc || !tapAudioCtx) return;
-      const now = tapAudioCtx.currentTime;
-      const v = vol01();
-      tapVol = v; saveTapVol();
-      if(tapMaster) tapMaster.gain.setTargetAtTime(tapVol, now, 0.02);
-      osc.frequency.setTargetAtTime(freq(v), now, 0.02);
-    }catch(e){}
-  }
-  function stopTone(){
-    try{
-      if(!active || !osc || !tapAudioCtx) return;
-      const now = tapAudioCtx.currentTime;
-      gain.gain.setTargetAtTime(0.00001, now, 0.02);
-      osc.stop(now + 0.06);
-    }catch(e){}
-    active=false; osc=null; gain=null;
-  }
-
-  function hook(){
-    try{
-      fixTapPlayMode();
-
-      const s = document.getElementById('tapVolume');
-      if(!s) return;
-
-      // 保存値をUIへ反映（baselineの0..1）
-      loadTapVol();
-      s.value = String(tapVol);
-
-      // 音量の同期（ヒット音も同音量）
-      s.addEventListener('input', ()=>{
-        fixTapPlayMode();
-        const v = vol01();
-        tapVol = v; saveTapVol();
-        ensureTapAudio();
-        if(tapMaster) tapMaster.gain.value = tapVol;
-        if(active) updateTone();
-      }, {passive:true});
-
-      // 押している間だけ連続音
-      s.addEventListener('pointerdown', (e)=>{
-        try{ if(e && e.pointerId!=null) s.setPointerCapture(e.pointerId); }catch(_){}
-        startTone(); updateTone();
-      });
-      s.addEventListener('pointermove', ()=>{ if(active) updateTone(); });
-      s.addEventListener('pointerup', stopTone);
-      s.addEventListener('pointercancel', stopTone);
-
-      // touch fallback
-      s.addEventListener('touchstart', ()=>{ startTone(); updateTone(); }, {passive:true});
-      s.addEventListener('touchmove', ()=>{ if(active) updateTone(); }, {passive:true});
-      s.addEventListener('touchend', stopTone, {passive:true});
-      s.addEventListener('touchcancel', stopTone, {passive:true});
-
-      window.addEventListener('blur', stopTone);
-      window.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopTone(); });
-    }catch(e){}
-  }
-
-  window.addEventListener('DOMContentLoaded', hook);
-  window.addEventListener('pageshow', fixTapPlayMode);
 })();
 
 </script>

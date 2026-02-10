@@ -2897,6 +2897,51 @@ window.addEventListener('pageshow', ()=>{
   }
 })();
 
+
+// v25: volume slider preview sound ("ピュ"確認)
+let v25_lastPreviewAt = 0;
+function v25_previewBeep(vol01){
+  try{
+    unlockTapAudio();
+    ensureTapAudio();
+    if(!tapAudioCtx || !tapMaster) return;
+    const nowMs = Date.now();
+    // throttle to avoid too many beeps while dragging
+    if(nowMs - v25_lastPreviewAt < 90) return;
+    v25_lastPreviewAt = nowMs;
+
+    const now = tapAudioCtx.currentTime;
+    const o = tapAudioCtx.createOscillator();
+    const g = tapAudioCtx.createGain();
+    o.type = 'sine';
+    // "pyu": quick sweep
+    o.frequency.setValueAtTime(880, now);
+    o.frequency.exponentialRampToValueAtTime(440, now + 0.08);
+
+    const amp = Math.max(0.0, Math.min(1.0, vol01));
+    g.gain.setValueAtTime(0.00001, now);
+    g.gain.exponentialRampToValueAtTime(0.25 * amp + 0.00001, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.00001, now + 0.12);
+
+    o.connect(g).connect(tapMaster);
+    o.start(now);
+    o.stop(now + 0.13);
+  }catch(e){}
+}
+
+function v25_hookVolumePreview(){
+  const slider = document.getElementById('tapVolume');
+  if(!slider) return;
+  slider.addEventListener('input', ()=>{
+    const v = Number(slider.value);
+    const min = Number(slider.min || 0);
+    const max = Number(slider.max || 100);
+    const vol01 = (v - min) / (max - min || 1);
+    v25_previewBeep(vol01);
+  }, {passive:true});
+}
+window.addEventListener('DOMContentLoaded', v25_hookVolumePreview);
+
 </script>
 <div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>

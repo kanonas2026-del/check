@@ -2868,7 +2868,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v40: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+// ===== v41: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2882,7 +2882,12 @@ window.addEventListener('pageshow', ()=>{
   function getTapVolFromSlider(){
     const s = getSlider();
     if(!s) return clamp01(tapVol);
-    return clamp01(s.value);
+    const v = Number(s.value);
+    const min = Number(s.min || 0);
+    const max = Number(s.max || 1);
+    if(!Number.isFinite(v) || !Number.isFinite(min) || !Number.isFinite(max)) return clamp01(tapVol);
+    const vol01 = (v - min) / (max - min || 1);
+    return Math.max(0, Math.min(1, vol01));
   }
   function syncTapVol(){
     tapVol = getTapVolFromSlider();
@@ -2994,15 +2999,69 @@ window.addEventListener('pageshow', ()=>{
     if(!isTapMode()) return;
     syncTapVol();
 
-    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    // ===== v41: fingers (A/E/C/G + fret) から周波数を算出（開放弦0やきらきら短音に対応） =====
+    function baseFreqByS(s){
+      // s: 1=A,2=E,3=C,4=G (AECG)
+      if(s===1) return 440.00;     // A4
+      if(s===2) return 329.63;     // E4
+      if(s===3) return 261.63;     // C4
+      if(s===4) return 392.00;     // G4
+      return 440.00;
+    }
+    function freqForFinger(fg){
+      const s = Number(fg && fg.s);
+      const f = Number(fg && fg.f);
+      const base = baseFreqByS(s);
+      const fret = (Number.isFinite(f) ? f : 0);
+      return base * Math.pow(2, fret/12);
+    }
+
+    // cache URLs by key
+    if(!window.__v41_cache) window.__v41_cache = {note:{}, chord:{}};
+    const cache = window.__v41_cache;
+
+    function urlForFreqs(freqs, dur){
+      // freqs array -> cache key
+      const key = freqs.map(f=>f.toFixed(2)).join(',');
+      if(freqs.length===1){
+        if(cache.note[key]) return cache.note[key];
+        const u = makeWavUrl([freqs[0]], dur);
+        cache.note[key]=u;
+        return u;
+      }else{
+        if(cache.chord[key]) return cache.chord[key];
+        const u = makeWavUrl(freqs, dur);
+        cache.chord[key]=u;
+        return u;
+      }
+    }
+
     try{
-      if(target && target.noteKey && urls[target.noteKey]){
-        playUrl(urls[target.noteKey], tapVol);
-        return; // don't fall through to original (to avoid 1音だけになる)
+      const fingers = (target && target.chord && Array.isArray(target.chord.fingers)) ? target.chord.fingers : null;
+      if(fingers && fingers.length>0){
+        const freqs = fingers.map(freqForFinger);
+        if(freqs.length===1){
+          // きらきらの短音は短く
+          const u = urlForFreqs(freqs, 0.14);
+          playUrl(u, tapVol);
+          return;
+        }else{
+          const u = urlForFreqs(freqs, 0.20);
+          playUrl(u, tapVol);
+          return;
+        }
       }
     }catch(e){}
 
-    // Chords: target.chord.name like 'C','F','G7','Am'
+    // Notes mode (scale): target.noteKey = 'do'|'re'...
+    try{
+      if(target && target.noteKey && urls[target.noteKey]){
+        playUrl(urls[target.noteKey], tapVol);
+        return;
+      }
+    }catch(e){}
+
+    // Chord name fallback
     try{
       const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
       const up = n.trim().toUpperCase();
@@ -3012,11 +3071,10 @@ window.addEventListener('pageshow', ()=>{
       if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
     }catch(e){}
 
-    // fallback: keep original behavior if we couldn't identify
-    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
+    // keep original (in case it does score/visual side effects)
+    try{ if(origPlayTapHitSound) return origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
-
-  window.addEventListener('DOMContentLoaded', hookSlider);
+window.addEventListener('DOMContentLoaded', hookSlider);
 })();
 
 </script>

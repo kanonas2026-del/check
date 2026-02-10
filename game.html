@@ -2868,7 +2868,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v42: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+// ===== v43: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2876,6 +2876,27 @@ window.addEventListener('pageshow', ()=>{
     if(!Number.isFinite(x)) return 0.5;
     return Math.max(0, Math.min(1, x));
   }
+
+  // v43: iOSでAudio.volumeが効きにくい環境対策 → 音量はWAV振幅に焼き込む
+  function v43_volToAmp(vol01){
+    const v = clamp01(vol01);
+    if(v <= 0.01) return 0;
+    // perceptual curve
+    return Math.pow(v, 2.2);
+  }
+  if(!window.__v43_urlCache) window.__v43_urlCache = {};
+  const v43_cache = window.__v43_urlCache;
+
+  function v43_urlFor(freqs, dur, vol01){
+    const amp = v43_volToAmp(vol01);
+    const ampBucket = Math.round(amp * 20) / 20; // 0.00,0.05,...1.00
+    const key = freqs.map(f=>f.toFixed(2)).join(',') + '|' + dur.toFixed(2) + '|' + ampBucket.toFixed(2);
+    if(v43_cache[key]) return v43_cache[key];
+    const u = makeWavUrl(freqs, dur, ampBucket);
+    v43_cache[key] = u;
+    return u;
+  }
+
   function getSlider(){
     return document.getElementById('tapVolume');
   }
@@ -2897,7 +2918,11 @@ window.addEventListener('pageshow', ()=>{
   }
 
   // --- WAV generator (Blob URL) ---
-  function makeWavUrl(freqs, durSec){
+  function makeWavUrl(freqs, durSec, ampScale){
+    ampScale = Number(ampScale);
+    if(!Number.isFinite(ampScale)) ampScale = 1.0;
+    ampScale = Math.max(0, Math.min(1, ampScale));
+
     const sr = 44100;
     const n = Math.max(1, Math.floor(sr * durSec));
     const data = new Int16Array(n);
@@ -2910,7 +2935,7 @@ window.addEventListener('pageshow', ()=>{
       let s = 0;
       for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
       s /= Math.max(1, freqs.length);
-      data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * 32767;
+      data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * ampScale * 32767;
     }
     const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
     const dataSize = data.length * bytesPerSample;
@@ -2949,8 +2974,7 @@ window.addEventListener('pageshow', ()=>{
   function playUrl(url, vol01){
     try{
       const a = new Audio(url);
-      a.volume = clamp01(vol01);
-      // play must be user gesture for iOS; slider input / hit tap qualifies
+      a.volume = 1.0; // volume baked into wav
       a.play().catch(()=>{});
     }catch(e){}
   }
@@ -2962,7 +2986,7 @@ window.addEventListener('pageshow', ()=>{
     if(now - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = now;
     syncTapVol();
-    playUrl(urls.preview, tapVol);
+    playUrl(v43_urlFor([NOTE.A4], 0.14, tapVol), tapVol);
   }
 
   function hookSlider(){
@@ -3016,12 +3040,12 @@ window.addEventListener('pageshow', ()=>{
       const key = freqs.map(f=>f.toFixed(2)).join(',');
       if(freqs.length===1){
         if(cache.note[key]) return cache.note[key];
-        const u = makeWavUrl([freqs[0]], dur);
+        const u = v43_urlFor([freqs[0]], dur, tapVol);
         cache.note[key]=u;
         return u;
       }else{
         if(cache.chord[key]) return cache.chord[key];
-        const u = makeWavUrl(freqs, dur);
+        const u = v43_urlFor(freqs, dur, tapVol);
         cache.chord[key]=u;
         return u;
       }
@@ -3056,10 +3080,10 @@ window.addEventListener('pageshow', ()=>{
     try{
       const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
       const up = n.trim().toUpperCase();
-      if(up === 'C') { playUrl(urls.C, tapVol); return; }
-      if(up === 'F') { playUrl(urls.F, tapVol); return; }
-      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
-      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+      if(up === 'C') { playUrl(v43_urlFor([NOTE.C4,NOTE.E4,NOTE.G4], 0.22, tapVol), tapVol); return; }
+      if(up === 'F') { playUrl(v43_urlFor([NOTE.F4,NOTE.A4,NOTE.C5], 0.22, tapVol), tapVol); return; }
+      if(up === 'G7') { playUrl(v43_urlFor([NOTE.G4,NOTE.B4,NOTE.D5,NOTE.F5], 0.22, tapVol), tapVol); return; }
+      if(up === 'AM') { playUrl(v43_urlFor([NOTE.A4,NOTE.C5,NOTE.E5], 0.22, tapVol), tapVol); return; }
     }catch(e){}
 
     // keep original (in case it does score/visual side effects)

@@ -944,9 +944,6 @@ body.is-uke .vol-inline{ display:none !important; }
   <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
 </div>
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
-<div class="tap-vol-wrap" id="tap-vol-wrap">
-  <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="range" min="0" max="100" value="35" />
 </div>
 
 </div>
@@ -956,7 +953,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVol" type="range" min="0" max="1" step="0.01" value="0.5">
+    <input id="tapVol" type="range" min="0" max="100" value="35" />
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
@@ -1395,7 +1392,7 @@ function ensureTapAudio(){
   }catch(e){}
 }
 
-// ===== v27: TAP音（単音＋和音） + 音量スライドの「ピューーー」プレビュー =====
+// ===== v28: TAP音（単音＋和音） + 音量スライドの「ピューーー」プレビュー =====
 function semitone(freq, n){ return freq * Math.pow(2, n/12); }
 
 function chordFreqsFromName(name){
@@ -1453,40 +1450,40 @@ function playTapChord(freqs, now){
 }
 
 // --- slider preview tone ("ピューーー") ---
-let v27_previewOsc = null;
-let v27_previewGain = null;
+let v28_previewOsc = null;
+let v28_previewGain = null;
 
-function v27_startPreviewTone(){
+function v28_startPreviewTone(){
   try{
     ensureTapAudio(); // must be called in user gesture
     if(!tapAudioCtx || !tapMaster) return;
-    if(v27_previewOsc) return;
+    if(v28_previewOsc) return;
     const now = tapAudioCtx.currentTime;
-    v27_previewOsc = tapAudioCtx.createOscillator();
-    v27_previewGain = tapAudioCtx.createGain();
-    v27_previewOsc.type='sine';
-    v27_previewGain.gain.setValueAtTime(0.0001, now);
-    v27_previewGain.gain.exponentialRampToValueAtTime(0.35, now + 0.01); // constant, master handles volume
-    v27_previewOsc.connect(v27_previewGain).connect(tapMaster);
-    v27_previewOsc.start(now);
+    v28_previewOsc = tapAudioCtx.createOscillator();
+    v28_previewGain = tapAudioCtx.createGain();
+    v28_previewOsc.type='sine';
+    v28_previewGain.gain.setValueAtTime(0.0001, now);
+    v28_previewGain.gain.exponentialRampToValueAtTime(0.35, now + 0.01); // constant, master handles volume
+    v28_previewOsc.connect(v28_previewGain).connect(tapMaster);
+    v28_previewOsc.start(now);
   }catch(e){}
 }
 
-function v27_stopPreviewTone(){
+function v28_stopPreviewTone(){
   try{
-    if(v27_previewOsc){
+    if(v28_previewOsc){
       const now = tapAudioCtx ? tapAudioCtx.currentTime : 0;
-      if(v27_previewGain && tapAudioCtx){
-        v27_previewGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+      if(v28_previewGain && tapAudioCtx){
+        v28_previewGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
       }
-      v27_previewOsc.stop((tapAudioCtx?tapAudioCtx.currentTime:0) + 0.04);
+      v28_previewOsc.stop((tapAudioCtx?tapAudioCtx.currentTime:0) + 0.04);
     }
   }catch(e){}
-  v27_previewOsc = null;
-  v27_previewGain = null;
+  v28_previewOsc = null;
+  v28_previewGain = null;
 }
 
-function v27_updatePreviewToneFromSlider(){
+function v28_updatePreviewToneFromSlider(){
   try{
     const el = document.getElementById('tapVol');
     if(!el) return;
@@ -1495,27 +1492,27 @@ function v27_updatePreviewToneFromSlider(){
     const ratio = (v-min)/Math.max(1,(max-min));
     // pitch: left low -> right high
     const f = 220 + ratio * 660; // 220..880
-    if(v27_previewOsc){
-      v27_previewOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.01);
+    if(v28_previewOsc){
+      v28_previewOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
 }
 
-function v27_bindPreviewToSlider(){
+function v28_bindPreviewToSlider(){
   const el = document.getElementById('tapVol');
   if(!el) return;
 
-  const start = (e)=>{ if(!isTapMode()) return; v27_startPreviewTone(); v27_updatePreviewToneFromSlider(); };
-  const end   = (e)=>{ v27_stopPreviewTone(); };
+  const start = (e)=>{ if(!isTapMode()) return; v28_startPreviewTone(); v28_updatePreviewToneFromSlider(); };
+  const end   = (e)=>{ v28_stopPreviewTone(); };
 
   el.addEventListener('pointerdown', start, {passive:true});
   el.addEventListener('touchstart', start, {passive:true});
   window.addEventListener('pointerup', end, {passive:true});
   window.addEventListener('touchend', end, {passive:true});
-  el.addEventListener('input', ()=>{ v27_updatePreviewToneFromSlider(); }, {passive:true});
+  el.addEventListener('input', ()=>{ v28_updatePreviewToneFromSlider(); }, {passive:true});
 }
 
-window.addEventListener('DOMContentLoaded', v27_bindPreviewToSlider);
+window.addEventListener('DOMContentLoaded', v28_bindPreviewToSlider);
 function noteFreqFromTarget(t){
   try{
     if(t && t.noteKey){

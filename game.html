@@ -393,7 +393,6 @@ window.addEventListener('load', ()=>{
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
 
-window.v46_globalUnlock = function(){ try{ (function(){})(); }catch(e){} };
 })();
 
 
@@ -824,24 +823,41 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* v23: UKE menu does NOT show volume slider (TOP button stays) */
-body.is-uke .vol-inline{ display:none !important; }
+/* ===== v15: restore TAP layout, UKE uses same bottom row without volume ===== */
+/* show/hide by mode */
+body.is-tap #bottomTap{ display:flex !important; }
+body.is-tap #bottomUke{ display:none !important; }
 
+body.is-uke #bottomTap{ display:none !important; }
+body.is-uke #bottomUke{ display:flex !important; }
 
-/* v23 build badge (cache check) */
-#buildBadge{
-  position: fixed;
-  top: 10px;
-  left: 12px;
-  z-index: 9999;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  font-weight: 800;
-  font-size: 12px;
-  pointer-events: none;
+/* ensure bottom rows sit naturally (NOT fixed) to avoid overlap */
+#bottomTap, #bottomUke{
+  position: static !important;
+  transform: none !important;
+  margin-top: 10px;
+  justify-content: flex-end;
 }
+#bottomUke{ justify-content: center; }
+
+/* compact slider so it fits without scroll */
+#bottomTap #tapVolume{
+  max-width: 220px;
+}
+
+/* lighten look (B) */
+#bottomTap, #bottomUke{
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 6px 8px !important;
+}
+
+
+/* ===== v16: ensure UKE top button is visible ===== */
+body.is-uke #bottomUke{ display:flex !important; justify-content:center; }
+body.is-uke #bottomTap{ display:none !important; }
+body.is-tap #bottomTap{ display:flex !important; }
+body.is-tap #bottomUke{ display:none !important; }
 
 </style>
 
@@ -914,7 +930,6 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id=\"buildBadge\">v23</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -969,9 +984,15 @@ body.is-uke .vol-inline{ display:none !important; }
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
 <!-- ▼ v8 音量＋TOP 横並び -->
-<div class="bottom-inline">
+<div id="bottomTap" class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
+
+<!-- ▼ v15 ウクレレ用：TOPだけ（タップと同じ位置） -->
+<div id="bottomUke" class="bottom-inline">
+  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
+</div>
+
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
@@ -1430,10 +1451,7 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  
-  try{ if(window.v46_globalUnlock) window.v46_globalUnlock(); }catch(e){}
-  try{ if(window.v46_globalSyncVol) window.v46_globalSyncVol(); }catch(e){}
-// Only for TAP entry (タップであそぶ)
+  // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
   if(!tapAudioCtx || !tapMaster) return;
@@ -1943,19 +1961,26 @@ let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
-  // v46: TAP判定強化（リンクBでもタップ選択後にTAP扱い）
-  try{
-    const p = new URLSearchParams(location.search);
-    if ((p.get('mode')||'').toUpperCase() === 'TAP') return true;
-  }catch(e){}
-  if (String(entryKind||'').toLowerCase() === 'tap') return true;
   return String(playMode||'').toUpperCase().startsWith('TAP');
 }
 function isWaitMode(){
   return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
+
+// v16: always sync entryKind -> body class (failsafe)
+function syncEntryKindClass(){
+  try{
+    document.body.classList.toggle('is-uke', entryKind === 'uke');
+    document.body.classList.toggle('is-tap', entryKind === 'tap');
+  }catch(e){}
+}
+
 function applyUiMode(mode){
+  // v15: mark entry kind on body for CSS
+  document.body.classList.toggle('is-uke', entryKind === 'uke');
+  document.body.classList.toggle('is-tap', entryKind === 'tap');
+
   uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
   // map to internal playMode
   if(entryKind === 'tap'){
@@ -2031,7 +2056,9 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
-})(); 
+})();
+
+syncEntryKindClass();
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
@@ -2863,147 +2890,6 @@ window.addEventListener('pageshow', ()=>{
   const ov = document.getElementById('pageFlip');
   if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
 });
-
-
-// v23: mode flag for menu UI (mode=TAP => tap, else uke)
-(function(){
-  try{
-    const p = new URLSearchParams(location.search);
-    const isTap = (p.get('mode')||'').toUpperCase()==='TAP';
-    document.body.classList.toggle('is-tap', isTap);
-    document.body.classList.toggle('is-uke', !isTap);
-  }catch(e){
-    document.body.classList.add('is-uke');
-  }
-})();
-
-
-// ===== v46: iPhone音ロック解除を「ユーザー操作の瞬間」に固定（スライダー＆ヒットで必ず鳴らす） =====
-(function(){
-  function clamp01(x){
-    x = Number(x);
-    if(!Number.isFinite(x)) return 0.5;
-    return Math.max(0, Math.min(1, x));
-  }
-
-  let v46_unlocked = false;
-
-  function v46_unlock(){
-    if(v46_unlocked) return;
-    try{
-      // AudioContextは「ユーザー操作の瞬間」に生成
-      if(!tapAudioCtx){
-        tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      }
-      if(tapAudioCtx.state === 'suspended'){
-        tapAudioCtx.resume().catch(()=>{});
-      }
-      if(!tapMaster){
-        tapMaster = tapAudioCtx.createGain();
-        tapMaster.gain.value = tapVol;
-        tapMaster.connect(tapAudioCtx.destination);
-      }else{
-        tapMaster.gain.value = tapVol;
-      }
-
-      // ごく短い超小音でロック解除（クリック回避）
-      const now = tapAudioCtx.currentTime;
-      const o = tapAudioCtx.createOscillator();
-      const g = tapAudioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(440, now);
-      g.gain.setValueAtTime(0.00001, now);
-      o.connect(g).connect(tapMaster);
-      o.start(now);
-      o.stop(now + 0.02);
-
-      v46_unlocked = true;
-    }catch(e){}
-  }
-
-  function v46_syncFromSlider(){
-    const s = document.getElementById('tapVolume');
-    if(!s) return;
-    tapVol = clamp01(s.value);
-    try{ saveTapVol(); }catch(e){}
-    // tapMaster.gainへ反映（unlock済みなら確実）
-    try{
-      if(tapMaster) tapMaster.gain.value = tapVol;
-    }catch(e){}
-  }
-
-  function v46_previewBeep(){
-    // スライダーの現在音量で短い「ピュ」
-    try{
-      v46_unlock();
-      v46_syncFromSlider();
-      if(!tapAudioCtx || !tapMaster) return;
-
-      const now = tapAudioCtx.currentTime;
-      const o = tapAudioCtx.createOscillator();
-      const g = tapAudioCtx.createGain();
-
-      const vol = Math.max(0.0001, tapVol);
-      o.type = 'sine';
-      o.frequency.setValueAtTime(440 + 440*tapVol, now); // 右ほど高音
-      g.gain.setValueAtTime(0.00001, now);
-      g.gain.exponentialRampToValueAtTime(vol*0.8, now + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.00001, now + 0.09);
-
-      o.connect(g).connect(tapMaster);
-      o.start(now);
-      o.stop(now + 0.10);
-    }catch(e){}
-  }
-
-  let last = 0;
-  function throttledPreview(){
-    const t = Date.now();
-    if(t - last < 120) return;
-    last = t;
-    v46_previewBeep();
-  }
-
-  function hook(){
-    const s = document.getElementById('tapVolume');
-    if(!s) return;
-
-    // 初期はUI表示値を採用（保存値0固定でも救済）
-    try{ loadTapVol(); }catch(e){}
-    if(clamp01(tapVol) === 0 && clamp01(s.value) > 0) tapVol = clamp01(s.value);
-    s.value = String(clamp01(tapVol));
-
-    // ユーザー操作の瞬間にunlockして鳴らす
-    const start = ()=>{
-      if(!isTapMode()) return;
-      v46_previewBeep();
-    };
-
-    s.addEventListener('pointerdown', start, {passive:true});
-    s.addEventListener('touchstart', start, {passive:true});
-
-    s.addEventListener('input', ()=>{
-      if(!isTapMode()) return;
-      v46_unlock();
-      v46_syncFromSlider();
-      throttledPreview();
-    }, {passive:true});
-
-    s.addEventListener('pointerup', ()=>{ if(isTapMode()) v46_previewBeep(); }, {passive:true});
-    s.addEventListener('touchend', ()=>{ if(isTapMode()) v46_previewBeep(); }, {passive:true});
-  }
-
-  window.addEventListener('DOMContentLoaded', hook);
-
-  // どこを触っても一度unlock（タップモード時のみ）
-  window.addEventListener('pointerdown', ()=>{ if(isTapMode()) v46_unlock(); }, {passive:true});
-  window.addEventListener('touchstart',  ()=>{ if(isTapMode()) v46_unlock(); }, {passive:true});
-
-// expose for hit-sound hook
-window.v46_globalUnlock = v46_unlock;
-window.v46_globalSyncVol = v46_syncFromSlider;
-
-})();
 
 </script>
 <div class="verBadge">v12</div>

@@ -2868,7 +2868,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v43: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+// ===== v44: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2953,6 +2953,33 @@ window.addEventListener('pageshow', ()=>{
   }
 
   const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+  
+  // v44: preview音は事前生成しておく（スライダー操作中にWAV生成しない＝iOSで鳴りやすい）
+  const __v44_previewSteps = [];
+  const __v44_previewAudios = [];
+  (function(){
+    const step = 0.05; // 0.00..1.00
+    for(let i=0;i<=20;i++){
+      const v = i*step;
+      __v44_previewSteps.push(v);
+      const u = v43_urlFor([NOTE.A4], 0.14, v); // vol01をそのまま渡す（内部でamp焼き込み）
+      const a = new Audio(u);
+      a.preload = 'auto';
+      a.volume = 1.0;
+      __v44_previewAudios.push(a);
+    }
+  })();
+  function v44_playPreview(vol01){
+    const v = clamp01(vol01);
+    const i = Math.max(0, Math.min(__v44_previewAudios.length-1, Math.round(v*20)));
+    try{
+      const a = __v44_previewAudios[i];
+      a.pause();
+      a.currentTime = 0;
+      a.play().catch(()=>{});
+    }catch(e){}
+  }
+
   const urls = {
     // preview beep (fixed pitch, volume shows loudness)
     preview: makeWavUrl([440], 0.12),

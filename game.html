@@ -823,41 +823,24 @@ body.playing #menu-overlay{ display:none; }
 }
 
 
-/* ===== v15: restore TAP layout, UKE uses same bottom row without volume ===== */
-/* show/hide by mode */
-body.is-tap #bottomTap{ display:flex !important; }
-body.is-tap #bottomUke{ display:none !important; }
+/* v23: UKE menu does NOT show volume slider (TOP button stays) */
+body.is-uke .vol-inline{ display:none !important; }
 
-body.is-uke #bottomTap{ display:none !important; }
-body.is-uke #bottomUke{ display:flex !important; }
 
-/* ensure bottom rows sit naturally (NOT fixed) to avoid overlap */
-#bottomTap, #bottomUke{
-  position: static !important;
-  transform: none !important;
-  margin-top: 10px;
-  justify-content: flex-end;
+/* v23 build badge (cache check) */
+#buildBadge{
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  pointer-events: none;
 }
-#bottomUke{ justify-content: center; }
-
-/* compact slider so it fits without scroll */
-#bottomTap #tapVolume{
-  max-width: 220px;
-}
-
-/* lighten look (B) */
-#bottomTap, #bottomUke{
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 6px 8px !important;
-}
-
-
-/* ===== v16: ensure UKE top button is visible ===== */
-body.is-uke #bottomUke{ display:flex !important; justify-content:center; }
-body.is-uke #bottomTap{ display:none !important; }
-body.is-tap #bottomTap{ display:flex !important; }
-body.is-tap #bottomUke{ display:none !important; }
 
 </style>
 
@@ -930,6 +913,7 @@ body.is-tap #bottomUke{ display:none !important; }
 
 </head>
 <body class="menuOpen">
+<div id=\"buildBadge\">v23</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -984,15 +968,9 @@ body.is-tap #bottomUke{ display:none !important; }
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
 <!-- ▼ v8 音量＋TOP 横並び -->
-<div id="bottomTap" class="bottom-inline">
+<div class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-
-<!-- ▼ v15 ウクレレ用：TOPだけ（タップと同じ位置） -->
-<div id="bottomUke" class="bottom-inline">
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
-</div>
-
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
@@ -1967,20 +1945,7 @@ function isWaitMode(){
   return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
-
-// v16: always sync entryKind -> body class (failsafe)
-function syncEntryKindClass(){
-  try{
-    document.body.classList.toggle('is-uke', entryKind === 'uke');
-    document.body.classList.toggle('is-tap', entryKind === 'tap');
-  }catch(e){}
-}
-
 function applyUiMode(mode){
-  // v15: mark entry kind on body for CSS
-  document.body.classList.toggle('is-uke', entryKind === 'uke');
-  document.body.classList.toggle('is-tap', entryKind === 'tap');
-
   uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
   // map to internal playMode
   if(entryKind === 'tap'){
@@ -2056,9 +2021,7 @@ function setMode(el, mode){
     entryKind = 'uke';
     applyUiMode('WAIT');
   }
-})();
-
-syncEntryKindClass();
+})(); 
 
 function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
@@ -2890,6 +2853,241 @@ window.addEventListener('pageshow', ()=>{
   const ov = document.getElementById('pageFlip');
   if(ov){ ov.classList.remove('run'); ov.style.display='none'; }
 });
+
+
+// v23: mode flag for menu UI (mode=TAP => tap, else uke)
+(function(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const isTap = (p.get('mode')||'').toUpperCase()==='TAP';
+    document.body.classList.toggle('is-tap', isTap);
+    document.body.classList.toggle('is-uke', !isTap);
+  }catch(e){
+    document.body.classList.add('is-uke');
+  }
+})();
+
+
+// ===== v47: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+(function(){
+  // --- helpers ---
+  function clamp01(x){
+    x = Number(x);
+    if(!Number.isFinite(x)) return 0.5;
+    return Math.max(0, Math.min(1, x));
+  }
+  // v47: bake volume into wav (avoid Audio.volume依存)
+  function v47_volToAmp(vol01){
+    const v = clamp01(vol01);
+    if(v <= 0.01) return 0;
+    return Math.pow(v, 2.2);
+  }
+  if(!window.__v47_cache) window.__v47_cache = {};
+  const v47_cache = window.__v47_cache;
+  function v47_urlFor(freqs, dur, vol01){
+    const amp = v47_volToAmp(vol01);
+    const ampBucket = Math.round(amp * 20) / 20; // 0.00..1.00 step 0.05
+    const key = freqs.map(f=>Number(f).toFixed(2)).join(',') + '|' + dur.toFixed(3) + '|' + ampBucket.toFixed(2);
+    if(v47_cache[key]) return v47_cache[key];
+    const u = makeWavUrl(freqs, dur, ampBucket);
+    v47_cache[key] = u;
+    return u;
+  }
+  function getSlider(){
+    return document.getElementById('tapVolume');
+  }
+  function getTapVolFromSlider(){
+    const s = getSlider();
+    if(!s) return clamp01(tapVol);
+    const v = Number(s.value);
+    const min = Number(s.min || 0);
+    const max = Number(s.max || 1);
+    if(!Number.isFinite(v) || !Number.isFinite(min) || !Number.isFinite(max)) return clamp01(tapVol);
+    const vol01 = (v - min) / (max - min || 1);
+    return Math.max(0, Math.min(1, vol01));
+  }
+  function syncTapVol(){
+    tapVol = getTapVolFromSlider();
+    try{ saveTapVol(); }catch(e){}
+    // keep existing engine in sync (even if we don't rely on WebAudio)
+    try{ ensureTapAudio(); }catch(e){}
+  }
+
+  // --- WAV generator (Blob URL) ---
+  function makeWavUrl(freqs, durSec){
+    ampScale = Number(ampScale);
+    if(!Number.isFinite(ampScale)) ampScale = 1.0;
+    ampScale = Math.max(0, Math.min(1, ampScale));
+    const sr = 44100;
+    const n = Math.max(1, Math.floor(sr * durSec));
+    const data = new Int16Array(n);
+    const atk = 0.006, rel = 0.040;
+    for(let i=0;i<n;i++){
+      const t = i / sr;
+      let env = 1.0;
+      if(t < atk) env = t/atk;
+      else if(t > durSec - rel) env = Math.max(0, (durSec - t)/rel);
+      let s = 0;
+      for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
+      s /= Math.max(1, freqs.length);
+      data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * ampScale * 32767;
+    }
+    const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
+    const dataSize = data.length * bytesPerSample;
+    const buf = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buf);
+    let o = 0;
+    function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
+    function u32(v){ view.setUint32(o, v, true); o+=4; }
+    function u16(v){ view.setUint16(o, v, true); o+=2; }
+    writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
+    writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
+    writeStr('data'); u32(dataSize);
+    for(let i=0;i<data.length;i++){ view.setInt16(o, data[i], true); o+=2; }
+    return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
+  }
+
+  const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+  const urls = {
+    // preview beep (fixed pitch, volume shows loudness)
+    preview: makeWavUrl([440], 0.12),
+    do: makeWavUrl([NOTE.do], 0.18),
+    re: makeWavUrl([NOTE.re], 0.18),
+    mi: makeWavUrl([NOTE.mi], 0.18),
+    fa: makeWavUrl([NOTE.fa], 0.18),
+    so: makeWavUrl([NOTE.so], 0.18),
+    la: makeWavUrl([NOTE.la], 0.18),
+    si: makeWavUrl([NOTE.si], 0.18),
+    do2: makeWavUrl([NOTE.do2], 0.18),
+    // chords
+    C:  makeWavUrl([261.63,329.63,392.00], 0.22),
+    F:  makeWavUrl([349.23,440.00,523.25], 0.22),
+    G7: makeWavUrl([392.00,493.88,587.33,698.46], 0.22),
+    Am: makeWavUrl([440.00,523.25,659.26], 0.22),
+  };
+
+  function playUrl(url, vol01){
+    try{
+      const a = new Audio(url);
+      a.volume = 1.0; // volume baked into wav
+      a.play().catch(()=>{});
+    }catch(e){}
+  });
+    }catch(e){}
+  }
+
+  // --- Slider: non-continuous preview (no glitches) ---
+  let lastPreviewAt = 0;
+  function sliderPreview(){
+    const now = Date.now();
+    if(now - lastPreviewAt < 120) return;
+    lastPreviewAt = now;
+    syncTapVol();
+    // pitch: 右ほど高音（A4を基準に再生速度ではなく周波数で生成）
+    const f = 220 + (880-220) * clamp01(tapVol);
+    const u = v47_urlFor([f], 0.12, tapVol);
+    playUrl(u, tapVol);
+  }
+
+  function hookSlider(){
+    const s = getSlider();
+    if(!s) return;
+
+    // initial sync: if saved tapVol is 0 but slider default isn't, prefer slider value
+    try{ loadTapVol(); }catch(e){}
+    const sliderV = clamp01(s.value);
+    if(clamp01(tapVol) === 0 && sliderV > 0) tapVol = sliderV;
+    s.value = String(clamp01(tapVol));
+    syncTapVol();
+
+    s.addEventListener('input', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+
+    // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
+    s.addEventListener('pointerup', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+    s.addEventListener('touchend', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+  }
+
+  // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
+  const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
+
+  window.playTapHitSound = function(target){
+    if(!isTapMode()) return;
+    syncTapVol();
+
+    function baseFreqByS(s){
+      // 1=A,2=E,3=C,4=G (AECG)
+      if(s===1) return 440.00;
+      if(s===2) return 329.63;
+      if(s===3) return 261.63;
+      if(s===4) return 392.00;
+      return 440.00;
+    }
+    function freqForFinger(fg){
+      const s = Number(fg && fg.s);
+      const f = Number(fg && fg.f);
+      const base = baseFreqByS(s);
+      const fret = (Number.isFinite(f) ? f : 0);
+      return base * Math.pow(2, fret/12);
+    }
+
+    // 1) fingersがあればそれを優先（開放弦0/きらきら短音対応）
+    try{
+      const fingers = (target && target.chord && Array.isArray(target.chord.fingers)) ? target.chord.fingers : null;
+      if(fingers && fingers.length>0){
+        const freqs = fingers.map(freqForFinger);
+        const dur = (freqs.length===1) ? 0.14 : 0.22;
+        const u = v47_urlFor(freqs, dur, tapVol);
+        playUrl(u, tapVol);
+        // keep original for visuals/score
+        try{ if(origPlayTapHitSound) return origPlayTapHitSound.apply(this, arguments); }catch(e){}
+        return;
+      }
+    }catch(e){}
+
+    // 2) scale noteKey
+    try{
+      const k = target && target.noteKey ? String(target.noteKey) : '';
+      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+      if(map[k]){
+        const u = v47_urlFor([map[k]], 0.18, tapVol);
+        playUrl(u, tapVol);
+        try{ if(origPlayTapHitSound) return origPlayTapHitSound.apply(this, arguments); }catch(e){}
+        return;
+      }
+    }catch(e){}
+
+    // 3) chord name fallback
+    try{
+      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const up = n.trim().toUpperCase();
+      let freqs = null;
+      if(up==='C') freqs=[261.63,329.63,392.00];
+      else if(up==='F') freqs=[349.23,440.00,523.25];
+      else if(up==='G7') freqs=[392.00,493.88,587.33,698.46];
+      else if(up==='AM') freqs=[440.00,523.25,659.26];
+      if(freqs){
+        const u = v47_urlFor(freqs, 0.22, tapVol);
+        playUrl(u, tapVol);
+        try{ if(origPlayTapHitSound) return origPlayTapHitSound.apply(this, arguments); }catch(e){}
+        return;
+      }
+    }catch(e){}
+
+    // default: call original if exists
+    try{ if(origPlayTapHitSound) return origPlayTapHitSound.apply(this, arguments); }catch(e){}
+  };
+
+  window.addEventListener('DOMContentLoaded', hookSlider);
+})();
 
 </script>
 <div class="verBadge">v12</div>

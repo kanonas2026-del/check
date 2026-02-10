@@ -827,6 +827,7 @@ body.playing #menu-overlay{ display:none; }
 body.is-uke .vol-inline{ display:none !important; }
 
 
+/* v23 build badge (cache check) */
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -1413,60 +1414,25 @@ function noteFreqFromTarget(t){
   }catch(e){}
   return 440.00;
 }
-
-function noteFreqsFromTarget(t){
-  try{
-    // melody note
-    if(t && t.noteKey){
-      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
-      if(map[t.noteKey]) return [map[t.noteKey]];
-    }
-    // chord
-    const n = (t && t.chord && t.chord.name) ? String(t.chord.name).toUpperCase() : '';
-    // Triads / 7th (simple voicings)
-    if(n.startsWith('C'))  return [261.63, 329.63, 392.00];                 // C-E-G
-    if(n.startsWith('F'))  return [349.23, 440.00, 523.25];                 // F-A-C
-    if(n.startsWith('G7')) return [392.00, 493.88, 587.33, 698.46];         // G-B-D-F
-    if(n.startsWith('G'))  return [392.00, 493.88, 587.33];                 // G-B-D
-    if(n.startsWith('AM')) return [440.00, 523.25, 659.25];                 // A-C-E
-    if(n.startsWith('A'))  return [440.00, 554.37, 659.25];                 // A-C#-E (A major)
-    if(n.startsWith('DM')) return [293.66, 349.23, 440.00];                 // D-F-A
-    if(n.startsWith('D'))  return [293.66, 369.99, 440.00];                 // D-F#-A
-    if(n.startsWith('EM')) return [329.63, 392.00, 493.88];                 // E-G-B
-    if(n.startsWith('E'))  return [329.63, 415.30, 493.88];                 // E-G#-B
-  }catch(e){}
-  // fallback single
-  return [noteFreqFromTarget(t)];
-}
-
 function playTapHitSound(target){
   // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
   if(!tapAudioCtx || !tapMaster) return;
   const now = tapAudioCtx.currentTime;
-  const freqs = noteFreqsFromTarget(target);
+  const f = noteFreqFromTarget(target);
   try{
-    // main pluck (single note / chord)
+    // main pluck
+    const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, now);
     g.gain.setValueAtTime(0.0001, now);
-    // scale a bit when chord
-    const chordScale = Math.max(1, freqs.length);
-    const peak = Math.max(0.0001, tapVol) * 0.9 / chordScale;
-    g.gain.exponentialRampToValueAtTime(peak, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    g.connect(tapMaster);
-
-    const oscs = [];
-    for(const f of freqs){
-      const o = tapAudioCtx.createOscillator();
-      o.type = 'triangle';
-      o.frequency.setValueAtTime(f, now);
-      o.connect(g);
-      o.start(now);
-      o.stop(now + 0.24);
-      oscs.push(o);
-    }
+    o.connect(g).connect(tapMaster);
+    o.start(now);
+    o.stop(now + 0.24);
 
     // little "pick" click
     const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
@@ -2888,81 +2854,117 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// v29_sliderTone: 音量スライダー操作中に「ピューーー」連続音（iPhone Safari対策：ユーザー操作イベント内で開始）
-let v29_toneOsc = null;
-let v29_toneGain = null;
-let v29_toneActive = false;
+// ===== v30: slider drag continuous "ピューーー" (tap mode only) =====
+let v30_ctx = null, v30_master = null, v30_osc = null, v30_gain = null, v30_running = false;
 
-function v29_stopSliderTone(){
+function v30_isTapMode(){
   try{
-    if(v29_toneOsc){
-      const t = tapAudioCtx ? tapAudioCtx.currentTime : 0;
-      if(v29_toneGain) v29_toneGain.gain.setTargetAtTime(0.00001, t, 0.02);
-      v29_toneOsc.stop(t + 0.06);
-    }
-  }catch(e){}
-  v29_toneOsc = null;
-  v29_toneGain = null;
-  v29_toneActive = false;
+    const p = new URLSearchParams(location.search);
+    return (p.get('mode')||'').toUpperCase()==='TAP';
+  }catch(e){ return false; }
 }
 
-function v29_updateSliderTone(slider){
+function v30_ensureAudio(){
+  if(v30_ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return;
+  v30_ctx = new AC();
+  v30_master = v30_ctx.createGain();
+  v30_master.gain.value = 1.0;
+  v30_master.connect(v30_ctx.destination);
+}
+
+function v30_getVol01(){
+  const s = document.getElementById('tapVolume');
+  if(!s) return 0.5;
+  const v = Number(s.value);
+  const min = Number(s.min || 0);
+  const max = Number(s.max || 100);
+  const vol01 = (v - min) / (max - min || 1);
+  return Math.max(0, Math.min(1, vol01));
+}
+
+function v30_getFreq(){
+  const vol01 = v30_getVol01();
+  // 右ほど高音: 220 -> 880
+  return 220 + (880-220) * vol01;
+}
+
+function v30_startTone(){
+  if(!v30_isTapMode()) return;
+  v30_ensureAudio();
+  if(!v30_ctx || !v30_master) return;
+  if(v30_ctx.state === 'suspended'){
+    v30_ctx.resume().catch(()=>{});
+  }
+  if(v30_running) return;
+
+  v30_osc = v30_ctx.createOscillator();
+  v30_gain = v30_ctx.createGain();
+  v30_osc.type = 'sine';
+  const now = v30_ctx.currentTime;
+  v30_osc.frequency.setValueAtTime(v30_getFreq(), now);
+  const vol01 = v30_getVol01();
+  // small volumes still audible, but proportional
+  const amp = 0.35 * Math.pow(vol01, 0.8);
+  v30_gain.gain.setValueAtTime(0.00001, now);
+  v30_gain.gain.exponentialRampToValueAtTime(amp + 0.00001, now + 0.01);
+
+  v30_osc.connect(v30_gain).connect(v30_master);
+  v30_osc.start(now);
+  v30_running = true;
+}
+
+function v30_updateTone(){
+  if(!v30_running || !v30_ctx || !v30_osc || !v30_gain) return;
+  const now = v30_ctx.currentTime;
+  v30_osc.frequency.setTargetAtTime(v30_getFreq(), now, 0.02);
+  const vol01 = v30_getVol01();
+  const amp = 0.35 * Math.pow(vol01, 0.8);
+  v30_gain.gain.setTargetAtTime(amp + 0.00001, now, 0.02);
+}
+
+function v30_stopTone(){
+  if(!v30_running) return;
   try{
-    if(!tapAudioCtx || !v29_toneOsc || !v29_toneGain) return;
-    const v = Number(slider.value); // 0..1
-    const vol = Math.max(0, Math.min(1, v));
-    // 音量はスライダー値に追従（そのまま）
-    v29_toneGain.gain.setTargetAtTime(Math.max(0.00001, vol) * 0.6, tapAudioCtx.currentTime, 0.01);
-    // 右に行くほど高く（220→880）
-    const f = 220 + (880-220) * vol;
-    v29_toneOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.01);
+    const now = v30_ctx.currentTime;
+    v30_gain.gain.setTargetAtTime(0.00001, now, 0.02);
+    v30_osc.stop(now + 0.05);
   }catch(e){}
+  v30_running = false;
+  v30_osc = null;
+  v30_gain = null;
 }
 
-function v29_startSliderTone(slider){
-  if(!isTapMode()) return;
-  try{
-    ensureTapAudio(); // create/resume AudioContext in user gesture
-    if(!tapAudioCtx || !tapMaster) return;
+function v30_hookSliderTone(){
+  const s = document.getElementById('tapVolume');
+  if(!s) return;
 
-    v29_stopSliderTone();
-    const now = tapAudioCtx.currentTime;
+  const start = ()=>{ v30_startTone(); v30_updateTone(); };
+  const move  = ()=>{ v30_updateTone(); };
+  const stop  = ()=>{ v30_stopTone(); };
 
-    v29_toneGain = tapAudioCtx.createGain();
-    v29_toneGain.gain.setValueAtTime(0.00001, now);
-    v29_toneGain.connect(tapMaster);
+  // Pointer events
+  s.addEventListener('pointerdown', start);
+  s.addEventListener('pointerup', stop);
+  s.addEventListener('pointercancel', stop);
+  s.addEventListener('pointermove', move);
 
-    v29_toneOsc = tapAudioCtx.createOscillator();
-    v29_toneOsc.type = 'sine';
-    v29_toneOsc.frequency.setValueAtTime(440, now);
-    v29_toneOsc.connect(v29_toneGain);
-    v29_toneOsc.start(now);
+  // Touch fallback
+  s.addEventListener('touchstart', start, {passive:true});
+  s.addEventListener('touchend', stop, {passive:true});
+  s.addEventListener('touchcancel', stop, {passive:true});
+  s.addEventListener('touchmove', move, {passive:true});
 
-    v29_toneActive = true;
-    v29_updateSliderTone(slider);
-  }catch(e){}
+  // Input updates while dragging
+  s.addEventListener('input', move, {passive:true});
+
+  // Safety
+  window.addEventListener('blur', stop);
+  window.addEventListener('visibilitychange', ()=>{ if(document.hidden) stop(); });
 }
 
-function v29_hookSliderTone(){
-  const slider = document.getElementById('tapVolume');
-  if(!slider) return;
-
-  const start = (e)=>{ v29_startSliderTone(slider); };
-  const end = (e)=>{ v29_stopSliderTone(); };
-
-  slider.addEventListener('pointerdown', start);
-  slider.addEventListener('pointerup', end);
-  slider.addEventListener('pointercancel', end);
-  slider.addEventListener('pointerleave', end);
-
-  slider.addEventListener('touchstart', start, {passive:true});
-  slider.addEventListener('touchend', end, {passive:true});
-  slider.addEventListener('touchcancel', end, {passive:true});
-
-  // while dragging / moving
-  slider.addEventListener('input', ()=>{ if(v29_toneActive) v29_updateSliderTone(slider); }, {passive:true});
-}
-window.addEventListener('DOMContentLoaded', v29_hookSliderTone);
+window.addEventListener('DOMContentLoaded', v30_hookSliderTone);
 
 </script>
 <div class="verBadge">v12</div>

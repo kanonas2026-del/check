@@ -829,9 +829,8 @@ body.is-uke .vol-inline{ display:none !important; }
 
 /* v23 build badge (cache check) */
 
-/* v32: prevent page scroll while dragging volume slider */
-#tapVolume{ touch-action: none; }
-.vol-inline{ touch-action: none; }
+/* v33: allow slider drag; hint browser to pan-x */
+#tapVolume{ touch-action: pan-x; }
 
 </style>
 
@@ -2859,20 +2858,19 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
+// ===== v33: slider drag continuous "ピューーー" (HTMLAudio loop, slider-first) =====
+let v33_audio = null;
+let v33_url = null;
+let v33_dragging = false;
 
-// ===== v32: slider drag continuous "ピューーー" (HTMLAudio loop, stable & no scroll) =====
-let v32_toneAudio = null;
-let v32_toneUrl = null;
-let v32_dragging = false;
-
-function v32_isTapMode(){
+function v33_isTapMode(){
   try{
     const p = new URLSearchParams(location.search);
     return (p.get('mode')||'').toUpperCase()==='TAP';
   }catch(e){ return false; }
 }
 
-function v32_getVol01(){
+function v33_getVol01(){
   const s = document.getElementById('tapVolume');
   if(!s) return 0.5;
   const v = Number(s.value);
@@ -2882,16 +2880,14 @@ function v32_getVol01(){
   return Math.max(0, Math.min(1, vol01));
 }
 
-function v32_getPlaybackRate(){
-  const vol01 = v32_getVol01();
-  // 右ほど高音（pitch up）: 0.7x -> 2.0x（極端に低くならないよう下限を上げる）
-  return 0.7 + 1.3 * vol01;
+function v33_getRate(){
+  const vol01 = v33_getVol01();
+  // 右ほど高音: 0.8x -> 2.0x
+  return 0.8 + 1.2 * vol01;
 }
 
-function v32_makeWavUrl(){
-  // 44.1kHz, mono, 16-bit PCM, 1.0s sine @440Hz (pitchはplaybackRateで変える)
-  const sr = 44100;
-  const dur = 1.0;
+function v33_makeWavUrl(){
+  const sr = 44100, dur = 1.0;
   const n = Math.floor(sr * dur);
   const data = new Int16Array(n);
   for(let i=0;i<n;i++){
@@ -2900,104 +2896,75 @@ function v32_makeWavUrl(){
     const fade = Math.min(1, t/0.01, (dur-t)/0.01);
     data[i] = Math.max(-1, Math.min(1, s*fade)) * 0.9 * 32767;
   }
-
-  const bytesPerSample = 2;
-  const blockAlign = bytesPerSample;
-  const byteRate = sr * blockAlign;
-  const dataSize = data.length * bytesPerSample;
-
-  const buf = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buf);
-  let o = 0;
+  const bytesPerSample=2, blockAlign=bytesPerSample, byteRate=sr*blockAlign;
+  const dataSize=data.length*bytesPerSample;
+  const buf=new ArrayBuffer(44+dataSize);
+  const view=new DataView(buf);
+  let o=0;
   function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
   function u32(v){ view.setUint32(o, v, true); o+=4; }
   function u16(v){ view.setUint16(o, v, true); o+=2; }
-
-  writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
+  writeStr('RIFF'); u32(36+dataSize); writeStr('WAVE');
   writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
   writeStr('data'); u32(dataSize);
   for(let i=0;i<data.length;i++){ view.setInt16(o, data[i], true); o+=2; }
-
-  const blob = new Blob([buf], {type:'audio/wav'});
-  return URL.createObjectURL(blob);
+  return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
 }
 
-function v32_prepareTone(){
-  if(v32_toneAudio) return;
+function v33_prepare(){
+  if(v33_audio) return;
   try{
-    v32_toneUrl = v32_makeWavUrl();
-    v32_toneAudio = new Audio(v32_toneUrl);
-    v32_toneAudio.loop = true;
-    v32_toneAudio.preload = 'auto';
-    v32_toneAudio.volume = 0;
-    v32_toneAudio.playbackRate = 1.0;
+    v33_url = v33_makeWavUrl();
+    v33_audio = new Audio(v33_url);
+    v33_audio.loop = true;
+    v33_audio.preload = 'auto';
+    v33_audio.volume = 0;
+    v33_audio.playbackRate = 1.0;
   }catch(e){}
 }
 
-function v32_startTone(){
-  if(!v32_isTapMode()) return;
-  v32_prepareTone();
-  if(!v32_toneAudio) return;
-  v32_dragging = true;
-
-  const vol01 = v32_getVol01();
-  v32_toneAudio.volume = vol01;
-  v32_toneAudio.playbackRate = v32_getPlaybackRate();
-  try{ v32_toneAudio.currentTime = 0; }catch(e){}
-
-  // must be called in user gesture; retry once if needed
-  v32_toneAudio.play().catch(()=>{
-    setTimeout(()=>{ if(v32_dragging) v32_toneAudio.play().catch(()=>{}); }, 0);
-  });
+function v33_applyParams(){
+  if(!v33_audio) return;
+  v33_audio.volume = v33_getVol01();
+  v33_audio.playbackRate = v33_getRate();
 }
 
-function v32_updateTone(){
-  if(!v32_toneAudio || !v32_dragging) return;
-  v32_toneAudio.volume = v32_getVol01();
-  v32_toneAudio.playbackRate = v32_getPlaybackRate();
+function v33_start(){
+  if(!v33_isTapMode()) return;
+  v33_prepare();
+  if(!v33_audio) return;
+  v33_dragging = true;
+  v33_applyParams();
+  try{ v33_audio.currentTime = 0; }catch(e){}
+  v33_audio.play().catch(()=>{});
 }
 
-function v32_stopTone(){
-  v32_dragging = false;
-  if(!v32_toneAudio) return;
+function v33_stop(){
+  v33_dragging = false;
+  if(!v33_audio) return;
   try{
-    v32_toneAudio.pause();
-    v32_toneAudio.currentTime = 0;
+    v33_audio.pause();
+    v33_audio.currentTime = 0;
   }catch(e){}
 }
 
-function v32_hookSliderTone(){
+function v33_hook(){
   const s = document.getElementById('tapVolume');
   if(!s) return;
 
-  // Prevent page scroll while dragging on iOS
-  const prevent = (e)=>{ if(v32_isTapMode()) e.preventDefault(); };
+  s.addEventListener('pointerdown', ()=>{ v33_start(); }, {passive:true});
+  s.addEventListener('touchstart',  ()=>{ v33_start(); }, {passive:true});
 
-  const start = (e)=>{ if(e) prevent(e); v32_startTone(); v32_updateTone(); };
-  const move  = (e)=>{ if(e) prevent(e); v32_updateTone(); };
-  const stop  = (e)=>{ v32_stopTone(); };
+  s.addEventListener('input', ()=>{ if(v33_dragging) v33_applyParams(); }, {passive:true});
 
-  // Pointer events
-  s.addEventListener('pointerdown', start, {passive:false});
-  s.addEventListener('pointermove', move, {passive:false});
-  // stop on window (more reliable)
-  window.addEventListener('pointerup', stop, {passive:true});
-  window.addEventListener('pointercancel', stop, {passive:true});
+  window.addEventListener('pointerup', ()=>{ if(v33_dragging) v33_stop(); }, {passive:true});
+  window.addEventListener('touchend',  ()=>{ if(v33_dragging) v33_stop(); }, {passive:true});
+  window.addEventListener('touchcancel',()=>{ if(v33_dragging) v33_stop(); }, {passive:true});
 
-  // Touch fallback
-  s.addEventListener('touchstart', start, {passive:false});
-  s.addEventListener('touchmove', move, {passive:false});
-  window.addEventListener('touchend', stop, {passive:true});
-  window.addEventListener('touchcancel', stop, {passive:true});
-
-  // Input updates while dragging
-  s.addEventListener('input', move, {passive:true});
-
-  window.addEventListener('blur', stop);
-  window.addEventListener('visibilitychange', ()=>{ if(document.hidden) stop(); });
+  window.addEventListener('blur', ()=>{ if(v33_dragging) v33_stop(); }, {passive:true});
+  window.addEventListener('visibilitychange', ()=>{ if(document.hidden && v33_dragging) v33_stop(); }, {passive:true});
 }
-
-window.addEventListener('DOMContentLoaded', v32_hookSliderTone);
+window.addEventListener('DOMContentLoaded', v33_hook);
 
 </script>
 <div class="verBadge">v12</div>

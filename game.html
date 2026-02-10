@@ -393,6 +393,7 @@ window.addEventListener('load', ()=>{
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', onUp);
 
+window.v46_globalUnlock = function(){ try{ (function(){})(); }catch(e){} };
 })();
 
 
@@ -1415,18 +1416,6 @@ function noteFreqFromTarget(t){
       const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
       if(map[t.noteKey]) return map[t.noteKey];
     }
-    // v45: fingers(A/E/C/G + fret) から周波数を算出（開放弦0/きらきら短音）
-    try{
-      const fingers = (t && t.chord && Array.isArray(t.chord.fingers)) ? t.chord.fingers : null;
-      if(fingers && fingers.length === 1){
-        const fg = fingers[0];
-        const s = Number(fg && fg.s); // 1=A,2=E,3=C,4=G (AECG)
-        const f = Number(fg && fg.f); // fret
-        const base = (s===1)?440.00:(s===2)?329.63:(s===3)?261.63:(s===4)?392.00:440.00;
-        const fret = (Number.isFinite(f)?f:0);
-        return base * Math.pow(2, fret/12);
-      }
-    }catch(e){}
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
     const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
@@ -1441,7 +1430,10 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  // Only for TAP entry (タップであそぶ)
+  
+  try{ if(window.v46_globalUnlock) window.v46_globalUnlock(); }catch(e){}
+  try{ if(window.v46_globalSyncVol) window.v46_globalSyncVol(); }catch(e){}
+// Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
   if(!tapAudioCtx || !tapMaster) return;
@@ -1951,7 +1943,7 @@ let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
 function isTapMode(){
-  // v45: TAP判定強化（リンクBでもタップ選択後に確実にTAP扱い）
+  // v46: TAP判定強化（リンクBでもタップ選択後にTAP扱い）
   try{
     const p = new URLSearchParams(location.search);
     if ((p.get('mode')||'').toUpperCase() === 'TAP') return true;
@@ -2886,38 +2878,78 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v45: 音量スライダーをtapVolへ接続 + その音量でプレビュー「ピュ」 =====
+// ===== v46: iPhone音ロック解除を「ユーザー操作の瞬間」に固定（スライダー＆ヒットで必ず鳴らす） =====
 (function(){
   function clamp01(x){
     x = Number(x);
     if(!Number.isFinite(x)) return 0.5;
     return Math.max(0, Math.min(1, x));
   }
-  function getSlider(){ return document.getElementById('tapVolume'); }
 
-  function syncFromSlider(){
-    const s = getSlider();
-    if(!s) return;
-    tapVol = clamp01(s.value);
-    try{ saveTapVol(); }catch(e){}
-    // update master gain
-    ensureTapAudio();
-  }
+  let v46_unlocked = false;
 
-  // iOS unlock + short preview tone
-  function previewBeep(){
-    // note: only when in TAP (or while user is adjusting tap slider)
-    ensureTapAudio();
-    if(!tapAudioCtx || !tapMaster) return;
-    const now = tapAudioCtx.currentTime;
+  function v46_unlock(){
+    if(v46_unlocked) return;
     try{
+      // AudioContextは「ユーザー操作の瞬間」に生成
+      if(!tapAudioCtx){
+        tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      }
+      if(tapAudioCtx.state === 'suspended'){
+        tapAudioCtx.resume().catch(()=>{});
+      }
+      if(!tapMaster){
+        tapMaster = tapAudioCtx.createGain();
+        tapMaster.gain.value = tapVol;
+        tapMaster.connect(tapAudioCtx.destination);
+      }else{
+        tapMaster.gain.value = tapVol;
+      }
+
+      // ごく短い超小音でロック解除（クリック回避）
+      const now = tapAudioCtx.currentTime;
       const o = tapAudioCtx.createOscillator();
       const g = tapAudioCtx.createGain();
       o.type = 'sine';
-      o.frequency.setValueAtTime(440 + 440 * clamp01(tapVol), now); // rightほど高音
-      g.gain.setValueAtTime(0.0001, now);
-      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, tapVol) * 0.8, now + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+      o.frequency.setValueAtTime(440, now);
+      g.gain.setValueAtTime(0.00001, now);
+      o.connect(g).connect(tapMaster);
+      o.start(now);
+      o.stop(now + 0.02);
+
+      v46_unlocked = true;
+    }catch(e){}
+  }
+
+  function v46_syncFromSlider(){
+    const s = document.getElementById('tapVolume');
+    if(!s) return;
+    tapVol = clamp01(s.value);
+    try{ saveTapVol(); }catch(e){}
+    // tapMaster.gainへ反映（unlock済みなら確実）
+    try{
+      if(tapMaster) tapMaster.gain.value = tapVol;
+    }catch(e){}
+  }
+
+  function v46_previewBeep(){
+    // スライダーの現在音量で短い「ピュ」
+    try{
+      v46_unlock();
+      v46_syncFromSlider();
+      if(!tapAudioCtx || !tapMaster) return;
+
+      const now = tapAudioCtx.currentTime;
+      const o = tapAudioCtx.createOscillator();
+      const g = tapAudioCtx.createGain();
+
+      const vol = Math.max(0.0001, tapVol);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(440 + 440*tapVol, now); // 右ほど高音
+      g.gain.setValueAtTime(0.00001, now);
+      g.gain.exponentialRampToValueAtTime(vol*0.8, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.00001, now + 0.09);
+
       o.connect(g).connect(tapMaster);
       o.start(now);
       o.stop(now + 0.10);
@@ -2929,40 +2961,48 @@ window.addEventListener('pageshow', ()=>{
     const t = Date.now();
     if(t - last < 120) return;
     last = t;
-    previewBeep();
+    v46_previewBeep();
   }
 
   function hook(){
-    const s = getSlider();
+    const s = document.getElementById('tapVolume');
     if(!s) return;
 
-    // 初期：保存値→スライダー、ただし0固定の場合はスライダー初期値(0.5)を優先
+    // 初期はUI表示値を採用（保存値0固定でも救済）
     try{ loadTapVol(); }catch(e){}
     if(clamp01(tapVol) === 0 && clamp01(s.value) > 0) tapVol = clamp01(s.value);
     s.value = String(clamp01(tapVol));
-    ensureTapAudio();
 
-    // 触った瞬間にunlock + 反映 + プレビュー
-    const onStart = ()=>{
-      syncFromSlider();
-      previewBeep();
+    // ユーザー操作の瞬間にunlockして鳴らす
+    const start = ()=>{
+      if(!isTapMode()) return;
+      v46_previewBeep();
     };
 
-    s.addEventListener('pointerdown', onStart, {passive:true});
-    s.addEventListener('touchstart', onStart, {passive:true});
+    s.addEventListener('pointerdown', start, {passive:true});
+    s.addEventListener('touchstart', start, {passive:true});
 
-    // 動かしたら音量反映（tapVol）＋間引きプレビュー
     s.addEventListener('input', ()=>{
-      syncFromSlider();
+      if(!isTapMode()) return;
+      v46_unlock();
+      v46_syncFromSlider();
       throttledPreview();
     }, {passive:true});
 
-    // 指を離した時にも一度鳴らす
-    s.addEventListener('pointerup', ()=>{ syncFromSlider(); previewBeep(); }, {passive:true});
-    s.addEventListener('touchend', ()=>{ syncFromSlider(); previewBeep(); }, {passive:true});
+    s.addEventListener('pointerup', ()=>{ if(isTapMode()) v46_previewBeep(); }, {passive:true});
+    s.addEventListener('touchend', ()=>{ if(isTapMode()) v46_previewBeep(); }, {passive:true});
   }
 
   window.addEventListener('DOMContentLoaded', hook);
+
+  // どこを触っても一度unlock（タップモード時のみ）
+  window.addEventListener('pointerdown', ()=>{ if(isTapMode()) v46_unlock(); }, {passive:true});
+  window.addEventListener('touchstart',  ()=>{ if(isTapMode()) v46_unlock(); }, {passive:true});
+
+// expose for hit-sound hook
+window.v46_globalUnlock = v46_unlock;
+window.v46_globalSyncVol = v46_syncFromSlider;
+
 })();
 
 </script>

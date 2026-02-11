@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v66</div>
+<div id="verTag">v67</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -960,7 +960,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap" style="display:none">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  <input id="tapVol" type="hidden" value="35" />
 </div>
 
 </div>
@@ -2910,56 +2910,60 @@ window.addEventListener('pageshow', ()=>{
     return Math.max(0, Math.min(1, x));
   }
 
-function getTapVolume01(){
-  // prefer tapVolume (0..1), fallback tapVol (0..100)
-  const s01 = document.getElementById('tapVolume');
-  if(s01){
-    const v = Number(s01.value);
-    return clamp01(Number.isFinite(v)? v : 0.35);
-  }
-  const s100 = document.getElementById('tapVol');
-  if(s100){
-    const v = Number(s100.value);
-    const min = Number(s100.min || 0);
-    const max = Number(s100.max || 100);
-    const vol01 = (v - min) / (max - min || 1);
-    return clamp01(vol01);
-  }
-  return clamp01(window.tapVol || 0.35);
-}
-function applyTapVolumeToGain(){
-  // live update master gain
-  try{
-    const v = getTapVolume01();
-    window.tapVol = v;
-    if(window.tapMaster && window.tapAudioCtx){
-      // psychoacoustic curve: more control in low volumes
-      const g = Math.pow(v, 2.2);
-      window.tapMaster.gain.setTargetAtTime(g, window.tapAudioCtx.currentTime, 0.01);
+  function getTapVolume01(){
+    // prefer tapVolume (0..1), fallback tapVol (0..100)
+    const s01 = document.getElementById('tapVolume');
+    if(s01){
+      const v = Number(s01.value);
+      return clamp01(Number.isFinite(v)? v : 0.35);
     }
-  }catch(e){}
-}
-  function getSlider(){
-    return document.getElementById('tapVolume');
+    const s100 = document.getElementById('tapVol');
+    if(s100){
+      const v = Number(s100.value);
+      const min = Number(s100.min || 0);
+      const max = Number(s100.max || 100);
+      const vol01 = (v - min) / (max - min || 1);
+      return clamp01(vol01);
+    }
+    return clamp01(tapVol || 0.35);
   }
+
+  function applyTapVolumeToGain(){
+    // live update master gain (keep existing WebAudio engine in sync)
+    try{
+      const v = getTapVolume01();
+      tapVol = v;
+      if(tapMaster && tapAudioCtx){
+        // psychoacoustic curve: more control in low volumes
+        const g = Math.pow(v, 2.2);
+        tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
+      }
+    }catch(e){}
+  }
+
+  function getSlider(){ return document.getElementById('tapVolume'); }
+
   function getTapVolFromSlider(){
     const s = getSlider();
-    if(!s) return clamp01(tapVol);
+    if(!s) return clamp01(tapVol || 0.35);
     return clamp01(s.value);
   }
+
   function syncTapVol(){
-    tapVol = getTapVolFromSlider();
+    const v = getTapVolFromSlider();
+    tapVol = v;
     try{ saveTapVol(); }catch(e){}
-    // keep existing engine in sync (even if we don't rely on WebAudio)
     try{ ensureTapAudio(); }catch(e){}
+    try{ applyTapVolumeToGain(); }catch(e){}
   }
 
   // --- WAV generator (Blob URL) ---
-  function makeWavUrl(freqs, durSec){
+  function makeWavUrl(freqs, durSec, amp01){
     const sr = 44100;
     const n = Math.max(1, Math.floor(sr * durSec));
     const data = new Int16Array(n);
     const atk = 0.006, rel = 0.040;
+    const amp = clamp01(amp01);
     for(let i=0;i<n;i++){
       const t = i / sr;
       let env = 1.0;
@@ -2968,7 +2972,8 @@ function applyTapVolumeToGain(){
       let s = 0;
       for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
       s /= Math.max(1, freqs.length);
-      data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * 32767;
+      // volume baked into waveform (iOS Safari対策: audio.volumeが効かないことがある)
+      data[i] = Math.max(-1, Math.min(1, s*env*amp)) * 0.95 * 32767;
     }
     const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
     const dataSize = data.length * bytesPerSample;
@@ -2986,41 +2991,71 @@ function applyTapVolumeToGain(){
   }
 
   const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
-  const urls = {
-    // preview beep (fixed pitch, volume shows loudness)
-    preview: makeWavUrl([440], 0.12),
-    do: makeWavUrl([NOTE.do], 0.18),
-    re: makeWavUrl([NOTE.re], 0.18),
-    mi: makeWavUrl([NOTE.mi], 0.18),
-    fa: makeWavUrl([NOTE.fa], 0.18),
-    so: makeWavUrl([NOTE.so], 0.18),
-    la: makeWavUrl([NOTE.la], 0.18),
-    si: makeWavUrl([NOTE.si], 0.18),
-    do2: makeWavUrl([NOTE.do2], 0.18),
+
+  // tone definitions (urls are generated per-volume bucket)
+  const TONE = {
+    preview: {freqs:[440], dur:0.12},
+    do:  {freqs:[NOTE.do],  dur:0.18},
+    re:  {freqs:[NOTE.re],  dur:0.18},
+    mi:  {freqs:[NOTE.mi],  dur:0.18},
+    fa:  {freqs:[NOTE.fa],  dur:0.18},
+    so:  {freqs:[NOTE.so],  dur:0.18},
+    la:  {freqs:[NOTE.la],  dur:0.18},
+    si:  {freqs:[NOTE.si],  dur:0.18},
+    do2: {freqs:[NOTE.do2], dur:0.18},
     // chords
-    C:  makeWavUrl([261.63,329.63,392.00], 0.22),
-    F:  makeWavUrl([349.23,440.00,523.25], 0.22),
-    G7: makeWavUrl([392.00,493.88,587.33,698.46], 0.22),
-    Am: makeWavUrl([440.00,523.25,659.26], 0.22),
+    C:  {freqs:[261.63,329.63,392.00], dur:0.22},
+    F:  {freqs:[349.23,440.00,523.25], dur:0.22},
+    G7: {freqs:[392.00,493.88,587.33,698.46], dur:0.22},
+    Am: {freqs:[440.00,523.25,659.26], dur:0.22},
   };
 
-  function playUrl(url, vol01){
+  const urlCache = new Map();
+  function bucketAmp(vol01){
+    const v = clamp01(vol01);
+    // bucket 0.00..1.00 by 0.05 and apply perceptual curve
+    const b = Math.round(v*20)/20;
+    return {b, amp: Math.pow(b, 2.2)};
+  }
+
+  function getUrlForTone(key, vol01){
+    const t = TONE[key];
+    if(!t) return null;
+    const {b, amp} = bucketAmp(vol01);
+    const cacheKey = key + '@' + b;
+    if(urlCache.has(cacheKey)) return urlCache.get(cacheKey);
+    const url = makeWavUrl(t.freqs, t.dur, amp);
+    urlCache.set(cacheKey, url);
+    return url;
+  }
+
+  function getUrlForFreqs(freqs, dur, vol01){
+    const {b, amp} = bucketAmp(vol01);
+    const cacheKey = 'F:' + freqs.map(x=>Number(x).toFixed(2)).join(',') + '|' + dur + '@' + b;
+    if(urlCache.has(cacheKey)) return urlCache.get(cacheKey);
+    const url = makeWavUrl(freqs, dur, amp);
+    urlCache.set(cacheKey, url);
+    return url;
+  }
+
+  function playUrl(url){
     try{
       const a = new Audio(url);
-      a.volume = clamp01(vol01);
-      // play must be user gesture for iOS; slider input / hit tap qualifies
+      // audio.volumeはiOSで効かないことがあるので常に1（音量はWAV側で焼き込み）
+      a.volume = 1;
       a.play().catch(()=>{});
     }catch(e){}
   }
 
-  // --- Slider: non-continuous preview (no glitches) ---
+  // --- Slider: preview beep ---
   let lastPreviewAt = 0;
   function sliderPreview(){
     const now = Date.now();
     if(now - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = now;
     syncTapVol();
-    playUrl(urls.preview, tapVol);
+    const url = getUrlForTone('preview', tapVol);
+    if(url) playUrl(url);
   }
 
   function hookSlider(){
@@ -3034,56 +3069,93 @@ function applyTapVolumeToGain(){
     s.value = String(clamp01(tapVol));
     syncTapVol();
 
-    // ★修正: メニュー画面でもプレビュー音が鳴るように制限を削除しました
-    s.addEventListener('input', ()=>{
-      // if(!isTapMode()) return; // 削除
-      sliderPreview();
-    }, {passive:true});
+    // prevent scroll while dragging (no layout change)
+    try{ s.style.touchAction = 'none'; }catch(e){}
+    ['touchstart','touchmove','touchend'].forEach(ev=>{
+      s.addEventListener(ev, (e)=>{ try{ e.preventDefault(); }catch(_e){} }, {passive:false});
+    });
 
-    s.addEventListener('pointerup', ()=>{
-      // if(!isTapMode()) return; // 削除
-      sliderPreview();
-    }, {passive:true});
-    s.addEventListener('touchend', ()=>{
-      // if(!isTapMode()) return; // 削除
-      sliderPreview();
-    }, {passive:true});
+    // ★修正: メニュー画面でもプレビュー音が鳴るように制限を削除しました
+    s.addEventListener('pointerdown', ()=>{ sliderPreview(); }, {passive:true});
+    s.addEventListener('input', ()=>{ sliderPreview(); }, {passive:true});
+    s.addEventListener('pointerup', ()=>{ sliderPreview(); }, {passive:true});
+    s.addEventListener('touchend', ()=>{ sliderPreview(); }, {passive:true});
   }
 
   // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
   const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
 
+  function normalizeSolfege(s){
+    const t = String(s||'').trim();
+    if(!t) return '';
+    const low = t.toLowerCase();
+    // japanese
+    const jp = {'ド':'do','レ':'re','ミ':'mi','ファ':'fa','ソ':'so','ラ':'la','シ':'si'};
+    if(jp[t]) return jp[t];
+    // common variants
+    if(low === 'sol' || low === 'so') return 'so';
+    if(low === 'ti') return 'si';
+    if(low === 'do' || low === 're' || low === 'mi' || low === 'fa' || low === 'so' || low === 'la' || low === 'si' || low === 'do2') return low;
+    return '';
+  }
+
   window.playTapHitSound = function(target){
     // ゲーム中は「タップモード」でなければ音を出さない（マイクモード時の誤動作防止）
-    if(!isTapMode()) return;
+    if(typeof isTapMode === 'function' && !isTapMode()) return;
     syncTapVol();
 
-    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    const v = clamp01(tapVol);
+
+    // 1) noteKey: 'do'|'re'|'mi'...
     try{
-      if(target && target.noteKey && urls[target.noteKey]){
-        playUrl(urls[target.noteKey], tapVol);
-        return; // don't fall through to original (to avoid 1音だけになる)
+      if(target && target.noteKey){
+        const k = normalizeSolfege(target.noteKey);
+        if(k && TONE[k]){
+          const url = getUrlForTone(k, v);
+          if(url) playUrl(url);
+          return;
+        }
       }
     }catch(e){}
 
-
-
-    // Solfege from chord.name (kirakira等でnoteKeyが無い場合)
+    // 2) solfege in chord.name (kirakira等でnoteKeyが無い場合)
     try{
-      const cn = (target && target.chord && target.chord.name) ? String(target.chord.name).trim().toLowerCase() : '';
-      if(cn && urls[cn]){
-        playUrl(urls[cn], tapVol);
+      const cn = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const k = normalizeSolfege(cn);
+      if(k && TONE[k]){
+        const url = getUrlForTone(k, v);
+        if(url) playUrl(url);
         return;
       }
     }catch(e){}
-    // Chords: target.chord.name like 'C','F','G7','Am'
+
+    // 3) chord names
     try{
       const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
       const up = n.trim().toUpperCase();
-      if(up === 'C') { playUrl(urls.C, tapVol); return; }
-      if(up === 'F') { playUrl(urls.F, tapVol); return; }
-      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
-      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+      if(up === 'C')  { playUrl(getUrlForTone('C', v)); return; }
+      if(up === 'F')  { playUrl(getUrlForTone('F', v)); return; }
+      if(up === 'G7') { playUrl(getUrlForTone('G7', v)); return; }
+      if(up === 'AM') { playUrl(getUrlForTone('Am', v)); return; }
+    }catch(e){}
+
+    // 4) fingers (single note or chord) – robust fallback
+    try{
+      const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
+      if(fingers && fingers.length >= 1){
+        const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
+        const freqs = fingers.map(fg=>{
+          const s = Number(fg && fg.s);
+          const fret = Number(fg && fg.f);
+          const base = baseMap[s] || 440.00;
+          const f = (Number.isFinite(fret) ? fret : 0);
+          return base * Math.pow(2, f/12);
+        });
+        const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.18 : 0.22);
+        const url = getUrlForFreqs(freqs, dur, v);
+        if(url) playUrl(url);
+        return;
+      }
     }catch(e){}
 
     // fallback: keep original behavior if we couldn't identify
@@ -3091,10 +3163,8 @@ function applyTapVolumeToGain(){
   };
 
   window.addEventListener('DOMContentLoaded', hookSlider);
-})();
-
-</script>
-<div class="verBadge">v66</div>
+})();</script>
+<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;
@@ -3134,7 +3204,6 @@ function applyTapVolumeToGain(){
 
 
 <!-- LANDSCAPE_LOCK v1 -->
-
 
 </body>
 </html>

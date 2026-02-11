@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v60</div>
+<div id="verTag">v62</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1401,9 +1401,12 @@ function ensureTapAudio(){
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
+      tapMaster.gain.value = tapVol;
       tapMaster.connect(tapAudioCtx.destination);
+  applyTapVolumeToGain();
+    } else {
+      tapMaster.gain.value = tapVol;
     }
-    applyTapVolumeToGain();
   }catch(e){}
 }
 function noteFreqFromTarget(t){
@@ -1413,11 +1416,6 @@ function noteFreqFromTarget(t){
       if(map[t.noteKey]) return map[t.noteKey];
     }
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
-    // Japanese solfege (きらきらぼし等)
-    const jpMap = {'ド':261.63,'レ':293.66,'ミ':329.63,'ファ':349.23,'ソ':392.00,'ラ':440.00,'シ':493.88};
-    for(const k in jpMap){
-      if(n.includes(k)) return jpMap[k];
-    }
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
     const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
     if(m[base]) return m[base];
@@ -1468,36 +1466,6 @@ function playTapHitSound(target){
       return;
     }
   }catch(e){}
-  // chord name triad fallback (when fingers are not present)
-  try{
-    const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
-    const up = n.trim().toUpperCase();
-    const chordMap = {
-      'C':[261.63,329.63,392.00],
-      'F':[349.23,440.00,523.25],
-      'G7':[392.00,493.88,587.33,698.46],
-      'AM':[440.00,523.25,659.26]
-    };
-    if(chordMap[up]){
-      const freqs = chordMap[up];
-      const dur = (target && target.isShort) ? 0.10 : 0.18;
-      const per = 0.35/Math.max(1,freqs.length);
-      freqs.forEach((ff)=>{
-        try{
-          const o = tapAudioCtx.createOscillator();
-          const g = tapAudioCtx.createGain();
-          g.gain.setValueAtTime(Math.max(0.0001, per), now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-          o.frequency.setValueAtTime(ff, now);
-          o.type = 'triangle';
-          o.connect(g); g.connect(tapMaster);
-          o.start(now); o.stop(now + dur + 0.01);
-        }catch(e){}
-      });
-      return;
-    }
-  }catch(e){}
-
 
   const f = noteFreqFromTarget(target);
   try{
@@ -1587,6 +1555,7 @@ function bindTapVolUI(){
   loadTapVol();
   const el = document.getElementById('tapVol');
   if(!el) return;
+  if(el.type !== 'range') return;
   el.value = String(Math.round(tapVol * 100));
   enhanceRangeSlider(el);
   const apply = ()=>{
@@ -2960,16 +2929,21 @@ function getTapVolume01(){
   return clamp01(window.tapVol || 0.35);
 }
 function applyTapVolumeToGain(){
-  // v60: live update master gain (WebAudio) using visible slider
+  // v61: live update master gain (WebAudio) using the visible slider value
   try{
-    const v = getTapVolume01();
+    const v = getTapVolume01(); // 0..1
     tapVol = clamp01(v);
+    try{ saveTapVol(); }catch(e){}
     if(tapMaster && tapAudioCtx){
-      const g = Math.pow(tapVol, 2.2); // perceptual curve
+      const g = Math.pow(tapVol, 2.2); // more control at low volumes
       tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
 }
+// v61: expose helpers for global playTapHitSound
+window.getTapVolume01 = getTapVolume01;
+window.applyTapVolumeToGain = applyTapVolumeToGain;
+
   function getSlider(){
     return document.getElementById('tapVolume');
   }
@@ -2981,6 +2955,7 @@ function applyTapVolumeToGain(){
   function syncTapVol(){
     tapVol = getTapVolFromSlider();
     try{ saveTapVol(); }catch(e){}
+    // keep existing engine in sync (even if we don't rely on WebAudio)
     try{ ensureTapAudio(); }catch(e){}
   }
 
@@ -3050,28 +3025,30 @@ function applyTapVolumeToGain(){
     if(nowMs - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = nowMs;
     if(!isTapMode()) return;
+    // sync + unlock audio in a user gesture context (slider drag)
     syncTapVol();
     ensureTapAudio();
-    if(!tapAudioCtx || !tapMaster){
-      // fallback
-      try{ playUrl(urls.preview, tapVol); }catch(e){}
-      return;
-    }
+    // apply master gain curve
+    try{ applyTapVolumeToGain(); }catch(e){}
+    if(!tapAudioCtx || !tapMaster) return;
+
     const t0 = tapAudioCtx.currentTime;
     const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
 
-    const f = 220 + (880-220) * clamp01(tapVol); // right -> higher pitch
+    // pitch rises to the right
+    const f = 220 + (880-220) * clamp01(tapVol);
     o.type = 'sine';
     o.frequency.setValueAtTime(f, t0);
 
+    // envelope (master gain handles loudness)
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.7, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
+    g.gain.exponentialRampToValueAtTime(0.8, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
 
     o.connect(g).connect(tapMaster);
     o.start(t0);
-    o.stop(t0 + 0.11);
+    o.stop(t0 + 0.12);
   }
 
   function hookSlider(){
@@ -3099,22 +3076,25 @@ function applyTapVolumeToGain(){
       if(!isTapMode()) return;
       sliderPreview();
     }, {passive:true});
-  }
+  
+    // v62: unlock AudioContext on first user gesture (so hit sounds can play even if fired slightly async)
+    const unlockOnce = ()=>{
+      if(!isTapMode()) return;
+      try{ syncTapVol(); }catch(e){}
+      try{ ensureTapAudio(); }catch(e){}
+      try{ applyTapVolumeToGain(); }catch(e){}
+    };
+    document.addEventListener('pointerdown', unlockOnce, { once:true, passive:true });
+    document.addEventListener('touchstart', unlockOnce, { once:true, passive:true });
 
-  // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
-  const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
-
-  window.playTapHitSound = function(target){
-    if(!isTapMode()) return;
-    // keep tapVol in sync and unlock audio on user gesture
-    syncTapVol();
-    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
-  };
-
+}
+  // v61: Do NOT override playTapHitSound; use the original WebAudio implementation.
+  // Slider still provides preview.
   window.addEventListener('DOMContentLoaded', hookSlider);
 })();
 
 </script>
+<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

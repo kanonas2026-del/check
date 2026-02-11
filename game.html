@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v65</div>
+<div id="verTag">v66</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -960,7 +960,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap" style="display:none">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" value="35" />
+  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
 </div>
 
 </div>
@@ -970,10 +970,11 @@ body.is-uke .vol-inline{ display:none !important; }
 <div class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5" style="touch-action: none;">
+    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
+</button>
 </div>
 </div>
 <div id="screenFlash"></div>
@@ -1415,12 +1416,6 @@ function noteFreqFromTarget(t){
       if(map[t.noteKey]) return map[t.noteKey];
     }
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
-    // Japanese solfege / note names (ドレミ…)
-    if(n){
-      const jpMap = {"ド":261.63,"レ":293.66,"ミ":329.63,"ファ":349.23,"ソ":392.00,"ラ":440.00,"シ":493.88,
-                     "ド#":277.18,"レ#":311.13,"ファ#":369.99,"ソ#":415.30,"ラ#":466.16};
-      if(jpMap[n]) return jpMap[n];
-    }
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
     const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
     if(m[base]) return m[base];
@@ -1445,7 +1440,7 @@ function playTapHitSound(target){
   // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
   try{
     const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
-    if(fingers && fingers.length>=1){
+    if(fingers && fingers.length>1){
       const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
       const freqs = fingers.map(fg=>{
         const s = Number(fg && fg.s);
@@ -1557,20 +1552,20 @@ function enhanceRangeSlider(el){
 }
 
 function bindTapVolUI(){
-  // single source of truth: tapVolume (0..1)
   loadTapVol();
-  const el = document.getElementById('tapVolume');
+  const el = document.getElementById('tapVol');
   if(!el) return;
-  el.value = String(clamp01(tapVol));
-  // user gesture => allow audio on iOS
+  el.value = String(Math.round(tapVol * 100));
+  enhanceRangeSlider(el);
   const apply = ()=>{
-    tapVol = clamp01(Number(el.value));
+    tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
+    if(tapMaster) tapMaster.gain.value = tapVol;
     saveTapVol();
-    try{ ensureTapAudio(); }catch(e){}
-    try{ applyTapVolumeToGain(); }catch(e){}
+    // user gesture => allow audio on iOS
+    ensureTapAudio();
   };
-  el.addEventListener('input', apply, {passive:true});
-  el.addEventListener('change', apply, {passive:true});
+  el.addEventListener('input', apply);
+  el.addEventListener('change', apply);
 }
 
 
@@ -3039,18 +3034,18 @@ function applyTapVolumeToGain(){
     s.value = String(clamp01(tapVol));
     syncTapVol();
 
+    // ★修正: メニュー画面でもプレビュー音が鳴るように制限を削除しました
     s.addEventListener('input', ()=>{
-      if(!isTapMode()) return;
+      // if(!isTapMode()) return; // 削除
       sliderPreview();
     }, {passive:true});
 
-    // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
     s.addEventListener('pointerup', ()=>{
-      if(!isTapMode()) return;
+      // if(!isTapMode()) return; // 削除
       sliderPreview();
     }, {passive:true});
     s.addEventListener('touchend', ()=>{
-      if(!isTapMode()) return;
+      // if(!isTapMode()) return; // 削除
       sliderPreview();
     }, {passive:true});
   }
@@ -3059,15 +3054,47 @@ function applyTapVolumeToGain(){
   const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
 
   window.playTapHitSound = function(target){
-    // Use WebAudio implementation (respects tapVolume slider and supports kirakira single notes)
-    try{ playTapHitSound(target); }catch(e){}
+    // ゲーム中は「タップモード」でなければ音を出さない（マイクモード時の誤動作防止）
+    if(!isTapMode()) return;
+    syncTapVol();
+
+    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    try{
+      if(target && target.noteKey && urls[target.noteKey]){
+        playUrl(urls[target.noteKey], tapVol);
+        return; // don't fall through to original (to avoid 1音だけになる)
+      }
+    }catch(e){}
+
+
+
+    // Solfege from chord.name (kirakira等でnoteKeyが無い場合)
+    try{
+      const cn = (target && target.chord && target.chord.name) ? String(target.chord.name).trim().toLowerCase() : '';
+      if(cn && urls[cn]){
+        playUrl(urls[cn], tapVol);
+        return;
+      }
+    }catch(e){}
+    // Chords: target.chord.name like 'C','F','G7','Am'
+    try{
+      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const up = n.trim().toUpperCase();
+      if(up === 'C') { playUrl(urls.C, tapVol); return; }
+      if(up === 'F') { playUrl(urls.F, tapVol); return; }
+      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
+      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+    }catch(e){}
+
+    // fallback: keep original behavior if we couldn't identify
+    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
 
   window.addEventListener('DOMContentLoaded', hookSlider);
 })();
 
 </script>
-<div class="verBadge">v12</div>
+<div class="verBadge">v66</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;
@@ -3107,71 +3134,7 @@ function applyTapVolumeToGain(){
 
 
 <!-- LANDSCAPE_LOCK v1 -->
-<script>
-(function(){
-  function apply(){
-    var portrait = window.innerHeight > window.innerWidth;
-    document.body.classList.toggle('needLandscape', portrait);
-    var lock = document.getElementById('landscapeLock');
-    if(lock){
-      lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
-    }
-  }
-  window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
-  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
-  // try to lock orientation when supported (PWA/Android)
-  try{
-    if(screen.orientation && screen.orientation.lock){
-      screen.orientation.lock('landscape').catch(function(){});
-    }
-  }catch(e){}
-  apply();
-})();
 
-(function(){
-  if(window.__tapVolumeListenersReady) return;
-  window.__tapVolumeListenersReady = true;
-  function bind(){
-    const s01 = document.getElementById('tapVolume');
-    const s100 = document.getElementById('tapVol');
-    [s01, s100].forEach(s=>{
-      if(!s) return;
-      s.addEventListener('input', ()=>{
-        // user gesture path keeps AudioContext alive on iOS
-        try{ ensureTapAudio(); }catch(e){}
-        applyTapVolumeToGain();
-        // optional: short preview tone while dragging (gentle)
-        try{
-          if(!window.tapAudioCtx || !window.tapMaster) return;
-          const now = window.tapAudioCtx.currentTime;
-          const f = 220 + (880-220) * getTapVolume01();
-          const o = window.tapAudioCtx.createOscillator();
-          const g = window.tapAudioCtx.createGain();
-          g.gain.setValueAtTime(0.0001, now);
-          g.gain.exponentialRampToValueAtTime(Math.max(0.0001, Math.pow(getTapVolume01(),2.2)*0.6), now+0.01);
-          g.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
-          o.frequency.setValueAtTime(f, now);
-          o.type = 'sine';
-          o.connect(g);
-          g.connect(window.tapMaster);
-          o.start(now);
-          o.stop(now+0.13);
-        }catch(e){}
-      }, {passive:true});
-      // prevent page scroll while dragging
-      ['touchstart','touchmove','touchend'].forEach(ev=>{
-        s.addEventListener(ev, (e)=>{ e.stopPropagation(); }, {passive:false});
-      });
-    });
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', bind);
-  }else{
-    bind();
-  }
-})();
 
-</script>
 </body>
 </html>

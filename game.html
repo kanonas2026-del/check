@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v55</div>
+<div id="verTag">v57</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -960,7 +960,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" value="35" />
+  <!-- legacy tapVol slider removed (v57) -->
 </div>
 
 </div>
@@ -1401,14 +1401,12 @@ function ensureTapAudio(){
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
+      tapMaster.gain.value = tapVol;
       tapMaster.connect(tapAudioCtx.destination);
+  applyTapVolumeToGain();
+    } else {
+      tapMaster.gain.value = tapVol;
     }
-    // expose (some parts of the file refer to window.*)
-    window.tapAudioCtx = tapAudioCtx;
-    window.tapMaster = tapMaster;
-    // apply current volume
-    const g = Math.pow(clamp01(tapVol), 2.2);
-    tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
   }catch(e){}
 }
 function noteFreqFromTarget(t){
@@ -1433,16 +1431,25 @@ function noteFreqFromTarget(t){
 function playTapHitSound(target){
   // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
-  ensureTapAudio();
-  applyTapVolumeToGain();
+
+  try{ ensureTapAudio(); }catch(e){}
   if(!tapAudioCtx || !tapMaster) return;
+
   const now = tapAudioCtx.currentTime;
-  const vol = getTapVolume01();
+
+  const vol = Math.max(0, Math.min(1, Number(getTapVolume01())));
   const amp = Math.pow(vol, 2.2);
-  // chord via fingers (including open string 0) – supports kirakira単音もここで鳴らす
+
+  // master stays 1.0; per-sound scaling reflects slider always
+  try{ tapMaster.gain.setValueAtTime(1.0, now); }catch(e){}
+
   try{
-    const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
-    if(fingers && fingers.length>=1){
+    const fingers =
+      (target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null) ||
+      (target && Array.isArray(target.fingers) ? target.fingers : null) ||
+      null;
+
+    if(fingers && fingers.length >= 1){
       const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
       const freqs = fingers.map(fg=>{
         const s = Number(fg && fg.s);
@@ -1451,15 +1458,17 @@ function playTapHitSound(target){
         const f = (Number.isFinite(fret) ? fret : 0);
         return base * Math.pow(2, f/12);
       });
-      const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
 
-      // master gain already reflects volume; per-osc gain just balances chord
-      const per = (freqs.length===1) ? 0.55 : (0.55/Math.max(1,freqs.length));
+      const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
+      const baseLevel = 0.65;
+      const per = (freqs.length===1) ? (baseLevel * amp) : ((baseLevel * amp)/Math.max(1,freqs.length));
+
       freqs.forEach((ff)=>{
         try{
           const o = tapAudioCtx.createOscillator();
           const gg = tapAudioCtx.createGain();
-          gg.gain.setValueAtTime(Math.max(0.0001, per), now);
+          gg.gain.setValueAtTime(0.0001, now);
+          gg.gain.exponentialRampToValueAtTime(Math.max(0.0001, per), now + 0.006);
           gg.gain.exponentialRampToValueAtTime(0.0001, now + dur);
           o.frequency.setValueAtTime(ff, now);
           o.type = 'triangle';
@@ -1473,30 +1482,33 @@ function playTapHitSound(target){
 
   const f = noteFreqFromTarget(target);
   try{
-    // main pluck
     const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
     o.type = 'triangle';
     o.frequency.setValueAtTime(f, now);
-    g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
-    g.gain.exponentialRampToValueAtTime(0.55, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.55 * amp), now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+
     o.connect(g).connect(tapMaster);
     o.start(now);
-    o.stop(now + 0.24);
+    o.stop(now + 0.18);
+  }catch(e){}
 
-    // little "pick" click
-    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
-    const d = nbuf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
-    const ns = tapAudioCtx.createBufferSource();
-    ns.buffer = nbuf;
+  try{
+    const ns = tapAudioCtx.createOscillator();
     const nf = tapAudioCtx.createBiquadFilter();
-    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
     const ng = tapAudioCtx.createGain();
+    ns.type='square';
+    ns.frequency.setValueAtTime(2000, now);
+    nf.type='highpass';
+    nf.frequency.setValueAtTime(1200, now);
+
     ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(0.18, now + 0.002);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.18 * amp), now + 0.002);
     ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
     ns.connect(nf).connect(ng).connect(tapMaster);
     ns.start(now);
     ns.stop(now + 0.06);
@@ -2932,15 +2944,14 @@ function getTapVolume01(){
   return clamp01(window.tapVol || 0.35);
 }
 function applyTapVolumeToGain(){
-  // v55: keep tapVol (0..1) in sync with visible slider and actually apply to WebAudio master gain
+  // live update master gain
   try{
-    const v = getTapVolume01();      // reads #tapVolume (0..1)
-    tapVol = clamp01(v);             // update global lexical binding
-    try{ saveTapVol(); }catch(e){}
-    ensureTapAudio();                // creates ctx/gain if needed (user gesture)
-    if(tapMaster && tapAudioCtx){
-      const g = Math.pow(tapVol, 2.2); // perceptual curve
-      tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
+    const v = getTapVolume01();
+    window.tapVol = v;
+    if(window.tapMaster && window.tapAudioCtx){
+      // psychoacoustic curve: more control in low volumes
+      const g = Math.pow(v, 2.2);
+      window.tapMaster.gain.setTargetAtTime(g, window.tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
 }
@@ -3025,21 +3036,24 @@ function applyTapVolumeToGain(){
     if(now - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = now;
     if(!isTapMode()) return;
-    applyTapVolumeToGain(); // sync + ensureTapAudio + apply gain
+    try{ syncTapVol(); }catch(e){}
+    try{ ensureTapAudio(); }catch(e){}
     if(!tapAudioCtx || !tapMaster) return;
+
+    const vol = Math.max(0, Math.min(1, Number(getTapVolume01())));
+    const amp = Math.pow(vol, 2.2);
+    try{ tapMaster.gain.setValueAtTime(1.0, tapAudioCtx.currentTime); }catch(e){}
 
     const t0 = tapAudioCtx.currentTime;
     const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
 
-    // pitch goes up as slider goes right
-    const f = 220 + (880-220) * clamp01(tapVol);
+    const f = 220 + (880-220) * vol;
     o.type = 'sine';
     o.frequency.setValueAtTime(f, t0);
 
-    // envelope (master gain controls loudness)
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.7, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.7 * amp), t0 + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
 
     o.connect(g).connect(tapMaster);
@@ -3060,6 +3074,7 @@ function applyTapVolumeToGain(){
 
     s.addEventListener('input', ()=>{
       if(!isTapMode()) return;
+      try{ syncTapVol(); }catch(e){}
       sliderPreview();
     }, {passive:true});
 
@@ -3079,27 +3094,7 @@ function applyTapVolumeToGain(){
 
   window.playTapHitSound = function(target){
     if(!isTapMode()) return;
-    syncTapVol();
-
-    // Notes: target.noteKey = 'do'|'re'|'mi'...
-    try{
-      if(target && target.noteKey && urls[target.noteKey]){
-        playUrl(urls[target.noteKey], tapVol);
-        return; // don't fall through to original (to avoid 1音だけになる)
-      }
-    }catch(e){}
-
-    // Chords: target.chord.name like 'C','F','G7','Am'
-    try{
-      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
-      const up = n.trim().toUpperCase();
-      if(up === 'C') { playUrl(urls.C, tapVol); return; }
-      if(up === 'F') { playUrl(urls.F, tapVol); return; }
-      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
-      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
-    }catch(e){}
-
-    // fallback: keep original behavior if we couldn't identify
+    try{ syncTapVol(); }catch(e){}
     try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
 

@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v7</div>
+<div id="verTag">v55</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -958,9 +958,9 @@ body.is-uke .vol-inline{ display:none !important; }
   <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
 </div>
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
-<div class="tap-vol-wrap" id="tap-vol-wrap" style="display:none">
+<div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  <input id="tapVol" type="hidden" value="35" />
 </div>
 
 </div>
@@ -1401,14 +1401,14 @@ function ensureTapAudio(){
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
-      tapMaster.gain.value = tapVol;
       tapMaster.connect(tapAudioCtx.destination);
-      window.tapMaster = tapMaster;
-      window.tapAudioCtx = tapAudioCtx;
-  applyTapVolumeToGain();
-    } else {
-      tapMaster.gain.value = tapVol;
     }
+    // expose (some parts of the file refer to window.*)
+    window.tapAudioCtx = tapAudioCtx;
+    window.tapMaster = tapMaster;
+    // apply current volume
+    const g = Math.pow(clamp01(tapVol), 2.2);
+    tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
   }catch(e){}
 }
 function noteFreqFromTarget(t){
@@ -1439,7 +1439,7 @@ function playTapHitSound(target){
   const now = tapAudioCtx.currentTime;
   const vol = getTapVolume01();
   const amp = Math.pow(vol, 2.2);
-  // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
+  // chord via fingers (including open string 0) – supports kirakira単音もここで鳴らす
   try{
     const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
     if(fingers && fingers.length>=1){
@@ -1451,17 +1451,19 @@ function playTapHitSound(target){
         const f = (Number.isFinite(fret) ? fret : 0);
         return base * Math.pow(2, f/12);
       });
-      const dur = (target && target.isShort) ? 0.10 : 0.18;
-      freqs.forEach((ff, idx)=>{
+      const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
+
+      // master gain already reflects volume; per-osc gain just balances chord
+      const per = (freqs.length===1) ? 0.55 : (0.55/Math.max(1,freqs.length));
+      freqs.forEach((ff)=>{
         try{
           const o = tapAudioCtx.createOscillator();
-          const g = tapAudioCtx.createGain();
-          const a = Math.max(0.0001, (0.35/Math.max(1,freqs.length)) * (0.15 + 0.85*amp));
-          g.gain.setValueAtTime(a, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          const gg = tapAudioCtx.createGain();
+          gg.gain.setValueAtTime(Math.max(0.0001, per), now);
+          gg.gain.exponentialRampToValueAtTime(0.0001, now + dur);
           o.frequency.setValueAtTime(ff, now);
           o.type = 'triangle';
-          o.connect(g); g.connect(tapMaster);
+          o.connect(gg); gg.connect(tapMaster);
           o.start(now); o.stop(now + dur + 0.01);
         }catch(e){}
       });
@@ -1477,7 +1479,7 @@ function playTapHitSound(target){
     o.type = 'triangle';
     o.frequency.setValueAtTime(f, now);
     g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.55, now + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
     o.connect(g).connect(tapMaster);
     o.start(now);
@@ -1493,7 +1495,7 @@ function playTapHitSound(target){
     nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
     const ng = tapAudioCtx.createGain();
     ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.18, now + 0.002);
     ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
     ns.connect(nf).connect(ng).connect(tapMaster);
     ns.start(now);
@@ -2930,15 +2932,14 @@ function getTapVolume01(){
   return clamp01(window.tapVol || 0.35);
 }
 function applyTapVolumeToGain(){
-  // live update master gain (tapMaster/tapAudioCtx を正しく更新)
+  // v55: keep tapVol (0..1) in sync with visible slider and actually apply to WebAudio master gain
   try{
-    const v = getTapVolume01(); // 0..1
-    tapVol = v;
-    window.tapVol = v;
-    window.tapMaster = tapMaster || window.tapMaster;
-    window.tapAudioCtx = tapAudioCtx || window.tapAudioCtx;
+    const v = getTapVolume01();      // reads #tapVolume (0..1)
+    tapVol = clamp01(v);             // update global lexical binding
+    try{ saveTapVol(); }catch(e){}
+    ensureTapAudio();                // creates ctx/gain if needed (user gesture)
     if(tapMaster && tapAudioCtx){
-      const g = Math.pow(v, 2.2);
+      const g = Math.pow(tapVol, 2.2); // perceptual curve
       tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
@@ -3023,8 +3024,27 @@ function applyTapVolumeToGain(){
     const now = Date.now();
     if(now - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = now;
-    syncTapVol();
-    playUrl(urls.preview, tapVol);
+    if(!isTapMode()) return;
+    applyTapVolumeToGain(); // sync + ensureTapAudio + apply gain
+    if(!tapAudioCtx || !tapMaster) return;
+
+    const t0 = tapAudioCtx.currentTime;
+    const o = tapAudioCtx.createOscillator();
+    const g = tapAudioCtx.createGain();
+
+    // pitch goes up as slider goes right
+    const f = 220 + (880-220) * clamp01(tapVol);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t0);
+
+    // envelope (master gain controls loudness)
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.7, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
+
+    o.connect(g).connect(tapMaster);
+    o.start(t0);
+    o.stop(t0 + 0.11);
   }
 
   function hookSlider(){
@@ -3087,7 +3107,7 @@ function applyTapVolumeToGain(){
 })();
 
 </script>
-<div class="verBadge">v54</div>
+<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

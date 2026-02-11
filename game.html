@@ -437,10 +437,12 @@ function bindTapVolSlider(){
     e.preventDefault();
     const cx = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
     setFromClientX(cx);
+    updatePreviewTone();
   };
   const onUp = (e)=>{
     if(!dragging) return;
     dragging = false;
+    stopPreviewTone();
   };
   let dragging = false;
 
@@ -796,12 +798,6 @@ body.playing #menu-overlay{ display:none; }
   font-size:12px;
   white-space:nowrap;
 }
-#tapVolume{
-  flex:1;
-  max-width:240px; /* 短く */
-  height:24px;
-  touch-action:pan-x;
-}
 .top-inline-btn{
   flex-shrink:0;
   padding:8px 14px;
@@ -828,6 +824,20 @@ body.is-uke .vol-inline{ display:none !important; }
 
 
 /* v23 build badge (cache check) */
+#buildBadge{
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  pointer-events: none;
+}
+
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -899,7 +909,7 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id=\"buildBadge\">v23</div>
+<div id=\"buildBadge\">v48</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -947,21 +957,13 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  <input id="tapVol" type="range" min="0" max="100" value="35" />
 </div>
 
 </div>
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
-<!-- ▼ v8 音量＋TOP 横並び -->
-<div class="bottom-inline">
-  <div class="vol-inline">
-    <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
-  </div>
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
-</div>
-</button>
+
 </div>
 </div>
 <div id="screenFlash"></div>
@@ -1379,6 +1381,18 @@ function loadTapVol(){
     if(!Number.isNaN(v) && v>=0 && v<=1) tapVol = v;
   }catch(e){}
 }
+
+function setTapVol(v){
+  const vv = Math.max(0, Math.min(1, Number(v)));
+  tapVol = vv;
+  saveTapVol(vv);
+  // master gainへ反映
+  if(tapAudioCtx && tapMaster){
+    const g = Math.pow(vv, 1.6);
+    tapMaster.gain.setValueAtTime(g, tapAudioCtx.currentTime);
+  }
+}
+
 function saveTapVol(){
   try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(e){}
 }
@@ -1390,6 +1404,7 @@ function ensureTapAudio(){
       tapMaster = tapAudioCtx.createGain();
       tapMaster.gain.value = tapVol;
       tapMaster.connect(tapAudioCtx.destination);
+  applyTapVolumeToGain();
     } else {
       tapMaster.gain.value = tapVol;
     }
@@ -1397,93 +1412,93 @@ function ensureTapAudio(){
 }
 function noteFreqFromTarget(t){
   try{
-    const sol = (t && t.noteKey) ? t.noteKey : (t && t.chord && t.chord.noteKey ? t.chord.noteKey : null);
-    if(sol){
-      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, ti:493.88, do2:523.25};
-      if(map[sol]) return map[sol];
+    if(t && t.noteKey){
+      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+      if(map[t.noteKey]) return map[t.noteKey];
     }
-
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
-    const up = n.toUpperCase();
-
-    // 代表コードのルート
-    if(up.startsWith('C')) return 261.63;
-    if(up.startsWith('F')) return 349.23;
-    if(up.startsWith('G')) return 392.00;
-    if(up.startsWith('AM')) return 440.00;
-
-    // 単音がとれない場合の保険
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
     const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
     if(m[base]) return m[base];
+    if(n.toUpperCase().startsWith('G7')) return 392.00;
+    if(n.toUpperCase().startsWith('AM')) return 440.00;
+    if(n.toUpperCase().startsWith('DM')) return 293.66;
+    if(n.toUpperCase().startsWith('EM')) return 329.63;
+    if(n.toUpperCase().startsWith('A7')) return 440.00;
+    if(n.toUpperCase().startsWith('D7')) return 293.66;
   }catch(e){}
   return 440.00;
 }
-
 function playTapHitSound(target){
   // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
+  applyTapVolumeToGain();
   if(!tapAudioCtx || !tapMaster) return;
-
-  // 最新音量を必ず反映
-  if(tapMaster) tapMaster.gain.setTargetAtTime(tapVol, tapAudioCtx.currentTime, 0.01);
-
   const now = tapAudioCtx.currentTime;
+  const vol = getTapVolume01();
+  const amp = Math.pow(vol, 2.2);
+  // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
+  try{
+    const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
+    if(fingers && fingers.length>1){
+      const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
+      const freqs = fingers.map(fg=>{
+        const s = Number(fg && fg.s);
+        const fret = Number(fg && fg.f);
+        const base = baseMap[s] || 440.00;
+        const f = (Number.isFinite(fret) ? fret : 0);
+        return base * Math.pow(2, f/12);
+      });
+      const dur = (target && target.isShort) ? 0.10 : 0.18;
+      freqs.forEach((ff, idx)=>{
+        try{
+          const o = tapAudioCtx.createOscillator();
+          const g = tapAudioCtx.createGain();
+          const a = Math.max(0.0001, (0.35/Math.max(1,freqs.length)) * (0.15 + 0.85*amp));
+          g.gain.setValueAtTime(a, now);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          o.frequency.setValueAtTime(ff, now);
+          o.type = 'triangle';
+          o.connect(g); g.connect(tapMaster);
+          o.start(now); o.stop(now + dur + 0.01);
+        }catch(e){}
+      });
+      return;
+    }
+  }catch(e){}
 
-  const playPluck = (freq, volMul=1.0)=>{
-    const osc = tapAudioCtx.createOscillator();
+  const f = noteFreqFromTarget(target);
+  try{
+    // main pluck
+    const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    g.gain.value = 0.0001;
-    osc.connect(g);
-    g.connect(tapMaster);
-    osc.start(now);
-    // ADSRっぽく（短音）
-    const a = 0.008;
-    const d = 0.14;
-    const peak = Math.max(0.0001, tapVol * 0.9 * volMul);
-    g.gain.setTargetAtTime(peak, now, a);
-    g.gain.setTargetAtTime(0.0001, now + d, 0.06);
-    osc.stop(now + 0.35);
-  };
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, now);
+    g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    o.connect(g).connect(tapMaster);
+    o.start(now);
+    o.stop(now + 0.24);
 
-  // コードは和音（C-E-G等）／単音は単音
-  const chordName = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
-  const up = chordName.toUpperCase();
-
-  if(target && target.chord && up){
-    // 単音(きらきら星の音符)は chord.noteKey を優先
-    if(target.chord.noteKey){
-      const f = noteFreqFromTarget({noteKey: target.chord.noteKey});
-      playPluck(f, 1.0);
-      return;
-    }
-
-    // triads
-    const triads = {
-      'C':  [261.63, 329.63, 392.00],
-      'F':  [349.23, 440.00, 523.25],
-      'G7': [392.00, 493.88, 587.33, 698.46], // G-B-D-F
-      'G':  [392.00, 493.88, 587.33],
-      'AM': [440.00, 523.25, 659.25]
-    };
-
-    if(triads[up]){
-      const arr = triads[up];
-      arr.forEach((freq, idx)=> playPluck(freq, idx===0 ? 1.0 : 0.75));
-      return;
-    }
-    // ここまで来たらルートだけ
-    playPluck(noteFreqFromTarget(target), 1.0);
-    return;
-  }
-
-  // 通常単音（ドレミファ等）
-  playPluck(noteFreqFromTarget(target), 1.0);
+    // little "pick" click
+    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
+    const d = nbuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
+    const ns = tapAudioCtx.createBufferSource();
+    ns.buffer = nbuf;
+    const nf = tapAudioCtx.createBiquadFilter();
+    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
+    const ng = tapAudioCtx.createGain();
+    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    ns.connect(nf).connect(ng).connect(tapMaster);
+    ns.start(now);
+    ns.stop(now + 0.06);
+  }catch(e){}
 }
-
 
 
 function enhanceRangeSlider(el){
@@ -1539,105 +1554,19 @@ function enhanceRangeSlider(el){
 
 function bindTapVolUI(){
   loadTapVol();
-
-  // UIとして使うのは tapVolume（表示スライダー）だけ。
-  const el = document.getElementById('tapVolume') || document.getElementById('tapVol');
+  const el = document.getElementById('tapVol');
   if(!el) return;
-
-  const min = Number(el.min ?? 0);
-  const max = Number(el.max ?? 100);
-  const span = (isFinite(max-min) && (max-min)!==0) ? (max-min) : 100;
-  const norm01 = (raw)=> Math.max(0, Math.min(1, (raw - min) / span ));
-  const denorm = (t)=> (min + span * Math.max(0, Math.min(1, t)));
-
-  // 初期値反映（スライダーの仕様に合わせる）
-  el.value = String(denorm(tapVol));
+  el.value = String(Math.round(tapVol * 100));
   enhanceRangeSlider(el);
-
   const apply = ()=>{
-    const raw = Number(el.value);
-    const t = norm01(isFinite(raw)? raw : min);
-    tapVol = t; // 0..1
+    tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
+    if(tapMaster) tapMaster.gain.value = tapVol;
     saveTapVol();
-    if(tapMaster) tapMaster.gain.setTargetAtTime(tapVol, tapAudioCtx.currentTime, 0.01);
-  };
-
-  // スライダー操作中の「ピューーー」確認音
-  let previewOsc = null;
-  let previewGain = null;
-
-  const setPreviewParams = ()=>{
-    const raw = Number(el.value);
-    const t = norm01(isFinite(raw)? raw : min);
-    // 右に行くほど音程UP（220Hz→1100Hz）
-    const f = 220 + 880 * t;
-    if(previewOsc) previewOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.01);
-    if(previewGain){
-      // スライダーの音量に比例して聞こえるように
-      previewGain.gain.setTargetAtTime(tapVol * 0.9, tapAudioCtx.currentTime, 0.01);
-    }
-  };
-
-  const stopPreview = ()=>{
-    if(previewOsc){
-      try{
-        previewGain.gain.setTargetAtTime(0.0001, tapAudioCtx.currentTime, 0.03);
-        previewOsc.stop(tapAudioCtx.currentTime + 0.06);
-      }catch(e){}
-      previewOsc = null;
-      previewGain = null;
-    }
-  };
-
-  const startPreview = ()=>{
-    // iOS: 必ずユーザー操作イベント内でAudioContextを動かす
+    // user gesture => allow audio on iOS
     ensureTapAudio();
-    apply();
-    stopPreview();
-    previewOsc = tapAudioCtx.createOscillator();
-    previewGain = tapAudioCtx.createGain();
-    previewOsc.type = 'sine';
-    previewGain.gain.value = 0.0001;
-    previewOsc.connect(previewGain);
-    previewGain.connect(tapMaster);
-    previewOsc.start();
-    setPreviewParams();
-    previewGain.gain.setTargetAtTime(tapVol * 0.9, tapAudioCtx.currentTime, 0.02);
   };
-
-  el.addEventListener('input', ()=>{
-    ensureTapAudio();
-    apply();
-    setPreviewParams();
-  });
-
-  // スクロールを奪われないように、ドラッグ中は touchmove を抑止
-  let dragging = false;
-  const onDown = (ev)=>{
-    dragging = true;
-    startPreview();
-    try{ ev.preventDefault(); }catch(e){}
-  };
-  const onUp = ()=>{
-    dragging = false;
-    stopPreview();
-  };
-
-  el.addEventListener('pointerdown', onDown, {passive:false});
-  window.addEventListener('pointerup', onUp, {passive:true});
-  window.addEventListener('pointercancel', onUp, {passive:true});
-
-  el.addEventListener('touchstart', onDown, {passive:false});
-  window.addEventListener('touchend', onUp, {passive:true});
-  window.addEventListener('touchcancel', onUp, {passive:true});
-  el.addEventListener('touchmove', (ev)=>{
-    if(dragging){
-      try{ ev.preventDefault(); }catch(e){}
-    }
-  }, {passive:false});
-
-  // 初回反映
-  apply();
+  el.addEventListener('input', apply);
+  el.addEventListener('change', apply);
 }
 
 
@@ -1918,14 +1847,10 @@ function chordObjForPick(chordName, pick){
     }
   }
     let nm = chordName;
-  let noteKey = null;
   if (fingers.length === 1) {
     try { nm = noteNameForFinger({s: fingers[0].s, f: fingers[0].f}); } catch(e) { nm = chordName; }
-    // きらきら星等の単音(アルペジオ)用：表示は日本語、発音はsolfegeキーで管理
-    const map = { 'ド':'do','レ':'re','ミ':'mi','ファ':'fa','ソ':'so','ラ':'la','シ':'ti' };
-    noteKey = map[nm] || null;
   }
-  return { name: nm, targetIdx: 0, fingers, noteKey };
+  return { name: nm, targetIdx: 0, fingers };
 }
 
 
@@ -2976,6 +2901,207 @@ window.addEventListener('pageshow', ()=>{
   }
 })();
 
+
+// ===== v40: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+(function(){
+  // --- helpers ---
+  function clamp01(x){
+    x = Number(x);
+    if(!Number.isFinite(x)) return 0.5;
+    return Math.max(0, Math.min(1, x));
+  }
+
+function getTapVolume01(){
+  return Math.max(0, Math.min(1, Number(tapVol ?? 0)));
+}
+function applyTapVolumeToGain(){
+  if(!tapMaster) return;
+  const v = getTapVolFromSlider(); // 0..1
+  tapVol = v;
+  const g = Math.pow(v, 1.6); // 体感カーブ
+  tapMaster.gain.setValueAtTime(g, tapAudioCtx.currentTime);
+}
+// --- スライダー操作中の「ピューーー」(連続) ---
+let __previewOsc=null, __previewGain=null;
+function startPreviewTone(){
+  ensureTapAudio();
+  if(!tapAudioCtx || !tapMaster) return;
+  tapAudioCtx.resume?.();
+  if(__previewOsc) return;
+  __previewGain = tapAudioCtx.createGain();
+  __previewGain.gain.value = 0;
+  __previewOsc = tapAudioCtx.createOscillator();
+  __previewOsc.type = 'sine';
+  __previewOsc.frequency.value = 220;
+  __previewOsc.connect(__previewGain);
+  __previewGain.connect(tapMaster);
+  __previewOsc.start();
+  updatePreviewTone();
+}
+function updatePreviewTone(){
+  if(!__previewOsc || !__previewGain || !tapAudioCtx) return;
+  const v = getTapVolFromSlider(); // 0..1
+  const f = 180 + v * 1200;        // 右ほど高い
+  __previewOsc.frequency.setTargetAtTime(f, tapAudioCtx.currentTime, 0.02);
+  // 音量はスライダー値そのまま（masterでカーブ）
+  __previewGain.gain.setTargetAtTime(v, tapAudioCtx.currentTime, 0.02);
+  applyTapVolumeToGain();
+}
+function stopPreviewTone(){
+  if(!tapAudioCtx) return;
+  if(__previewGain) __previewGain.gain.setTargetAtTime(0, tapAudioCtx.currentTime, 0.03);
+  const o = __previewOsc;
+  const g = __previewGain;
+  __previewOsc = null;
+  __previewGain = null;
+  setTimeout(()=>{ try{o?.stop(); o?.disconnect();}catch(e){} }, 90);
+  setTimeout(()=>{ try{g?.disconnect();}catch(e){} }, 140);
+}
+
+  function getSlider(){
+  return document.getElementById('tapVol'); // 0..100（UI上の唯一の音量スライダー）
+}
+  function getTapVolFromSlider(){
+  const el = getSlider();
+  if (!el) return tapVol || 0.35;
+  const v100 = Math.max(0, Math.min(100, Number(el.value || 0)));
+  return v100 / 100;
+}
+  function syncTapVol(){
+    tapVol = getTapVolFromSlider();
+    try{ saveTapVol(); }catch(e){}
+    // keep existing engine in sync (even if we don't rely on WebAudio)
+    try{ ensureTapAudio(); }catch(e){}
+  }
+
+  // --- WAV generator (Blob URL) ---
+  function makeWavUrl(freqs, durSec){
+    const sr = 44100;
+    const n = Math.max(1, Math.floor(sr * durSec));
+    const data = new Int16Array(n);
+    const atk = 0.006, rel = 0.040;
+    for(let i=0;i<n;i++){
+      const t = i / sr;
+      let env = 1.0;
+      if(t < atk) env = t/atk;
+      else if(t > durSec - rel) env = Math.max(0, (durSec - t)/rel);
+      let s = 0;
+      for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
+      s /= Math.max(1, freqs.length);
+      data[i] = Math.max(-1, Math.min(1, s*env)) * 0.95 * 32767;
+    }
+    const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
+    const dataSize = data.length * bytesPerSample;
+    const buf = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buf);
+    let o = 0;
+    function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
+    function u32(v){ view.setUint32(o, v, true); o+=4; }
+    function u16(v){ view.setUint16(o, v, true); o+=2; }
+    writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
+    writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
+    writeStr('data'); u32(dataSize);
+    for(let i=0;i<data.length;i++){ view.setInt16(o, data[i], true); o+=2; }
+    return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
+  }
+
+  const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+  const urls = {
+    // preview beep (fixed pitch, volume shows loudness)
+    preview: makeWavUrl([440], 0.12),
+    do: makeWavUrl([NOTE.do], 0.18),
+    re: makeWavUrl([NOTE.re], 0.18),
+    mi: makeWavUrl([NOTE.mi], 0.18),
+    fa: makeWavUrl([NOTE.fa], 0.18),
+    so: makeWavUrl([NOTE.so], 0.18),
+    la: makeWavUrl([NOTE.la], 0.18),
+    si: makeWavUrl([NOTE.si], 0.18),
+    do2: makeWavUrl([NOTE.do2], 0.18),
+    // chords
+    C:  makeWavUrl([261.63,329.63,392.00], 0.22),
+    F:  makeWavUrl([349.23,440.00,523.25], 0.22),
+    G7: makeWavUrl([392.00,493.88,587.33,698.46], 0.22),
+    Am: makeWavUrl([440.00,523.25,659.26], 0.22),
+  };
+
+  function playUrl(url, vol01){
+    try{
+      const a = new Audio(url);
+      a.volume = clamp01(vol01);
+      // play must be user gesture for iOS; slider input / hit tap qualifies
+      a.play().catch(()=>{});
+    }catch(e){}
+  }
+
+  // --- Slider: non-continuous preview (no glitches) ---
+  let lastPreviewAt = 0;
+  function sliderPreview(){
+    const now = Date.now();
+    if(now - lastPreviewAt < 120) return; // throttle
+    lastPreviewAt = now;
+    syncTapVol();
+    playUrl(urls.preview, tapVol);
+  }
+
+  function hookSlider(){
+    const s = getSlider();
+    if(!s) return;
+
+    // initial sync: if saved tapVol is 0 but slider default isn't, prefer slider value
+    try{ loadTapVol(); }catch(e){}
+    const sliderV = clamp01(s.value);
+    if(clamp01(tapVol) === 0 && sliderV > 0) tapVol = sliderV;
+    s.value = String(clamp01(tapVol));
+    syncTapVol();
+
+    s.addEventListener('input', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+
+    // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
+    s.addEventListener('pointerup', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+    s.addEventListener('touchend', ()=>{
+      if(!isTapMode()) return;
+      sliderPreview();
+    }, {passive:true});
+  }
+
+  // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
+  const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
+
+  window.playTapHitSound = function(target){
+    if(!isTapMode()) return;
+    syncTapVol();
+
+    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    try{
+      if(target && target.noteKey && urls[target.noteKey]){
+        playUrl(urls[target.noteKey], tapVol);
+        return; // don't fall through to original (to avoid 1音だけになる)
+      }
+    }catch(e){}
+
+    // Chords: target.chord.name like 'C','F','G7','Am'
+    try{
+      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const up = n.trim().toUpperCase();
+      if(up === 'C') { playUrl(urls.C, tapVol); return; }
+      if(up === 'F') { playUrl(urls.F, tapVol); return; }
+      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
+      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+    }catch(e){}
+
+    // fallback: keep original behavior if we couldn't identify
+    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
+  };
+
+  window.addEventListener('DOMContentLoaded', hookSlider);
+})();
+
 </script>
 <div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
@@ -3038,7 +3164,50 @@ window.addEventListener('pageshow', ()=>{
   }catch(e){}
   apply();
 })();
-</script>
 
+(function(){
+  if(window.__tapVolumeListenersReady) return;
+  window.__tapVolumeListenersReady = true;
+  function bind(){
+    const s01 = document.getElementById('tapVolume');
+    const s100 = document.getElementById('tapVol');
+    [s01, s100].forEach(s=>{
+      if(!s) return;
+      s.addEventListener('input', ()=>{
+        // user gesture path keeps AudioContext alive on iOS
+        try{ ensureTapAudio(); }catch(e){}
+        applyTapVolumeToGain();
+        // optional: short preview tone while dragging (gentle)
+        try{
+          if(!window.tapAudioCtx || !window.tapMaster) return;
+          const now = window.tapAudioCtx.currentTime;
+          const f = 220 + (880-220) * getTapVolume01();
+          const o = window.tapAudioCtx.createOscillator();
+          const g = window.tapAudioCtx.createGain();
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(Math.max(0.0001, Math.pow(getTapVolume01(),2.2)*0.6), now+0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+          o.frequency.setValueAtTime(f, now);
+          o.type = 'sine';
+          o.connect(g);
+          g.connect(window.tapMaster);
+          o.start(now);
+          o.stop(now+0.13);
+        }catch(e){}
+      }, {passive:true});
+      // prevent page scroll while dragging
+      ['touchstart','touchmove','touchend'].forEach(ev=>{
+        s.addEventListener(ev, (e)=>{ e.stopPropagation(); }, {passive:false});
+      });
+    });
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bind);
+  }else{
+    bind();
+  }
+})();
+
+</script>
 </body>
 </html>

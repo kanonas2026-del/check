@@ -913,11 +913,12 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
+<div id=\"buildBadge\">v48</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v67</div>
+<div id="verTag">v68</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -958,9 +959,9 @@ body.is-uke .vol-inline{ display:none !important; }
   <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
 </div>
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
-<div class="tap-vol-wrap" id="tap-vol-wrap" style="display:none">
+<div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" value="35" />
+  <input id="tapVol" type="range" min="0" max="100" value="35" />
 </div>
 
 </div>
@@ -2901,7 +2902,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v40: 音量プレビュー（短いピュ） + タップ実音（ドレミ/和音）をHTMLAudioで確実に鳴らす =====
+// ===== v68: WebAudio 音量プレビュー（連続ピュー） + タップ実音（ドレミ/和音/きらきら単音）を確実に鳴らす =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2910,12 +2911,13 @@ window.addEventListener('pageshow', ()=>{
     return Math.max(0, Math.min(1, x));
   }
 
+  // --- volume (0..1) ---
   function getTapVolume01(){
     // prefer tapVolume (0..1), fallback tapVol (0..100)
     const s01 = document.getElementById('tapVolume');
     if(s01){
       const v = Number(s01.value);
-      return clamp01(Number.isFinite(v)? v : 0.35);
+      return clamp01(Number.isFinite(v)? v : 0.5);
     }
     const s100 = document.getElementById('tapVol');
     if(s100){
@@ -2925,245 +2927,255 @@ window.addEventListener('pageshow', ()=>{
       const vol01 = (v - min) / (max - min || 1);
       return clamp01(vol01);
     }
-    return clamp01(tapVol || 0.35);
+    return clamp01(window.tapVol || 0.5);
+  }
+
+  // --- WebAudio core ---
+  let tapAudioCtx = null;
+  let tapMaster = null;
+  let tapVol = 0.5;
+
+  function ensureTapAudio(){
+    try{
+      if(!tapAudioCtx){
+        tapAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        tapMaster = tapAudioCtx.createGain();
+        tapMaster.connect(tapAudioCtx.destination);
+        window.tapAudioCtx = tapAudioCtx;
+        window.tapMaster = tapMaster;
+      }
+      if(tapAudioCtx.state === 'suspended'){
+        // resume must be inside user gesture handler
+        try{ tapAudioCtx.resume(); }catch(e){}
+      }
+    }catch(e){}
   }
 
   function applyTapVolumeToGain(){
-    // live update master gain (keep existing WebAudio engine in sync)
     try{
-      const v = getTapVolume01();
-      tapVol = v;
+      tapVol = getTapVolume01();
+      window.tapVol = tapVol;
       if(tapMaster && tapAudioCtx){
         // psychoacoustic curve: more control in low volumes
-        const g = Math.pow(v, 2.2);
+        const g = Math.pow(clamp01(tapVol), 2.2);
         tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
       }
     }catch(e){}
   }
 
-  function getSlider(){ return document.getElementById('tapVolume'); }
+  // --- slider continuous preview (single oscillator maintained) ---
+  let previewOsc = null;
+  let previewGain = null;
+  let previewActive = false;
 
-  function getTapVolFromSlider(){
-    const s = getSlider();
-    if(!s) return clamp01(tapVol || 0.35);
-    return clamp01(s.value);
+  function startPreview(){
+    ensureTapAudio();
+    applyTapVolumeToGain();
+    if(!tapAudioCtx || !tapMaster) return;
+    if(previewOsc) return;
+
+    const now = tapAudioCtx.currentTime;
+    previewOsc = tapAudioCtx.createOscillator();
+    previewGain = tapAudioCtx.createGain();
+
+    previewOsc.type = 'sine';
+    previewOsc.frequency.setValueAtTime(440, now);
+
+    previewGain.gain.setValueAtTime(0.0001, now);
+    previewGain.gain.exponentialRampToValueAtTime(0.7, now + 0.02);
+
+    previewOsc.connect(previewGain).connect(tapMaster);
+    previewOsc.start(now);
+    previewActive = true;
+    updatePreview();
   }
 
-  function syncTapVol(){
-    const v = getTapVolFromSlider();
-    tapVol = v;
-    try{ saveTapVol(); }catch(e){}
-    try{ ensureTapAudio(); }catch(e){}
-    try{ applyTapVolumeToGain(); }catch(e){}
+  function updatePreview(){
+    if(!previewOsc || !tapAudioCtx) return;
+    applyTapVolumeToGain();
+    const now = tapAudioCtx.currentTime;
+    const f = 220 + (880 - 220) * clamp01(tapVol); // right -> higher pitch
+    previewOsc.frequency.setTargetAtTime(f, now, 0.01);
   }
 
-  // --- WAV generator (Blob URL) ---
-  function makeWavUrl(freqs, durSec, amp01){
-    const sr = 44100;
-    const n = Math.max(1, Math.floor(sr * durSec));
-    const data = new Int16Array(n);
-    const atk = 0.006, rel = 0.040;
-    const amp = clamp01(amp01);
-    for(let i=0;i<n;i++){
-      const t = i / sr;
-      let env = 1.0;
-      if(t < atk) env = t/atk;
-      else if(t > durSec - rel) env = Math.max(0, (durSec - t)/rel);
-      let s = 0;
-      for(const f of freqs){ s += Math.sin(2*Math.PI*f*t); }
-      s /= Math.max(1, freqs.length);
-      // volume baked into waveform (iOS Safari対策: audio.volumeが効かないことがある)
-      data[i] = Math.max(-1, Math.min(1, s*env*amp)) * 0.95 * 32767;
-    }
-    const bytesPerSample = 2, blockAlign = bytesPerSample, byteRate = sr * blockAlign;
-    const dataSize = data.length * bytesPerSample;
-    const buf = new ArrayBuffer(44 + dataSize);
-    const view = new DataView(buf);
-    let o = 0;
-    function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(o++, s.charCodeAt(i)); }
-    function u32(v){ view.setUint32(o, v, true); o+=4; }
-    function u16(v){ view.setUint16(o, v, true); o+=2; }
-    writeStr('RIFF'); u32(36 + dataSize); writeStr('WAVE');
-    writeStr('fmt '); u32(16); u16(1); u16(1); u32(sr); u32(byteRate); u16(blockAlign); u16(16);
-    writeStr('data'); u32(dataSize);
-    for(let i=0;i<data.length;i++){ view.setInt16(o, data[i], true); o+=2; }
-    return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
-  }
-
-  const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
-
-  // tone definitions (urls are generated per-volume bucket)
-  const TONE = {
-    preview: {freqs:[440], dur:0.12},
-    do:  {freqs:[NOTE.do],  dur:0.18},
-    re:  {freqs:[NOTE.re],  dur:0.18},
-    mi:  {freqs:[NOTE.mi],  dur:0.18},
-    fa:  {freqs:[NOTE.fa],  dur:0.18},
-    so:  {freqs:[NOTE.so],  dur:0.18},
-    la:  {freqs:[NOTE.la],  dur:0.18},
-    si:  {freqs:[NOTE.si],  dur:0.18},
-    do2: {freqs:[NOTE.do2], dur:0.18},
-    // chords
-    C:  {freqs:[261.63,329.63,392.00], dur:0.22},
-    F:  {freqs:[349.23,440.00,523.25], dur:0.22},
-    G7: {freqs:[392.00,493.88,587.33,698.46], dur:0.22},
-    Am: {freqs:[440.00,523.25,659.26], dur:0.22},
-  };
-
-  const urlCache = new Map();
-  function bucketAmp(vol01){
-    const v = clamp01(vol01);
-    // bucket 0.00..1.00 by 0.05 and apply perceptual curve
-    const b = Math.round(v*20)/20;
-    return {b, amp: Math.pow(b, 2.2)};
-  }
-
-  function getUrlForTone(key, vol01){
-    const t = TONE[key];
-    if(!t) return null;
-    const {b, amp} = bucketAmp(vol01);
-    const cacheKey = key + '@' + b;
-    if(urlCache.has(cacheKey)) return urlCache.get(cacheKey);
-    const url = makeWavUrl(t.freqs, t.dur, amp);
-    urlCache.set(cacheKey, url);
-    return url;
-  }
-
-  function getUrlForFreqs(freqs, dur, vol01){
-    const {b, amp} = bucketAmp(vol01);
-    const cacheKey = 'F:' + freqs.map(x=>Number(x).toFixed(2)).join(',') + '|' + dur + '@' + b;
-    if(urlCache.has(cacheKey)) return urlCache.get(cacheKey);
-    const url = makeWavUrl(freqs, dur, amp);
-    urlCache.set(cacheKey, url);
-    return url;
-  }
-
-  function playUrl(url){
-    try{
-      const a = new Audio(url);
-      // audio.volumeはiOSで効かないことがあるので常に1（音量はWAV側で焼き込み）
-      a.volume = 1;
-      a.play().catch(()=>{});
-    }catch(e){}
-  }
-
-  // --- Slider: preview beep ---
-  let lastPreviewAt = 0;
-  function sliderPreview(){
-    const now = Date.now();
-    if(now - lastPreviewAt < 120) return; // throttle
-    lastPreviewAt = now;
-    syncTapVol();
-    const url = getUrlForTone('preview', tapVol);
-    if(url) playUrl(url);
+  function stopPreview(){
+    if(!previewOsc || !tapAudioCtx) return;
+    const now = tapAudioCtx.currentTime;
+    try{ previewGain.gain.setTargetAtTime(0.0001, now, 0.02); }catch(e){}
+    const o = previewOsc;
+    const g = previewGain;
+    previewOsc = null;
+    previewGain = null;
+    previewActive = false;
+    try{ o.stop(now + 0.08); }catch(e){}
+    try{ o.disconnect(); }catch(e){}
+    try{ g.disconnect(); }catch(e){}
   }
 
   function hookSlider(){
-    const s = getSlider();
+    const s = document.getElementById('tapVolume');
     if(!s) return;
 
-    // initial sync: if saved tapVol is 0 but slider default isn't, prefer slider value
-    try{ loadTapVol(); }catch(e){}
-    const sliderV = clamp01(s.value);
-    if(clamp01(tapVol) === 0 && sliderV > 0) tapVol = sliderV;
-    s.value = String(clamp01(tapVol));
-    syncTapVol();
+    // (DOM) 旧tapVolを無効化：rangeをhidden化してrange件数=1、見た目のズレ防止でwrapはvisibility:hidden
+    const old = document.getElementById('tapVol');
+    if(old && old.type === 'range'){
+      old.type = 'hidden';
+      old.value = String(Math.round(clamp01(Number(s.value))*100));
+    }
+    const wrap = document.getElementById('tap-vol-wrap');
+    if(wrap){
+      wrap.style.visibility = 'hidden'; // レイアウトは保持（空白になるだけ）
+      wrap.style.pointerEvents = 'none';
+    }
 
-    // prevent scroll while dragging (no layout change)
-    try{ s.style.touchAction = 'none'; }catch(e){}
-    ['touchstart','touchmove','touchend'].forEach(ev=>{
-      s.addEventListener(ev, (e)=>{ try{ e.preventDefault(); }catch(_e){} }, {passive:false});
-    });
+    // (DOM) 左上に残る「壊れたbuildBadge」系を除去（idにbuildBadgeを含む要素を削除）
+    try{
+      document.querySelectorAll('[id*="buildBadge"]').forEach(el=>{ try{ el.remove(); }catch(e){} });
+    }catch(e){}
 
-    // ★修正: メニュー画面でもプレビュー音が鳴るように制限を削除しました
-    s.addEventListener('pointerdown', ()=>{ sliderPreview(); }, {passive:true});
-    s.addEventListener('input', ()=>{ sliderPreview(); }, {passive:true});
-    s.addEventListener('pointerup', ()=>{ sliderPreview(); }, {passive:true});
-    s.addEventListener('touchend', ()=>{ sliderPreview(); }, {passive:true});
+    // drag smooth (no page move while dragging)
+    s.style.touchAction = 'pan-x';
+    s.addEventListener('touchmove', (e)=>{ if(previewActive) e.preventDefault(); }, {passive:false});
+
+    s.addEventListener('pointerdown', (e)=>{
+      try{ e.preventDefault(); }catch(_){}
+      try{ s.setPointerCapture(e.pointerId); }catch(_){}
+      startPreview();
+    }, {passive:false});
+
+    s.addEventListener('pointermove', (e)=>{
+      if(!previewActive) return;
+      try{ e.preventDefault(); }catch(_){}
+      updatePreview();
+    }, {passive:false});
+
+    const end = (e)=>{
+      if(!previewActive) return;
+      try{ e.preventDefault(); }catch(_){}
+      stopPreview();
+    };
+    s.addEventListener('pointerup', end, {passive:false});
+    s.addEventListener('pointercancel', end, {passive:false});
+
+    s.addEventListener('input', ()=>{
+      applyTapVolumeToGain();
+      if(previewActive) updatePreview();
+    }, {passive:true});
+
+    applyTapVolumeToGain();
   }
 
-  // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
-  const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
+  // --- note/chord frequencies ---
+  const NOTE = { do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25 };
+  const JP = { 'ド':'do', 'レ':'re', 'ミ':'mi', 'ファ':'fa', 'ソ':'so', 'ラ':'la', 'シ':'si' };
+  const STRING_BASE = { 1:440.00, 2:329.63, 3:261.63, 4:392.00 }; // A,E,C,G
 
-  function normalizeSolfege(s){
-    const t = String(s||'').trim();
-    if(!t) return '';
-    const low = t.toLowerCase();
-    // japanese
-    const jp = {'ド':'do','レ':'re','ミ':'mi','ファ':'fa','ソ':'so','ラ':'la','シ':'si'};
-    if(jp[t]) return jp[t];
-    // common variants
-    if(low === 'sol' || low === 'so') return 'so';
-    if(low === 'ti') return 'si';
-    if(low === 'do' || low === 're' || low === 'mi' || low === 'fa' || low === 'so' || low === 'la' || low === 'si' || low === 'do2') return low;
-    return '';
+  function noteToFreq(x){
+    if(x == null) return null;
+    const s = String(x).trim();
+    const low = s.toLowerCase();
+    if(NOTE[low]) return NOTE[low];
+    if(JP[s] && NOTE[JP[s]]) return NOTE[JP[s]];
+    if(low === 'sol') return NOTE.so;
+    if(low === 'ti') return NOTE.si;
+    return null;
   }
 
-  window.playTapHitSound = function(target){
-    // ゲーム中は「タップモード」でなければ音を出さない（マイクモード時の誤動作防止）
+  function chordNameToFreqs(name){
+    if(!name) return null;
+    const up = String(name).trim().toUpperCase();
+    if(up === 'C')  return [261.63,329.63,392.00];
+    if(up === 'F')  return [349.23,440.00,523.25];
+    if(up === 'G7') return [392.00,493.88,587.33,698.46];
+    if(up === 'AM') return [440.00,523.25,659.26];
+    return null;
+  }
+
+  function fingersToFreqs(fingers){
+    if(!Array.isArray(fingers) || fingers.length < 1) return null;
+    const out = [];
+    for(const fg of fingers){
+      if(!fg) continue;
+      const s = Number(fg.s);
+      const f = Number(fg.f);
+      const base = STRING_BASE[s] || 440.00;
+      const fret = Number.isFinite(f) ? f : 0;
+      out.push(base * Math.pow(2, fret/12));
+    }
+    return out.length ? out : null;
+  }
+
+  function playFreqs(freqs, dur){
+    ensureTapAudio();
+    applyTapVolumeToGain();
+    if(!tapAudioCtx || !tapMaster) return;
+    const now = tapAudioCtx.currentTime;
+    const d = Number.isFinite(dur) ? dur : 0.18;
+    const per = 0.75 / Math.max(1, freqs.length);
+    for(const f of freqs){
+      try{
+        const o = tapAudioCtx.createOscillator();
+        const g = tapAudioCtx.createGain();
+        o.type = (freqs.length===1) ? 'sine' : 'triangle';
+        o.frequency.setValueAtTime(f, now);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(per, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + d);
+        o.connect(g).connect(tapMaster);
+        o.start(now);
+        o.stop(now + d + 0.02);
+      }catch(e){}
+    }
+  }
+
+  // --- Hit sound override (tap mode only) ---
+  function patchedPlayTapHitSound(target){
     if(typeof isTapMode === 'function' && !isTapMode()) return;
-    syncTapVol();
+    ensureTapAudio();
+    applyTapVolumeToGain();
 
-    const v = clamp01(tapVol);
-
-    // 1) noteKey: 'do'|'re'|'mi'...
+    // (a) noteKey do/re/mi...
     try{
-      if(target && target.noteKey){
-        const k = normalizeSolfege(target.noteKey);
-        if(k && TONE[k]){
-          const url = getUrlForTone(k, v);
-          if(url) playUrl(url);
-          return;
-        }
-      }
+      const nk = target && target.noteKey;
+      const f = noteToFreq(nk);
+      if(f){ playFreqs([f], (target && target.isShort) ? 0.10 : 0.18); return; }
     }catch(e){}
 
-    // 2) solfege in chord.name (kirakira等でnoteKeyが無い場合)
-    try{
-      const cn = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
-      const k = normalizeSolfege(cn);
-      if(k && TONE[k]){
-        const url = getUrlForTone(k, v);
-        if(url) playUrl(url);
-        return;
-      }
-    }catch(e){}
-
-    // 3) chord names
-    try{
-      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
-      const up = n.trim().toUpperCase();
-      if(up === 'C')  { playUrl(getUrlForTone('C', v)); return; }
-      if(up === 'F')  { playUrl(getUrlForTone('F', v)); return; }
-      if(up === 'G7') { playUrl(getUrlForTone('G7', v)); return; }
-      if(up === 'AM') { playUrl(getUrlForTone('Am', v)); return; }
-    }catch(e){}
-
-    // 4) fingers (single note or chord) – robust fallback
+    // (b) fingers (1本でも単音として鳴らす)
     try{
       const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
-      if(fingers && fingers.length >= 1){
-        const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
-        const freqs = fingers.map(fg=>{
-          const s = Number(fg && fg.s);
-          const fret = Number(fg && fg.f);
-          const base = baseMap[s] || 440.00;
-          const f = (Number.isFinite(fret) ? fret : 0);
-          return base * Math.pow(2, f/12);
-        });
-        const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.18 : 0.22);
-        const url = getUrlForFreqs(freqs, dur, v);
-        if(url) playUrl(url);
-        return;
-      }
+      const fs = fingersToFreqs(fingers);
+      if(fs){ playFreqs(fs, (fs.length===1) ? 0.16 : 0.22); return; }
     }catch(e){}
 
-    // fallback: keep original behavior if we couldn't identify
-    try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
-  };
+    // (c) chord.name Japanese solfege or chord names
+    try{
+      const n = target && target.chord && target.chord.name ? String(target.chord.name) : '';
+      const f2 = noteToFreq(n);
+      if(f2){ playFreqs([f2], (target && target.isShort) ? 0.10 : 0.18); return; }
+      const ch = chordNameToFreqs(n);
+      if(ch){ playFreqs(ch, 0.22); return; }
+    }catch(e){}
+
+    // (d) fallback: never silent
+    playFreqs([440], 0.12);
+  }
+
+  window.playTapHitSound = patchedPlayTapHitSound;
+  try{ playTapHitSound = patchedPlayTapHitSound; }catch(e){}
+
+  // unlock once on first user gesture (helps iOS)
+  function unlockOnce(){
+    try{ ensureTapAudio(); }catch(e){}
+    document.removeEventListener('pointerdown', unlockOnce, true);
+    document.removeEventListener('touchstart', unlockOnce, true);
+  }
+  document.addEventListener('pointerdown', unlockOnce, true);
+  document.addEventListener('touchstart', unlockOnce, true);
 
   window.addEventListener('DOMContentLoaded', hookSlider);
-})();</script>
+})();
+</script>
 <div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="

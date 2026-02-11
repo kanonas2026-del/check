@@ -842,9 +842,6 @@ body.is-uke .vol-inline{ display:none !important; }
   pointer-events: none;
 }
 
-
-/* v58 hide legacy tap-vol-wrap */
-#tap-vol-wrap{display:none !important;}
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -920,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v58</div>
+<div id="verTag">v59</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1400,15 +1397,20 @@ function saveTapVol(){
 }
 function ensureTapAudio(){
   try{
-    if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudiocontext||window.webkitAudioContext)();
+    if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
       tapMaster.connect(tapAudioCtx.destination);
     }
-    // keep globals aligned for legacy callers
+    // expose for legacy code paths that reference window.*
     window.tapAudioCtx = tapAudioCtx;
-    window.tapMaster = tapMaster;
+    window.tapMaster  = tapMaster;
+
+    // apply current volume (perceptual curve)
+    const v = clamp01(typeof tapVol === 'number' ? tapVol : getTapVolume01());
+    const g = Math.pow(v, 2.2);
+    tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
   }catch(e){}
 }
 function noteFreqFromTarget(t){
@@ -1416,13 +1418,6 @@ function noteFreqFromTarget(t){
     if(t && t.noteKey){
       const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
       if(map[t.noteKey]) return map[t.noteKey];
-    }
-
-    // v58: solfege JP (きらきらぼし単音)
-    const jp = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
-    const jpMap = {'ド':261.63,'レ':293.66,'ミ':329.63,'ファ':349.23,'ソ':392.00,'ラ':440.00,'シ':493.88,'ド2':523.25};
-    for(const k in jpMap){
-      if(jp.includes(k)) return jpMap[k];
     }
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
@@ -1438,18 +1433,18 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  // v58: TAP only. WebAudio only. Volume via tapMaster.gain.
+  // Only for TAP entry (タップであそぶ)
   if(!isTapMode()) return;
   ensureTapAudio();
   applyTapVolumeToGain();
   if(!tapAudioCtx || !tapMaster) return;
-
   const now = tapAudioCtx.currentTime;
-
-  // 1) fingers (including single note & open string 0)
+  const vol = getTapVolume01();
+  const amp = Math.pow(vol, 2.2);
+  // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
   try{
     const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
-    if(fingers && fingers.length >= 1){
+    if(fingers && fingers.length>1){
       const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
       const freqs = fingers.map(fg=>{
         const s = Number(fg && fg.s);
@@ -1458,42 +1453,53 @@ function playTapHitSound(target){
         const f = (Number.isFinite(fret) ? fret : 0);
         return base * Math.pow(2, f/12);
       });
-      const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
-      const per = (freqs.length===1) ? 0.75 : (0.75/Math.max(1,freqs.length));
-      freqs.forEach((ff)=>{
+      const dur = (target && target.isShort) ? 0.10 : 0.18;
+      freqs.forEach((ff, idx)=>{
         try{
           const o = tapAudioCtx.createOscillator();
           const g = tapAudioCtx.createGain();
-          o.type = 'triangle';
-          o.frequency.setValueAtTime(ff, now);
-          g.gain.setValueAtTime(0.0001, now);
-          g.gain.exponentialRampToValueAtTime(per, now + 0.01);
+          const a = Math.max(0.0001, (0.35/Math.max(1,freqs.length)) * (0.15 + 0.85*amp));
+          g.gain.setValueAtTime(a, now);
           g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-          o.connect(g).connect(tapMaster);
-          o.start(now);
-          o.stop(now + dur + 0.01);
+          o.frequency.setValueAtTime(ff, now);
+          o.type = 'triangle';
+          o.connect(g); g.connect(tapMaster);
+          o.start(now); o.stop(now + dur + 0.01);
         }catch(e){}
       });
       return;
     }
   }catch(e){}
 
-  // 2) single note by noteKey / chord name (JP solfege supported in noteFreqFromTarget)
   const f = noteFreqFromTarget(target);
   try{
+    // main pluck
     const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
     o.type = 'triangle';
     o.frequency.setValueAtTime(f, now);
-
-    const dur = (target && target.isShort) ? 0.12 : 0.22;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.85, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
+    g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
     o.connect(g).connect(tapMaster);
     o.start(now);
-    o.stop(now + dur + 0.01);
+    o.stop(now + 0.24);
+
+    // little "pick" click
+    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
+    const d = nbuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
+    const ns = tapAudioCtx.createBufferSource();
+    ns.buffer = nbuf;
+    const nf = tapAudioCtx.createBiquadFilter();
+    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
+    const ng = tapAudioCtx.createGain();
+    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    ns.connect(nf).connect(ng).connect(tapMaster);
+    ns.start(now);
+    ns.stop(now + 0.06);
   }catch(e){}
 }
 
@@ -2926,17 +2932,15 @@ function getTapVolume01(){
   return clamp01(window.tapVol || 0.35);
 }
 function applyTapVolumeToGain(){
-  // v58: update lexical tapVol and apply to the actual WebAudio master gain
+  // v59: update lexical tapVol and apply to WebAudio master gain (iOS-safe)
   try{
-    const v = getTapVolume01();  // #tapVolume (0..1)
-    tapVol = clamp01(v);
-    window.tapVol = tapVol;
-    ensureTapAudio();
-    // expose for any legacy references
-    window.tapAudioCtx = tapAudioCtx;
-    window.tapMaster = tapMaster;
+    const v = getTapVolume01();      // reads #tapVolume (0..1)
+    tapVol = clamp01(v);             // keep lexical binding in sync
+    window.tapVol = tapVol;          // keep legacy reads in sync
+    try{ saveTapVol(); }catch(e){}
+    ensureTapAudio();                // create/resume ctx within user gesture
     if(tapMaster && tapAudioCtx){
-      const g = Math.pow(tapVol, 2.2); // perceptual curve
+      const g = Math.pow(tapVol, 2.2);
       tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
@@ -3022,26 +3026,23 @@ function applyTapVolumeToGain(){
     if(nowMs - lastPreviewAt < 120) return; // throttle
     lastPreviewAt = nowMs;
     if(!isTapMode()) return;
-    applyTapVolumeToGain();
-    if(!tapAudioCtx || !tapMaster) return;
-
-    const t0 = tapAudioCtx.currentTime;
-    const o = tapAudioCtx.createOscillator();
-    const g = tapAudioCtx.createGain();
-
-    // pitch goes up as slider goes right
-    const f = 220 + (880-220) * clamp01(tapVol);
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f, t0);
-
-    // envelope (master gain controls loudness)
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.8, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
-
-    o.connect(g).connect(tapMaster);
-    o.start(t0);
-    o.stop(t0 + 0.11);
+    // use WebAudio so volume actually changes on iOS Safari
+    try{
+      applyTapVolumeToGain();
+      if(!tapAudioCtx || !tapMaster) return;
+      const now = tapAudioCtx.currentTime;
+      const o = tapAudioCtx.createOscillator();
+      const g = tapAudioCtx.createGain();
+      const f = 220 + (880-220) * clamp01(tapVol);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, now);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.8, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      o.connect(g).connect(tapMaster);
+      o.start(now);
+      o.stop(now + 0.19);
+    }catch(e){}
   }
 
   function hookSlider(){
@@ -3076,27 +3077,82 @@ function applyTapVolumeToGain(){
 
   window.playTapHitSound = function(target){
     if(!isTapMode()) return;
-    syncTapVol();
+    try{ applyTapVolumeToGain(); }catch(e){}
+    try{ ensureTapAudio(); }catch(e){}
+    if(!tapAudioCtx || !tapMaster) return;
 
-    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    const now = tapAudioCtx.currentTime;
+
+    function playFreqs(freqs, isShort){
+      const dur = isShort ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
+      const per = (freqs.length===1) ? 0.70 : (0.70/Math.max(1,freqs.length));
+      freqs.forEach((ff)=>{
+        try{
+          const o = tapAudioCtx.createOscillator();
+          const g = tapAudioCtx.createGain();
+          o.type = (freqs.length===1) ? 'triangle' : 'sine';
+          o.frequency.setValueAtTime(ff, now);
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(per, now + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          o.connect(g).connect(tapMaster);
+          o.start(now);
+          o.stop(now + dur + 0.01);
+        }catch(e){}
+      });
+    }
+
+    // 1) fingers (single note & chord, includes open string 0)
     try{
-      if(target && target.noteKey && urls[target.noteKey]){
-        playUrl(urls[target.noteKey], tapVol);
-        return; // don't fall through to original (to avoid 1音だけになる)
+      const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
+      if(fingers && fingers.length>=1){
+        const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
+        const freqs = fingers.map(fg=>{
+          const s = Number(fg && fg.s);
+          const fret = Number(fg && fg.f);
+          const base = baseMap[s] || 440.00;
+          const f = (Number.isFinite(fret) ? fret : 0);
+          return base * Math.pow(2, f/12);
+        });
+        playFreqs(freqs, !!(target && target.isShort));
+        return;
       }
     }catch(e){}
 
-    // Chords: target.chord.name like 'C','F','G7','Am'
+    // 2) noteKey or solfege name
+    try{
+      let key = '';
+      if(target && target.noteKey) key = String(target.noteKey);
+      else if(target && target.chord && target.chord.name) key = String(target.chord.name);
+      key = key.trim();
+
+      const map = {
+        // english solfege
+        'DO':261.63,'RE':293.66,'MI':329.63,'FA':349.23,'SO':392.00,'SOL':392.00,'LA':440.00,'TI':493.88,'SI':493.88,
+        // japanese
+        'ド':261.63,'レ':293.66,'ミ':329.63,'ファ':349.23,'フ':349.23,'ソ':392.00,'ラ':440.00,'シ':493.88,
+        // letter notes
+        'C':261.63,'D':293.66,'E':329.63,'F':349.23,'G':392.00,'A':440.00,'B':493.88
+      };
+      const up = key.toUpperCase();
+      if(map[up] || map[key]){
+        const f = map[up] || map[key];
+        playFreqs([f], !!(target && target.isShort));
+        return;
+      }
+    }catch(e){}
+
+    // 3) chord names (C/F/G7/Am)
     try{
       const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
       const up = n.trim().toUpperCase();
-      if(up === 'C') { playUrl(urls.C, tapVol); return; }
-      if(up === 'F') { playUrl(urls.F, tapVol); return; }
-      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
-      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+      if(up === 'C')  { playFreqs([261.63,329.63,392.00], false); return; }
+      if(up === 'F')  { playFreqs([349.23,440.00,523.25], false); return; }
+      if(up === 'G7') { playFreqs([392.00,493.88,587.33,659.25], false); return; }
+      if(up === 'AM') { playFreqs([440.00,523.25,659.25], false); return; }
     }catch(e){}
 
-    // fallback: keep original behavior if we couldn't identify
+    // fallback
     try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
 
@@ -3104,7 +3160,6 @@ function applyTapVolumeToGain(){
 })();
 
 </script>
-<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

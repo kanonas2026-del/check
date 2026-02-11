@@ -811,8 +811,6 @@ body.playing #menu-overlay{ display:none; }
 
 
 /* ===== v9 hotfix: hide legacy duplicate blocks ===== */
-#tap-vol-wrap,
-#menuBackBtn,
 .legacy-volume,
 .legacy-top {
   display: none !important;
@@ -838,6 +836,9 @@ body.is-uke .vol-inline{ display:none !important; }
   pointer-events: none;
 }
 
+
+/* v53: hide top-left legacy version badge */
+.verBadge{display:none !important;}
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -914,7 +915,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v52</div>
+<div id="verTag">v53</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">

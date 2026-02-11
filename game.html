@@ -842,6 +842,9 @@ body.is-uke .vol-inline{ display:none !important; }
   pointer-events: none;
 }
 
+
+/* v58 hide legacy tap-vol-wrap */
+#tap-vol-wrap{display:none !important;}
 </style>
 
 <!-- LANDSCAPE_LOCK v1 -->
@@ -917,7 +920,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v57</div>
+<div id="verTag">v58</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -960,7 +963,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <!-- legacy tapVol slider removed (v57) -->
+  <input id="tapVol" type="hidden" value="35" />
 </div>
 
 </div>
@@ -1397,16 +1400,15 @@ function saveTapVol(){
 }
 function ensureTapAudio(){
   try{
-    if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudiocontext||window.webkitAudioContext)();
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
-      tapMaster.gain.value = tapVol;
       tapMaster.connect(tapAudioCtx.destination);
-  applyTapVolumeToGain();
-    } else {
-      tapMaster.gain.value = tapVol;
     }
+    // keep globals aligned for legacy callers
+    window.tapAudioCtx = tapAudioCtx;
+    window.tapMaster = tapMaster;
   }catch(e){}
 }
 function noteFreqFromTarget(t){
@@ -1414,6 +1416,13 @@ function noteFreqFromTarget(t){
     if(t && t.noteKey){
       const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
       if(map[t.noteKey]) return map[t.noteKey];
+    }
+
+    // v58: solfege JP (きらきらぼし単音)
+    const jp = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
+    const jpMap = {'ド':261.63,'レ':293.66,'ミ':329.63,'ファ':349.23,'ソ':392.00,'ラ':440.00,'シ':493.88,'ド2':523.25};
+    for(const k in jpMap){
+      if(jp.includes(k)) return jpMap[k];
     }
     const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
     const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
@@ -1429,26 +1438,17 @@ function noteFreqFromTarget(t){
   return 440.00;
 }
 function playTapHitSound(target){
-  // Only for TAP entry (タップであそぶ)
+  // v58: TAP only. WebAudio only. Volume via tapMaster.gain.
   if(!isTapMode()) return;
-
-  try{ ensureTapAudio(); }catch(e){}
+  ensureTapAudio();
+  applyTapVolumeToGain();
   if(!tapAudioCtx || !tapMaster) return;
 
   const now = tapAudioCtx.currentTime;
 
-  const vol = Math.max(0, Math.min(1, Number(getTapVolume01())));
-  const amp = Math.pow(vol, 2.2);
-
-  // master stays 1.0; per-sound scaling reflects slider always
-  try{ tapMaster.gain.setValueAtTime(1.0, now); }catch(e){}
-
+  // 1) fingers (including single note & open string 0)
   try{
-    const fingers =
-      (target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null) ||
-      (target && Array.isArray(target.fingers) ? target.fingers : null) ||
-      null;
-
+    const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
     if(fingers && fingers.length >= 1){
       const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
       const freqs = fingers.map(fg=>{
@@ -1458,28 +1458,27 @@ function playTapHitSound(target){
         const f = (Number.isFinite(fret) ? fret : 0);
         return base * Math.pow(2, f/12);
       });
-
       const dur = (target && target.isShort) ? 0.10 : (freqs.length===1 ? 0.14 : 0.18);
-      const baseLevel = 0.65;
-      const per = (freqs.length===1) ? (baseLevel * amp) : ((baseLevel * amp)/Math.max(1,freqs.length));
-
+      const per = (freqs.length===1) ? 0.75 : (0.75/Math.max(1,freqs.length));
       freqs.forEach((ff)=>{
         try{
           const o = tapAudioCtx.createOscillator();
-          const gg = tapAudioCtx.createGain();
-          gg.gain.setValueAtTime(0.0001, now);
-          gg.gain.exponentialRampToValueAtTime(Math.max(0.0001, per), now + 0.006);
-          gg.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-          o.frequency.setValueAtTime(ff, now);
+          const g = tapAudioCtx.createGain();
           o.type = 'triangle';
-          o.connect(gg); gg.connect(tapMaster);
-          o.start(now); o.stop(now + dur + 0.01);
+          o.frequency.setValueAtTime(ff, now);
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(per, now + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          o.connect(g).connect(tapMaster);
+          o.start(now);
+          o.stop(now + dur + 0.01);
         }catch(e){}
       });
       return;
     }
   }catch(e){}
 
+  // 2) single note by noteKey / chord name (JP solfege supported in noteFreqFromTarget)
   const f = noteFreqFromTarget(target);
   try{
     const o = tapAudioCtx.createOscillator();
@@ -1487,31 +1486,14 @@ function playTapHitSound(target){
     o.type = 'triangle';
     o.frequency.setValueAtTime(f, now);
 
+    const dur = (target && target.isShort) ? 0.12 : 0.22;
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.55 * amp), now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    g.gain.exponentialRampToValueAtTime(0.85, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
 
     o.connect(g).connect(tapMaster);
     o.start(now);
-    o.stop(now + 0.18);
-  }catch(e){}
-
-  try{
-    const ns = tapAudioCtx.createOscillator();
-    const nf = tapAudioCtx.createBiquadFilter();
-    const ng = tapAudioCtx.createGain();
-    ns.type='square';
-    ns.frequency.setValueAtTime(2000, now);
-    nf.type='highpass';
-    nf.frequency.setValueAtTime(1200, now);
-
-    ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.18 * amp), now + 0.002);
-    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-
-    ns.connect(nf).connect(ng).connect(tapMaster);
-    ns.start(now);
-    ns.stop(now + 0.06);
+    o.stop(now + dur + 0.01);
   }catch(e){}
 }
 
@@ -2944,14 +2926,18 @@ function getTapVolume01(){
   return clamp01(window.tapVol || 0.35);
 }
 function applyTapVolumeToGain(){
-  // live update master gain
+  // v58: update lexical tapVol and apply to the actual WebAudio master gain
   try{
-    const v = getTapVolume01();
-    window.tapVol = v;
-    if(window.tapMaster && window.tapAudioCtx){
-      // psychoacoustic curve: more control in low volumes
-      const g = Math.pow(v, 2.2);
-      window.tapMaster.gain.setTargetAtTime(g, window.tapAudioCtx.currentTime, 0.01);
+    const v = getTapVolume01();  // #tapVolume (0..1)
+    tapVol = clamp01(v);
+    window.tapVol = tapVol;
+    ensureTapAudio();
+    // expose for any legacy references
+    window.tapAudioCtx = tapAudioCtx;
+    window.tapMaster = tapMaster;
+    if(tapMaster && tapAudioCtx){
+      const g = Math.pow(tapVol, 2.2); // perceptual curve
+      tapMaster.gain.setTargetAtTime(g, tapAudioCtx.currentTime, 0.01);
     }
   }catch(e){}
 }
@@ -3032,28 +3018,25 @@ function applyTapVolumeToGain(){
   // --- Slider: non-continuous preview (no glitches) ---
   let lastPreviewAt = 0;
   function sliderPreview(){
-    const now = Date.now();
-    if(now - lastPreviewAt < 120) return; // throttle
-    lastPreviewAt = now;
+    const nowMs = Date.now();
+    if(nowMs - lastPreviewAt < 120) return; // throttle
+    lastPreviewAt = nowMs;
     if(!isTapMode()) return;
-    try{ syncTapVol(); }catch(e){}
-    try{ ensureTapAudio(); }catch(e){}
+    applyTapVolumeToGain();
     if(!tapAudioCtx || !tapMaster) return;
-
-    const vol = Math.max(0, Math.min(1, Number(getTapVolume01())));
-    const amp = Math.pow(vol, 2.2);
-    try{ tapMaster.gain.setValueAtTime(1.0, tapAudioCtx.currentTime); }catch(e){}
 
     const t0 = tapAudioCtx.currentTime;
     const o = tapAudioCtx.createOscillator();
     const g = tapAudioCtx.createGain();
 
-    const f = 220 + (880-220) * vol;
+    // pitch goes up as slider goes right
+    const f = 220 + (880-220) * clamp01(tapVol);
     o.type = 'sine';
     o.frequency.setValueAtTime(f, t0);
 
+    // envelope (master gain controls loudness)
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.7 * amp), t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.8, t0 + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
 
     o.connect(g).connect(tapMaster);
@@ -3074,7 +3057,6 @@ function applyTapVolumeToGain(){
 
     s.addEventListener('input', ()=>{
       if(!isTapMode()) return;
-      try{ syncTapVol(); }catch(e){}
       sliderPreview();
     }, {passive:true});
 
@@ -3094,7 +3076,27 @@ function applyTapVolumeToGain(){
 
   window.playTapHitSound = function(target){
     if(!isTapMode()) return;
-    try{ syncTapVol(); }catch(e){}
+    syncTapVol();
+
+    // Notes: target.noteKey = 'do'|'re'|'mi'...
+    try{
+      if(target && target.noteKey && urls[target.noteKey]){
+        playUrl(urls[target.noteKey], tapVol);
+        return; // don't fall through to original (to avoid 1音だけになる)
+      }
+    }catch(e){}
+
+    // Chords: target.chord.name like 'C','F','G7','Am'
+    try{
+      const n = (target && target.chord && target.chord.name) ? String(target.chord.name) : '';
+      const up = n.trim().toUpperCase();
+      if(up === 'C') { playUrl(urls.C, tapVol); return; }
+      if(up === 'F') { playUrl(urls.F, tapVol); return; }
+      if(up === 'G7') { playUrl(urls.G7, tapVol); return; }
+      if(up === 'AM') { playUrl(urls.Am, tapVol); return; }
+    }catch(e){}
+
+    // fallback: keep original behavior if we couldn't identify
     try{ if(origPlayTapHitSound) origPlayTapHitSound.apply(this, arguments); }catch(e){}
   };
 

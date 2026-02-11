@@ -918,7 +918,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v7</div>
+<div id="verTag">v50</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -2980,9 +2980,8 @@ function applyTapVolumeToGain(){
     return document.getElementById('tapVolume');
   }
   function getTapVolFromSlider(){
-    const s = getSlider();
-    if(!s) return clamp01(tapVol);
-    return clamp01(s.value);
+    // slider is 0..100; convert to 0..1
+    return getTapVolume01();
   }
   function syncTapVol(){
     tapVol = getTapVolFromSlider();
@@ -3090,7 +3089,27 @@ function applyTapVolumeToGain(){
   // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
   const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
 
-  window.playTapHitSound = function(target){
+  
+  function normalizeNoteKey(k){
+    if(!k) return null;
+    const s = String(k).trim();
+    if(!s) return null;
+    // Japanese solfege
+    const jpMap = {"ド":"do","レ":"re","ミ":"mi","ファ":"fa","フ":"fa","ソ":"so","ラ":"la","シ":"ti","ティ":"ti","サ":"so"};
+    if(jpMap[s]) return jpMap[s];
+    const low = s.toLowerCase();
+    // roman solfege
+    const solMap = {"do":"do","re":"re","mi":"mi","fa":"fa","so":"so","sol":"so","la":"la","ti":"ti","si":"ti"};
+    if(solMap[low]) return solMap[low];
+    // note letters (C major around C4)
+    const noteMap = {"c":"do","d":"re","e":"mi","f":"fa","g":"so","a":"la","b":"ti"};
+    if(noteMap[low]) return noteMap[low];
+    // common strings like "C4","D4" etc
+    const m = low.match(/^([a-g])/);
+    if(m && noteMap[m[1]]) return noteMap[m[1]];
+    return low;
+  }
+window.playTapHitSound = function(target){
     if(!isTapMode()) return;
     syncTapVol();
 
@@ -3120,7 +3139,6 @@ function applyTapVolumeToGain(){
 })();
 
 </script>
-<div class="verBadge">v12</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

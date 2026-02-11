@@ -918,7 +918,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v50</div>
+<div id="verTag">v51</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -971,8 +971,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div class="bottom-inline">
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
-  </div>
+</div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
 </button>
@@ -1423,6 +1422,76 @@ function ensureTapAudio(){
       tapMaster.gain.value = tapVol;
     }
   }catch(e){}
+
+// --- Volume slider continuous preview (iPhone Safari safe) ---
+let volPreviewOsc = null;
+let volPreviewGain = null;
+let volPreviewActive = false;
+
+function calcPreviewFreqFromSlider01(v01){
+  // 220Hz .. 880Hz (right -> higher)
+  return 220 + (880-220)*clamp01(v01);
+}
+
+function startVolPreview(){
+  ensureTapAudio();
+  if(!tapAudioCtx) return;
+  try{ tapAudioCtx.resume && tapAudioCtx.resume(); }catch(e){}
+  if(volPreviewOsc) return; // already running
+  volPreviewActive = true;
+
+  const v01 = getTapVolume01();
+  volPreviewGain = tapAudioCtx.createGain();
+  volPreviewGain.gain.value = 0.0001;
+  volPreviewGain.connect(tapMaster);
+
+  volPreviewOsc = tapAudioCtx.createOscillator();
+  volPreviewOsc.type = 'sine';
+  volPreviewOsc.frequency.value = calcPreviewFreqFromSlider01(v01);
+  volPreviewOsc.connect(volPreviewGain);
+  volPreviewOsc.start();
+
+  // small fade-in to avoid click
+  const now = tapAudioCtx.currentTime;
+  volPreviewGain.gain.cancelScheduledValues(now);
+  volPreviewGain.gain.setValueAtTime(0.0001, now);
+  volPreviewGain.gain.linearRampToValueAtTime(0.15 * v01, now + 0.03);
+}
+
+function updateVolPreview(){
+  if(!volPreviewOsc || !tapAudioCtx) return;
+  const v01 = getTapVolume01();
+  const now = tapAudioCtx.currentTime;
+  const f = calcPreviewFreqFromSlider01(v01);
+
+  volPreviewOsc.frequency.setTargetAtTime(f, now, 0.02);
+  volPreviewGain.gain.cancelScheduledValues(now);
+  volPreviewGain.gain.setValueAtTime(volPreviewGain.gain.value, now);
+  volPreviewGain.gain.linearRampToValueAtTime(0.15 * v01, now + 0.03);
+
+  // keep internal tapVol in sync for hit sounds
+  tapVol = v01;
+}
+
+function stopVolPreview(){
+  volPreviewActive = false;
+  if(!tapAudioCtx) { volPreviewOsc=null; volPreviewGain=null; return; }
+  if(!volPreviewOsc) return;
+  const now = tapAudioCtx.currentTime;
+  try{
+    volPreviewGain.gain.cancelScheduledValues(now);
+    volPreviewGain.gain.setValueAtTime(volPreviewGain.gain.value, now);
+    volPreviewGain.gain.linearRampToValueAtTime(0.0001, now + 0.05);
+    volPreviewOsc.stop(now + 0.06);
+  }catch(e){}
+  setTimeout(()=>{
+    try{ volPreviewOsc && volPreviewOsc.disconnect(); }catch(e){}
+    try{ volPreviewGain && volPreviewGain.disconnect(); }catch(e){}
+    volPreviewOsc = null;
+    volPreviewGain = null;
+  }, 120);
+}
+
 }
 function noteFreqFromTarget(t){
   try{
@@ -2948,21 +3017,12 @@ window.addEventListener('pageshow', ()=>{
   }
 
 function getTapVolume01(){
-  // prefer tapVolume (0..1), fallback tapVol (0..100)
-  const s01 = document.getElementById('tapVolume');
-  if(s01){
-    const v = Number(s01.value);
-    return clamp01(Number.isFinite(v)? v : 0.35);
-  }
-  const s100 = document.getElementById('tapVol');
-  if(s100){
-    const v = Number(s100.value);
-    const min = Number(s100.min || 0);
-    const max = Number(s100.max || 100);
-    const vol01 = (v - min) / (max - min || 1);
-    return clamp01(vol01);
-  }
-  return clamp01(window.tapVol || 0.35);
+  // single source of truth: #tapVol is 0..100 (percent)
+  const s = document.getElementById('tapVol');
+  if(!s) return 0.5;
+  const v = Number(s.value);
+  if(!Number.isFinite(v)) return 0.5;
+  return clamp01(v/100);
 }
 function applyTapVolumeToGain(){
   // live update master gain (and shared tapVol variable)
@@ -2976,9 +3036,7 @@ function applyTapVolumeToGain(){
     }
   }catch(e){}
 }
-  function getSlider(){
-    return document.getElementById('tapVolume');
-  }
+  function getSlider(){ return document.getElementById('tapVol'); }
   function getTapVolFromSlider(){
     // slider is 0..100; convert to 0..1
     return getTapVolume01();
@@ -3060,31 +3118,45 @@ function applyTapVolumeToGain(){
   }
 
   function hookSlider(){
-    const s = getSlider();
-    if(!s) return;
+  const s = getSlider();
+  if(!s) return;
 
-    // initial sync: if saved tapVol is 0 but slider default isn't, prefer slider value
-    try{ loadTapVol(); }catch(e){}
-    const sliderV = clamp01(s.value);
-    if(clamp01(tapVol) === 0 && sliderV > 0) tapVol = sliderV;
-    s.value = String(clamp01(tapVol));
-    syncTapVol();
+  // reflect saved internal tapVol (0..1) to UI slider (0..100)
+  s.value = String(Math.round(clamp01(tapVol)*100));
 
-    s.addEventListener('input', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
+  const setFromUI = ()=>{
+    const v01 = clamp01(Number(s.value)/100);
+    tapVol = v01;
+    applyTapVolumeToGain(v01);
+    saveTapVol();
+  };
 
-    // also preview on pointerup (so user hears final value even if drag didn't fire many inputs)
-    s.addEventListener('pointerup', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
-    s.addEventListener('touchend', ()=>{
-      if(!isTapMode()) return;
-      sliderPreview();
-    }, {passive:true});
-  }
+  s.addEventListener('input', ()=>{
+    setFromUI();
+    if(volPreviewActive) updateVolPreview();
+  }, {passive:true});
+
+  const start = (ev)=>{
+    // iOS: must start audio inside user gesture
+    setFromUI();
+    startVolPreview();
+    updateVolPreview();
+  };
+  const end = ()=> stopVolPreview();
+
+  s.addEventListener('pointerdown', start, {passive:true});
+  s.addEventListener('pointerup', end, {passive:true});
+  s.addEventListener('pointercancel', end, {passive:true});
+
+  // iOS Safari sometimes doesn't dispatch pointer events reliably on range,
+  // so also bind touch events (non-passive to prevent page scroll while sliding)
+  s.addEventListener('touchstart', (e)=>{ start(e); }, {passive:true});
+  s.addEventListener('touchend', end, {passive:true});
+  s.addEventListener('touchcancel', end, {passive:true});
+  s.addEventListener('touchmove', (e)=>{
+    if(volPreviewActive){ e.preventDefault(); }
+  }, {passive:false});
+}
 
   // --- Hit sound: replace playTapHitSound so it actually plays do/re/mi... and chords ---
   const origPlayTapHitSound = (typeof playTapHitSound === 'function') ? playTapHitSound : null;

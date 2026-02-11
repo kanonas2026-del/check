@@ -917,7 +917,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v71</div>
+<div id="verTag">v72</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -2931,20 +2931,41 @@ window.addEventListener('pageshow', ()=>{
   // ---- WebAudio unlock / master gain ----
   function ensureTapAudioUnlocked(){
     try{
-      if(typeof ensureTapAudio === 'function') ensureTapAudio(); // reuse existing
-      if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx && tapAudioCtx.state === 'suspended'){
-        tapAudioCtx.resume();
+      // reuse existing initializer if present
+      if(typeof ensureTapAudio === 'function') ensureTapAudio();
+
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+
+      // create context if missing
+      if(!tapAudioCtx){
+        if(!Ctx) return false;
+        tapAudioCtx = new Ctx();
       }
-      if(typeof tapAudioCtx === 'undefined' || !tapAudioCtx){
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if(Ctx) tapAudioCtx = new Ctx();
+
+      // resume (IMPORTANT: iOS often starts in suspended even after creation)
+      if(tapAudioCtx.state === 'suspended'){
+        try{ tapAudioCtx.resume(); }catch(e){}
       }
-      if(!tapAudioCtx) return false;
-      if(typeof tapMaster === 'undefined' || !tapMaster){
+
+      // create master gain if missing
+      if(!tapMaster){
         tapMaster = tapAudioCtx.createGain();
         tapMaster.gain.value = 0.0;
         tapMaster.connect(tapAudioCtx.destination);
       }
+
+      // prime output (silent tick) to satisfy some iOS devices
+      try{
+        const now = tapAudioCtx.currentTime;
+        const o = tapAudioCtx.createOscillator();
+        const g = tapAudioCtx.createGain();
+        g.gain.setValueAtTime(0.0001, now);
+        o.frequency.setValueAtTime(10, now);
+        o.connect(g); g.connect(tapAudioCtx.destination);
+        o.start(now);
+        o.stop(now + 0.02);
+      }catch(e){}
+
       return true;
     }catch(e){}
     return false;
@@ -3144,7 +3165,26 @@ window.addEventListener('pageshow', ()=>{
   window.playTapHitSound = patched;
   try{ playTapHitSound = patched; }catch(e){}
 
-  window.addEventListener('DOMContentLoaded', hookSlider);
+  function bindUnlockOnce(){
+    const unlock = ()=>{
+      try{ ensureTapAudioUnlocked(); applyTapVolumeToGainSafe(); }catch(e){}
+    };
+    // capture=true so we run even if other handlers stopPropagation
+    ['pointerdown','touchstart','mousedown'].forEach(ev=>{
+      try{ document.addEventListener(ev, unlock, {once:true, passive:true, capture:true}); }catch(e){}
+    });
+  }
+
+  function initV40(){
+    try{ hookSlider(); }catch(e){}
+    try{ bindUnlockOnce(); }catch(e){}
+  }
+
+  if(document.readyState === 'loading'){
+    window.addEventListener('DOMContentLoaded', initV40);
+  }else{
+    initV40();
+  }
 })();
 
 </script>

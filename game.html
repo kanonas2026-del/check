@@ -782,12 +782,12 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id="buildBadge">v77</div>
+<div id="buildBadge">v78</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v77</div>
+<div id="verTag">v78</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -844,7 +844,6 @@ body.is-uke .vol-inline{ display:none !important; }
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
-</button>
 </div>
 </div>
 <div id="screenFlash"></div>
@@ -1958,6 +1957,7 @@ function goBackFromGameMenu(){
 
 // ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
+  try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   try{ document.body.classList.remove('playing'); document.body.classList.add('menuOpen'); }catch(e){}
   if(rafId) cancelAnimationFrame(rafId);
   gameState = 'MENU';
@@ -1995,6 +1995,7 @@ function resumeGame(){
 
 // --- ゲーム開始フロー ---
 async function prepGame(type){
+  try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
   // タップモードならマイク不要
   if(isTapMode()){ startGameByType(type); return; }
@@ -2756,6 +2757,7 @@ let __navLock = false;
 function goFlip(url){
   if(__navLock) return;
   __navLock = true;
+  try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   const ov = document.getElementById('pageFlip');
   if(!ov){ location.href = url; return; }
   ov.style.display = 'block';
@@ -2850,84 +2852,33 @@ window.addEventListener('pageshow', ()=>{
     return Promise.resolve();
   }
 
-  // --- preview: single osc kept while dragging ---
-  let pvOsc = null, pvGain = null, pvActive = false;
+  // --- preview: DISABLED (was continuous osc; could get stuck and keep sounding) ---
+// Slider should not emit sound. We only unlock AudioContext when the user touches it.
+let pvOsc = null, pvGain = null, pvActive = false;
 
-  function freqFromVol(v01){
-    return 220 + (1320 - 220) * v01; // 220..1320Hz
-  }
+function startPreview(){
+  pvActive = false;
+  try{ resumeTapAudioInGesture(); }catch(e){}
+}
 
-  function startPreview(){
-    if(pvActive) return;
-    pvActive = true;
+function updatePreview(){ /* no-op */ }
 
-    resumeTapAudioInGesture().then(()=>{
-      try{
-        if(typeof tapAudioCtx === 'undefined' || !tapAudioCtx || typeof tapMaster === 'undefined' || !tapMaster){
-          pvActive = false;
-          return;
-        }
-        // sync volume and gain
-        const v01 = getTapVolume01();
-        setTapVolume01(v01);
-        window.applyTapVolumeToGain();
+function stopPreview(){
+  pvActive = false;
+  try{
+    if(pvGain && tapAudioCtx){
+      const now = tapAudioCtx.currentTime;
+      try{ pvGain.gain.setTargetAtTime(0.0, now, 0.02); }catch(_){}
+    }
+  }catch(e){}
+  try{ pvOsc && pvOsc.stop(); }catch(e){}
+  try{ pvOsc && pvOsc.disconnect(); }catch(e){}
+  try{ pvGain && pvGain.disconnect(); }catch(e){}
+  pvOsc = null; pvGain = null;
+}
 
-        const now = tapAudioCtx.currentTime;
-
-        pvGain = tapAudioCtx.createGain();
-        pvGain.gain.setValueAtTime(0.0, now);
-
-        pvOsc = tapAudioCtx.createOscillator();
-        pvOsc.type = 'sine';
-        pvOsc.frequency.setValueAtTime(freqFromVol(v01), now);
-
-        pvOsc.connect(pvGain);
-        pvGain.connect(tapMaster);
-
-        pvOsc.start(now);
-
-        const audible = v01 <= 0 ? 0.0 : 1.0;
-        pvGain.gain.setTargetAtTime(audible, now, 0.02);
-      }catch(e){
-        pvActive = false;
-        try{ pvOsc && pvOsc.stop(); }catch(_){}
-        pvOsc = null; pvGain = null;
-      }
-    });
-  }
-
-  function updatePreview(){
-    if(!pvActive) return;
-    try{
-      const v01 = getTapVolume01();
-      setTapVolume01(v01);
-      window.applyTapVolumeToGain();
-
-      if(pvOsc && tapAudioCtx){
-        const now = tapAudioCtx.currentTime;
-        pvOsc.frequency.setTargetAtTime(freqFromVol(v01), now, 0.02);
-        if(pvGain){
-          const audible = v01 <= 0 ? 0.0 : 1.0;
-          pvGain.gain.setTargetAtTime(audible, now, 0.02);
-        }
-      }
-    }catch(e){}
-  }
-
-  function stopPreview(){
-    if(!pvActive) return;
-    pvActive = false;
-    try{
-      if(pvGain && tapAudioCtx){
-        const now = tapAudioCtx.currentTime;
-        pvGain.gain.setTargetAtTime(0.0, now, 0.03);
-        if(pvOsc) pvOsc.stop(now + 0.06);
-      }else if(pvOsc){
-        pvOsc.stop();
-      }
-    }catch(e){}
-    pvOsc = null; pvGain = null;
-  }
+// expose for navigation / state changes
+window.stopTapPreview = stopPreview;
 
   // --- hit sound: WebAudio only (covers noteKey / 日本語 / fingers=1 まで) ---
   const origPlay = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
@@ -3053,54 +3004,37 @@ window.addEventListener('pageshow', ()=>{
   };
 
   // --- slider bind (#tapVolume only) ---
-  function hookSlider(){
-    const s = document.getElementById('tapVolume');
-    if(!s) return;
+function hookSlider(){
+  const s = document.getElementById('tapVolume');
+  if(!s) return;
 
-    // initial sync from saved tapVol
-    try{ loadTapVol(); }catch(e){}
-    const v01 = getTapVolume01();
-    setTapVolume01(v01);
-    window.applyTapVolumeToGain();
+  // initial sync from saved tapVol
+  try{ loadTapVol(); }catch(e){}
+  const v01 = getTapVolume01();
+  setTapVolume01(v01);
+  window.applyTapVolumeToGain();
 
-    try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s); }catch(e){}
+  // make dragging smooth on iOS
+  try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s); }catch(e){}
 
-    const onDown = (e)=>{
-      startPreview();
-      try{ if(s.setPointerCapture && e.pointerId != null) s.setPointerCapture(e.pointerId); }catch(_){}
-      try{ e.preventDefault(); }catch(_){}
-    };
-    const onMove = (e)=>{
-      if(!pvActive) return;
-      updatePreview();
-      try{ e.preventDefault(); }catch(_){}
-    };
-    const onUp = ()=>{
-      stopPreview();
-    };
+  const apply = ()=>{
+    try{ setTapVolume01(getTapVolume01()); }catch(e){}
+    try{ window.applyTapVolumeToGain(); }catch(e){}
+    // user gesture => allow audio on iOS (no sound here)
+    try{ ensureTapAudio(); }catch(e){}
+    try{ stopPreview(); }catch(e){}
+  };
 
-    s.addEventListener('pointerdown', onDown, {passive:false});
-    s.addEventListener('pointermove', onMove, {passive:false});
-    s.addEventListener('pointerup', onUp, {passive:true});
-    s.addEventListener('pointercancel', onUp, {passive:true});
+  s.addEventListener('input', apply, {passive:true});
+  s.addEventListener('change', apply, {passive:true});
+}
 
-    s.addEventListener('touchstart', onDown, {passive:false});
-    s.addEventListener('touchmove', onMove, {passive:false});
-    s.addEventListener('touchend', onUp, {passive:true});
-    s.addEventListener('touchcancel', onUp, {passive:true});
-
-    s.addEventListener('input', ()=>{
-      setTapVolume01(getTapVolume01());
-      window.applyTapVolumeToGain();
-      updatePreview();
-    }, {passive:true});
-  }
 
   window.addEventListener('DOMContentLoaded', hookSlider);
 })();;;
 
 </script>
-<div class="verBadge">v12</div>
+<div class="verBadge">v78</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

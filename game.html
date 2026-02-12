@@ -780,12 +780,12 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id="buildBadge">v87</div>
+<div id="buildBadge">v88</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v87</div>
+<div id="verTag">v88</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -2899,16 +2899,19 @@ window.addEventListener('pageshow', ()=>{
     const now = tapAudioCtx.currentTime;
     const N = Math.max(1, freqs.length);
 
-    // Ukulele-like pluck: Karplus-Strong (noise burst -> delay feedback loop)
-    // NOTE: tap volume (tapMaster gain) is NOT modified here.
-    const baseGain = 0.30 / N;
-    const tail = Math.min(1.60, Math.max(0.55, (dur || 0.16) * 6.0));
+    // Ukulele-like pluck (SAFE / warm / quiet):
+    // - Lower level (won't blow ears)
+    // - Softer highs (lowpass)
+    // - Moderate sustain
+    // NOTE: tap volume slider mapping is NOT changed (tapMaster gain untouched).
+    const baseGain = 0.12 / N;
+    const tail = Math.min(1.20, Math.max(0.45, (dur || 0.16) * 5.0));
 
     for(const f0 of freqs){
-      const f = Math.max(70, Math.min(1800, Number(f0) || 440));
+      const f = Math.max(80, Math.min(1500, Number(f0) || 440));
 
-      // excite: tiny noise burst (pick)
-      const burst = 0.020;
+      // excite: tiny noise burst (very short)
+      const burst = 0.014;
       const len = Math.max(1, Math.floor(tapAudioCtx.sampleRate * burst));
       const buf = tapAudioCtx.createBuffer(1, len, tapAudioCtx.sampleRate);
       const data = buf.getChannelData(0);
@@ -2923,34 +2926,41 @@ window.addEventListener('pageshow', ()=>{
       const delay = tapAudioCtx.createDelay(1.0);
       delay.delayTime.setValueAtTime(1 / f, now);
 
-      // loop damping (string loses highs)
+      // loop damping
       const damp = tapAudioCtx.createBiquadFilter();
       damp.type = 'lowpass';
-      damp.frequency.setValueAtTime(4200, now);
-      damp.Q.setValueAtTime(0.6, now);
+      damp.frequency.setValueAtTime(2400, now);
+      damp.Q.setValueAtTime(0.5, now);
 
-      // feedback => sustain
+      // feedback => sustain (keep safe)
       const fb = tapAudioCtx.createGain();
-      fb.gain.setValueAtTime(0.945, now);
+      fb.gain.setValueAtTime(0.905, now);
 
-      // body resonance
+      // body resonance (gentle)
       const body = tapAudioCtx.createBiquadFilter();
       body.type = 'bandpass';
-      body.frequency.setValueAtTime(820, now);
-      body.Q.setValueAtTime(0.8, now);
+      body.frequency.setValueAtTime(620, now);
+      body.Q.setValueAtTime(0.7, now);
 
-      // output envelope (controls ring-out only)
+      // extra tone softener (final lowpass)
+      const tone = tapAudioCtx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.setValueAtTime(2200, now);
+      tone.Q.setValueAtTime(0.7, now);
+
+      // output envelope
       const out = tapAudioCtx.createGain();
       out.gain.setValueAtTime(baseGain, now);
       out.gain.exponentialRampToValueAtTime(0.0001, now + tail);
 
-      // wire: excite -> delay -> body -> out -> master
+      // wire: excite -> delay -> body -> tone -> out -> master
       src.connect(delay);
       delay.connect(body);
-      body.connect(out);
+      body.connect(tone);
+      tone.connect(out);
       out.connect(tapMaster);
 
-      // feedback loop: delay -> damp -> fb -> delay
+      // feedback: delay -> damp -> fb -> delay
       delay.connect(damp);
       damp.connect(fb);
       fb.connect(delay);
@@ -2958,7 +2968,6 @@ window.addEventListener('pageshow', ()=>{
       src.start(now);
       src.stop(now + burst);
 
-      // cleanup (avoid node leaks)
       const cleanupMs = Math.round((tail + 0.25) * 1000);
       setTimeout(()=>{
         try{ src.disconnect(); }catch(e){}
@@ -2966,6 +2975,7 @@ window.addEventListener('pageshow', ()=>{
         try{ damp.disconnect(); }catch(e){}
         try{ fb.disconnect(); }catch(e){}
         try{ body.disconnect(); }catch(e){}
+        try{ tone.disconnect(); }catch(e){}
         try{ out.disconnect(); }catch(e){}
       }, cleanupMs);
     }
@@ -3089,7 +3099,7 @@ window.addEventListener('pageshow', ()=>{
   });
 })();
 </script>
-<div class="verBadge">v87</div>
+<div class="verBadge">v88</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

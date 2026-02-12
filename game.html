@@ -668,6 +668,28 @@ body.playing #menu-overlay{ display:none; }
   height:24px;
   touch-action:pan-x;
 }
+.tapVolMeta{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-shrink:0;
+}
+#tapVolVal{
+  font-weight:900;
+  font-size:12px;
+  min-width:44px;
+  text-align:right;
+  opacity:0.92;
+}
+.tapVolTest{
+  padding:6px 10px;
+  border-radius:999px;
+  border:none;
+  background:rgba(255,255,255,0.90);
+  font-weight:900;
+  font-size:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,.10);
+}
 .top-inline-btn{
   flex-shrink:0;
   padding:8px 14px;
@@ -782,12 +804,12 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id="buildBadge">v78</div>
+<div id="buildBadge">v79</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v78</div>
+<div id="verTag">v79</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -841,6 +863,7 @@ body.is-uke .vol-inline{ display:none !important; }
   <div class="vol-inline">
     <div class="vol-label">🔊 タップ音</div>
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
+    <div class="tapVolMeta"><span id="tapVolVal">50%</span><button id="tapVolTestBtn" class="tapVolTest" type="button">♪ テスト</button></div>
   </div>
   <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
@@ -3008,33 +3031,82 @@ function hookSlider(){
   const s = document.getElementById('tapVolume');
   if(!s) return;
 
-  // initial sync from saved tapVol
+  const valEl = document.getElementById('tapVolVal');
+  const btn = document.getElementById('tapVolTestBtn');
+
+  const updateLabel = ()=>{
+    if(!valEl) return;
+    const v01 = getTapVolume01();
+    valEl.textContent = String(Math.round(v01 * 100)) + '%';
+  };
+
+  const testBeep = ()=>{
+    // short confirmation sound (no continuous preview)
+    try{ resumeTapAudioInGesture(); }catch(e){}
+    try{ ensureTapAudio(); }catch(e){}
+    try{ window.applyTapVolumeToGain && window.applyTapVolumeToGain(); }catch(e){}
+    try{
+      if(!tapAudioCtx || !tapMaster) return;
+      const now = tapAudioCtx.currentTime;
+      const o = tapAudioCtx.createOscillator();
+      const g = tapAudioCtx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(880, now); // A5
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.35, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+      o.connect(g).connect(tapMaster);
+      o.start(now);
+      o.stop(now + 0.10);
+    }catch(e){}
+  };
+
+  // init from saved tapVol (0..1)
   try{ loadTapVol(); }catch(e){}
-  const v01 = getTapVolume01();
-  setTapVolume01(v01);
-  window.applyTapVolumeToGain();
+  try{
+    const v = clamp01(typeof tapVol !== 'undefined' ? tapVol : 0.35);
+    setTapVolume01(v); // sets slider + saves (same value)
+  }catch(e){}
+  try{ window.applyTapVolumeToGain && window.applyTapVolumeToGain(); }catch(e){}
+  updateLabel();
 
   // make dragging smooth on iOS
   try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s); }catch(e){}
 
   const apply = ()=>{
-    try{ setTapVolume01(getTapVolume01()); }catch(e){}
-    try{ window.applyTapVolumeToGain(); }catch(e){}
+    try{
+      const v01 = getTapVolume01();
+      setTapVolume01(v01); // persist + sync
+    }catch(e){}
+    try{ window.applyTapVolumeToGain && window.applyTapVolumeToGain(); }catch(e){}
+    updateLabel();
     // user gesture => allow audio on iOS (no sound here)
     try{ ensureTapAudio(); }catch(e){}
-    try{ stopPreview(); }catch(e){}
+    try{ stopPreview && stopPreview(); }catch(e){}
   };
 
   s.addEventListener('input', apply, {passive:true});
-  s.addEventListener('change', apply, {passive:true});
+  s.addEventListener('change', ()=>{
+    apply();
+    testBeep(); // one shot sound on release
+  }, {passive:true});
+
+  if(btn){
+    btn.addEventListener('click', (e)=>{
+      try{ e.preventDefault(); e.stopPropagation(); }catch(_){}
+      apply();
+      testBeep();
+    }, {passive:false});
+  }
 }
+
 
 
   window.addEventListener('DOMContentLoaded', hookSlider);
 })();;;
 
 </script>
-<div class="verBadge">v78</div>
+<div class="verBadge">v79</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

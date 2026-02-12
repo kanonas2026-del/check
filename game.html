@@ -2783,7 +2783,7 @@ window.addEventListener('pageshow', ()=>{
 })();
 
 
-// ===== v79: WebAudio一本化 & UI Feedback Fix =====
+// ===== v79: WebAudio FIX & Sound Design =====
 (function(){
   // --- helpers ---
   function clamp01(x){
@@ -2851,9 +2851,7 @@ window.addEventListener('pageshow', ()=>{
         const o = tapAudioCtx.createOscillator();
         const g = tapAudioCtx.createGain();
         
-        // Woodblock-ish "Pop" sound
         o.type = 'sine';
-        // Pitch goes up with volume slightly (800Hz base)
         const freq = 800 + (vol * 200); 
         o.frequency.setValueAtTime(freq, now);
         o.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.08);
@@ -2871,10 +2869,10 @@ window.addEventListener('pageshow', ()=>{
 
   // --- Legacy Preview Cleaner ---
   window.stopTapPreview = function(){ 
-    // No-op (old oscillator code removed)
+    // No-op
   };
 
-  // --- Hit Sound (WebAudio) ---
+  // --- Hit Sound (WebAudio) - UKULELE TONE FIX ---
   const origPlay = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
   const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
   const JP = {'ド':'do','レ':'re','ミ':'mi','ファ':'fa','ソ':'so','ラ':'la','シ':'si'};
@@ -2893,152 +2891,104 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){ return null; }
   }
 
+  // ★音質改善：安全な減算合成方式（ウクレレ風）
+  // 以前の物理モデル音源(Delay Feedback)は発振しやすいため廃止し、
+  // 三角波＋ローパスフィルタによる安全で温かみのある音色に変更。
   function playFreqs(freqs, dur){
-  try{
-    ensureTapAudio();
-    const now = tapAudioCtx.currentTime;
-    const N = Math.max(1, freqs.length);
+    try{
+      ensureTapAudio();
+      const now = tapAudioCtx.currentTime;
+      const N = Math.max(1, freqs.length);
 
-    // Ukulele-like pluck (Sustain & Warmth):
-    // - High feedback for long tail (sustain)
-    // - Lowpass filter (damp) to cut high freq (warm nylon tone)
-    // - Strumming delay for "Poron" feel
-    const baseGain = 0.15 / N; 
-    const tail = Math.min(1.50, Math.max(0.60, (dur || 0.16) * 6.0)); // Increased tail duration
+      // 音量調整：和音数に応じて下げる（音割れ防止）
+      const baseGain = 0.55 / N; 
+      // 余韻を長く
+      const tail = 1.0; 
 
-    freqs.forEach((f0, i) => {
-      const f = Math.max(80, Math.min(1500, Number(f0) || 440));
-      const strumDelay = i * 0.035; 
-      const startTime = now + strumDelay;
+      freqs.forEach((f0, i) => {
+        const f = Math.max(80, Math.min(1500, Number(f0) || 440));
+        
+        // ストローク表現：弦をはじくタイミングを少しずらす
+        const strumDelay = i * 0.03; 
+        const startTime = now + strumDelay;
 
-      // excite: tiny noise burst
-      const burst = 0.012; // Slightly shorter burst for cleaner attack
-      const len = Math.max(1, Math.floor(tapAudioCtx.sampleRate * burst));
-      const buf = tapAudioCtx.createBuffer(1, len, tapAudioCtx.sampleRate);
-      const data = buf.getChannelData(0);
-      for(let i=0;i<len;i++){
-        const w = 1 - (i / len);
-        data[i] = (Math.random()*2-1) * w;
-      }
-      const src = tapAudioCtx.createBufferSource();
-      src.buffer = buf;
+        const osc = tapAudioCtx.createOscillator();
+        const gain = tapAudioCtx.createGain();
+        const filter = tapAudioCtx.createBiquadFilter();
 
-      // delay line defines pitch
-      const delay = tapAudioCtx.createDelay(1.0);
-      delay.delayTime.setValueAtTime(1 / f, startTime);
+        // 1. 基本波形：ナイロン弦に近い「Triangle」
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, startTime);
 
-      // loop damping (Lowpass) - Cut high freq faster for Nylon feel
-      const damp = tapAudioCtx.createBiquadFilter();
-      damp.type = 'lowpass';
-      damp.frequency.setValueAtTime(1800, startTime); // Lower cutoff for warmer tone
-      damp.Q.setValueAtTime(0.5, startTime);
+        // 2. フィルタ：弾いた瞬間の「硬さ」→すぐ「柔らかく」なる変化
+        filter.type = 'lowpass';
+        filter.Q.value = 0.5; // レゾナンス控えめ
+        filter.frequency.setValueAtTime(3000, startTime); // 最初は明るく
+        filter.frequency.exponentialRampToValueAtTime(400, startTime + 0.15); // すぐ丸くなる
 
-      // feedback => sustain (HIGHER for longer tail)
-      const fb = tapAudioCtx.createGain();
-      fb.gain.setValueAtTime(0.96, startTime); // High feedback for long sustain
+        // 3. エンベロープ（音量変化）：アタック感と減衰
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.01); // アタック
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + tail); // 減衰
 
-      // body resonance (gentle)
-      const body = tapAudioCtx.createBiquadFilter();
-      body.type = 'bandpass';
-      body.frequency.setValueAtTime(450, startTime); // Lower body resonance
-      body.Q.setValueAtTime(0.6, startTime);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(tapMaster);
 
-      // extra tone softener
-      const tone = tapAudioCtx.createBiquadFilter();
-      tone.type = 'lowpass';
-      tone.frequency.setValueAtTime(2200, startTime);
-      tone.Q.setValueAtTime(0.7, startTime);
+        osc.start(startTime);
+        osc.stop(startTime + tail + 0.1);
+      });
+    }catch(e){ console.error(e); }
+  }
 
-      // output envelope
-      const out = tapAudioCtx.createGain();
-      out.gain.setValueAtTime(baseGain, startTime);
-      out.gain.exponentialRampToValueAtTime(0.0001, startTime + tail);
-
-      // wire
-      src.connect(delay);
-      delay.connect(body);
-      body.connect(tone);
-      tone.connect(out);
-      out.connect(tapMaster);
-
-      // feedback loop
-      delay.connect(damp);
-      damp.connect(fb);
-      fb.connect(delay);
-
-      src.start(startTime);
-      src.stop(startTime + burst);
-
-      const cleanupMs = Math.round((tail + 0.25 + strumDelay) * 1000);
-      setTimeout(()=>{
-        try{ src.disconnect(); }catch(e){}
-        try{ delay.disconnect(); }catch(e){}
-        try{ damp.disconnect(); }catch(e){}
-        try{ fb.disconnect(); }catch(e){}
-        try{ body.disconnect(); }catch(e){}
-        try{ tone.disconnect(); }catch(e){}
-        try{ out.disconnect(); }catch(e){}
-      }, cleanupMs);
-    });
-  }catch(e){}
-}
-
-  // ★修正: コードモードで全弦の周波数を返すマップ (Order: A, E, C, G)
+  // コード定義 (High-G Tuning: G=392, C=261, E=329, A=440)
+  // [A弦フレット, E弦フレット, C弦フレット, G弦フレット]
   const UKE_FULL_CHORDS = {
-    'C':  [3,0,0,0], // A3, E0, C0, G0
-    'F':  [0,1,0,2], // A0, E1, C0, G2
-    'G7': [2,1,2,0], // A2, E1, C2, G0
-    'Am': [0,0,0,2], // A0, E0, C0, G2
-    'G':  [2,3,2,0], // A2, E3, C2, G0
-    'A7': [0,0,1,0], // A0, E0, C1, G0
-    'Dm': [0,1,2,2], // A0, E1, C2, G2
-    'Em': [2,3,4,0], // A2, E3, C4, G0
-    'D7': [0,2,2,2]  // A0, E2, C2, G2 (Standard/Hawaiian D7 often uses open A)
+    'C':  [3,0,0,0], 
+    'F':  [0,1,0,2], 
+    'G7': [2,1,2,0], 
+    'Am': [0,0,0,2], 
+    'G':  [2,3,2,0], 
+    'A7': [0,0,1,0], 
+    'Dm': [0,1,2,2], 
+    'Em': [2,3,4,0], 
+    'D7': [0,2,2,2]  
   };
 
   function getFreqsFromTarget(target){
-    // 1. 特殊音名指定
-    try{
-      const nk = target && target.noteKey ? String(target.noteKey).toLowerCase().trim() : '';
-      if(nk){
-        if(NOTE[nk]) return [NOTE[nk]];
-        if(nk === 'sol') return [NOTE.so];
-        if(nk === 'ti') return [NOTE.si];
-      }
-    }catch(e){}
-
-    // 2. 指指定がある場合 (fingers) -> もしコード名が既知なら全弦優先、そうでなければ指のみ
+    // 1. コード名から周波数（和音）
     try{
       const name = target && target.chord && target.chord.name != null ? String(target.chord.name).trim() : '';
-      
-      // ★修正: 既知のコードなら全弦の周波数を生成して返す (開放弦も含めるため)
       if(name && UKE_FULL_CHORDS[name]){
-        // UKE_FULL_CHORDS definitions are [A_fret, E_fret, C_fret, G_fret]
         const shapes = UKE_FULL_CHORDS[name];
-        const bases = [STR_BASE.A, STR_BASE.E, STR_BASE.C, STR_BASE.G];
-        const freqs = [];
-        // G, C, E, A の順(低い弦から)で鳴らすとポロン感が良いため並び替える
-        // Re-entrant tuning (High-G) なので G(392) C(261) E(329) A(440)
-        // 順番: C(2) -> E(1) -> G(3) -> A(0) の順にpushして奏でる
+        // 実際のウクレレの開放弦ピッチ (A4, E4, C4, G4)
+        const bases = [440.00, 329.63, 261.63, 392.00]; // index: 0=A, 1=E, 2=C, 3=G
         
-        // 0:A, 1:E, 2:C, 3:G in data
-        const pairs = [
-          {base: bases[2], fret: shapes[2]}, // C string (Low)
-          {base: bases[1], fret: shapes[1]}, // E string
-          {base: bases[3], fret: shapes[3]}, // G string (High but physically top) - or actually C->E->A->G order varies by strum
-          {base: bases[0], fret: shapes[0]}  // A string
+        // ストローク順（上から G->C->E->A の順に鳴らすとポロン感が出る）
+        const strOrder = [
+           {base: bases[3], fret: shapes[3]}, // G string
+           {base: bases[2], fret: shapes[2]}, // C string
+           {base: bases[1], fret: shapes[1]}, // E string
+           {base: bases[0], fret: shapes[0]}  // A string
         ];
         
-        // Simple linear pitch sort often sounds best for generic "Poron"
-        // Let's stick to specific string order C -> E -> G -> A for upward strum simulation
-        pairs.forEach(p => {
+        const freqs = [];
+        strOrder.forEach(p => {
            freqs.push(p.base * Math.pow(2, p.fret/12));
         });
         return freqs;
       }
     }catch(e){}
 
-    // 3. フォールバック: 指データから生成 (スケールモードや未知のコード用)
+    // 2. 特殊音名指定
+    try{
+      const nk = target && target.noteKey ? String(target.noteKey).toLowerCase().trim() : '';
+      if(nk){
+        if(NOTE[nk]) return [NOTE[nk]];
+      }
+    }catch(e){}
+
+    // 3. 指データから生成 (スケールモードなど)
     try{
       const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
       if(fingers && fingers.length){
@@ -3049,22 +2999,18 @@ window.addEventListener('pageshow', ()=>{
           const fret = Number(fretRaw);
           const key = sRaw.trim().toUpperCase();
           const base = STR_BASE[key] ?? STR_BASE[sRaw.trim()] ?? null;
-          if(base != null && Number.isFinite(fret)){
-            freqs.push(base * Math.pow(2, fret/12));
+          // s=1(A), 2(E), 3(C), 4(G) マッピング
+          const numBase = {1:440.00, 2:329.63, 3:261.63, 4:392.00}[sRaw] || base;
+
+          if(numBase != null && Number.isFinite(fret)){
+            freqs.push(numBase * Math.pow(2, fret/12));
           }
         }
         if(freqs.length) return freqs;
       }
     }catch(e){}
 
-    try{
-      const name = target && target.chord && target.chord.name != null ? String(target.chord.name).trim() : '';
-      if(name){
-        const up = name.toUpperCase();
-        if(JP[name]) return [NOTE[JP[name]]];
-      }
-    }catch(e){}
-
+    // 4. フォールバック
     try{
       const nn = target && (target.note || target.noteName || target.pitchName) ? (target.note || target.noteName || target.pitchName) : '';
       const f = noteNameToFreq(nn);
@@ -3085,10 +3031,8 @@ window.addEventListener('pageshow', ()=>{
       playFreqs(freqs, freqs.length >= 3 ? 0.22 : 0.18);
       return;
     }
-    try{
-      if(origPlay){ origPlay.apply(this, arguments); return; }
-    }catch(e){}
-    playFreqs([440], 0.16);
+    // fallback default C chord
+    playFreqs([392.00, 261.63, 329.63, 523.25], 0.2);
   };
 
   function hookSlider(){

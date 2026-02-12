@@ -785,7 +785,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v83</div>
+<div id="verTag">v85</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -2878,7 +2878,7 @@ window.addEventListener('pageshow', ()=>{
   const origPlay = (typeof playTapHitSound === 'function') ? playTapHitSound : null;
   const NOTE = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
   const JP = {'ド':'do','レ':'re','ミ':'mi','ファ':'fa','ソ':'so','ラ':'la','シ':'si'};
-  const STR_BASE = {A:440.00, E:329.63, C:261.63, G:392.00, 'ラ':440.00, 'ミ':329.63, 'ド':261.63, 'ソ':392.00};
+  const STR_BASE = {A:440.00, E:329.63, C:261.63, G:392.00, 'ラ':440.00, 'ミ':329.63, 'ド':261.63, 'ソ':392.00, '1':440.00, '2':329.63, '3':261.63, '4':392.00};
 
   function noteNameToFreq(name){
     try{
@@ -2897,21 +2897,88 @@ window.addEventListener('pageshow', ()=>{
     try{
       ensureTapAudio();
       const now = tapAudioCtx.currentTime;
-      const attack = 0.008, release = 0.060;
-      const peak = 0.28 / Math.max(1, freqs.length); 
-      for(const f of freqs){
+      dur = Number(dur)||0.18;
+      // Keep it short & plucky (ウクレレっぽい減衰)
+      dur = Math.max(0.12, Math.min(0.26, dur));
+
+      const attack = 0.004, release = 0.070;
+
+      // Loudness baseline: keep close to previous sine implementation
+      const peak = 0.33 / Math.max(1, freqs.length);
+
+      // Cached pick-noise buffer (tiny burst)
+      if(!playFreqs._noiseBuf || playFreqs._noiseBuf.sampleRate !== tapAudioCtx.sampleRate){
+        const nlen = Math.max(1, Math.floor(tapAudioCtx.sampleRate * 0.02));
+        const buf = tapAudioCtx.createBuffer(1, nlen, tapAudioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for(let i=0;i<nlen;i++){ d[i] = (Math.random()*2-1); }
+        playFreqs._noiseBuf = buf;
+      }
+
+      for(const f0 of freqs){
+        const f = Math.max(60, Number(f0)||440);
+
+        // Main string (triangle) + soft overtone, through a body lowpass
         const o = tapAudioCtx.createOscillator();
+        const o2 = tapAudioCtx.createOscillator();
+        const o2g = tapAudioCtx.createGain();
+        const body = tapAudioCtx.createBiquadFilter();
         const g = tapAudioCtx.createGain();
-        o.type = 'sine';
+
+        o.type = 'triangle';
         o.frequency.setValueAtTime(f, now);
+
+        // slight "pluck" detune & settle
+        const d0 = (Math.random()*8-4);
+        o.detune.setValueAtTime(d0, now);
+        o.detune.linearRampToValueAtTime(d0 - 10, now + 0.03);
+
+        o2.type = 'sine';
+        o2.frequency.setValueAtTime(f*2, now);
+        o2.detune.setValueAtTime(d0, now);
+
+        o2g.gain.setValueAtTime(0.12, now);
+
+        body.type = 'lowpass';
+        body.frequency.setValueAtTime(4200, now);
+        body.Q.setValueAtTime(0.85, now);
 
         g.gain.setValueAtTime(0.0, now);
         g.gain.linearRampToValueAtTime(peak, now + attack);
-        g.gain.setTargetAtTime(0.0001, now + Math.max(0.01, dur - release), 0.02);
+        g.gain.setTargetAtTime(0.0001, now + Math.max(0.01, dur - release), 0.03);
 
-        o.connect(g); g.connect(tapMaster);
+        // connect tonal components
+        o.connect(body);
+        o2.connect(o2g); o2g.connect(body);
+
+        // pick noise (very short, band-limited)
+        const ns = tapAudioCtx.createBufferSource();
+        ns.buffer = playFreqs._noiseBuf;
+
+        const nHp = tapAudioCtx.createBiquadFilter();
+        nHp.type = 'highpass';
+        nHp.frequency.setValueAtTime(1200, now);
+
+        const nLp = tapAudioCtx.createBiquadFilter();
+        nLp.type = 'lowpass';
+        nLp.frequency.setValueAtTime(7000, now);
+
+        const nG = tapAudioCtx.createGain();
+        nG.gain.setValueAtTime(0.10 * peak, now);
+        nG.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
+
+        ns.connect(nHp); nHp.connect(nLp); nLp.connect(nG); nG.connect(body);
+
+        // to master (tap volume slider still controls tapMaster)
+        body.connect(g); g.connect(tapMaster);
+
         o.start(now);
+        o2.start(now);
+        ns.start(now);
+
+        ns.stop(now + 0.02);
         o.stop(now + dur);
+        o2.stop(now + dur);
       }
     }catch(e){}
   }

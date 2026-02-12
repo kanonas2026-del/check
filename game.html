@@ -785,7 +785,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v79</div>
+<div id="verTag">v83</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -991,20 +991,20 @@ function getSongSpeedBase(){
 function bindSongSpeedUI(){
   const wrap = document.getElementById('song-speed-pills');
   if(!wrap) return;
-  wrap.addEventListener('click', (ev)=>{
-    const pill = ev.target.closest('.mode-pill');
+
+  const pick = (ev)=>{
+    const pill = ev.target && ev.target.closest ? ev.target.closest('.mode-pill') : null;
     if(!pill) return;
-    // prevent starting the song when selecting speed (pills are inside the song button)
-    ev.preventDefault();
-    ev.stopPropagation();
+    try{ ev.preventDefault(); }catch(e){}
+    try{ ev.stopPropagation(); }catch(e){}
     setSongSpeedId(pill.dataset.ss);
-  });
-  // iOS: stop tap on pills from triggering the parent song button
-  wrap.addEventListener('touchstart', (ev)=>{
-    const pill = ev.target.closest('.mode-pill');
-    if(!pill) return;
-    ev.stopPropagation();
-  }, {passive:true});
+  };
+
+  // capture phase: pills always win (iOS & nested button safety)
+  wrap.addEventListener('pointerdown', pick, {passive:false, capture:true});
+  wrap.addEventListener('touchstart',  pick, {passive:false, capture:true});
+  wrap.addEventListener('mousedown',   pick, true);
+  wrap.addEventListener('click',       pick, true);
 
   // init
   setSongSpeedId(getSongSpeedId());
@@ -2993,14 +2993,33 @@ window.addEventListener('pageshow', ()=>{
 
     try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s); }catch(e){}
 
+    // iOS: first interaction must "wake" WebAudio inside a real gesture
+    const wake = ()=>{
+      try{ ensureTapAudio(); }catch(e){}
+      try{
+        if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx && tapAudioCtx.state === 'suspended'){
+          tapAudioCtx.resume().catch(()=>{});
+        }
+      }catch(e){}
+    };
+    s.addEventListener('pointerdown', (e)=>{ wake(); try{ e.preventDefault(); }catch(_){ } }, {passive:false});
+    s.addEventListener('touchstart',  (e)=>{ wake(); try{ e.preventDefault(); }catch(_){ } }, {passive:false});
+    s.addEventListener('mousedown',   wake);
+
     const apply = (e)=>{
       try{ setTapVolume01(getTapVolume01()); }catch(e){}
       try{ window.applyTapVolumeToGain(); }catch(e){}
-      try{ ensureTapAudio(); }catch(e){}
-      
-      // Feedback sound on input
+      wake();
+
+      // Feedback sound on input (wait for resume if needed)
       if(e && e.type === 'input'){
-        playSliderFeedback();
+        try{
+          if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx && tapAudioCtx.state === 'suspended'){
+            tapAudioCtx.resume().then(()=>{ try{ playSliderFeedback(); }catch(_){ } }).catch(()=>{});
+          }else{
+            playSliderFeedback();
+          }
+        }catch(err){}
       }
     };
 
@@ -3008,10 +3027,13 @@ window.addEventListener('pageshow', ()=>{
     s.addEventListener('change', apply, {passive:true});
   }
 
-  window.addEventListener('DOMContentLoaded', hookSlider);
+  window.addEventListener('DOMContentLoaded', ()=>{
+    hookSlider();
+    try{ bindSongSpeedUI(); }catch(e){}
+  });
 })();
 </script>
-<div class="verBadge">v79</div>
+<div class="verBadge">v83</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

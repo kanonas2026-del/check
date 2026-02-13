@@ -1617,14 +1617,13 @@ function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
   el.textContent = text;
-  // place FX on the neck area (do not cover the next-chord label)
+  // place FX in the upper-center of the screen (avoiding the left chord label and the neck)
   try{
-    const cx = canvas ? canvas.width : window.innerWidth;
-    const cy2 = canvas ? canvas.height/2 : window.innerHeight/2;
-    const baseX = (typeof NUT_X !== 'undefined') ? (NUT_X + 320) : (cx*0.45);
-    const baseY = (typeof STAGE !== 'undefined' && STAGE.LANE_DY) ? (cy2 + STAGE.LANE_DY*0.9) : (cy2 + 80);
-    const px = (opts.x != null) ? opts.x : baseX;
-    const py = (opts.y != null) ? opts.y : baseY;
+    // Center X
+    const px = (canvas ? canvas.width/2 : window.innerWidth/2);
+    // Upper Y (above the neck)
+    const py = (canvas ? canvas.height/2 : window.innerHeight/2) - 90;
+    
     el.style.left = px + 'px';
     el.style.top  = py + 'px';
     el.style.transform = 'translate(-50%,-50%)';
@@ -1775,6 +1774,8 @@ const KIRAKIRA_TAB_BLOCKS = [
   { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
   // 6) G7 → C → G7 → C
   { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
+  // 7) C (End)
+  { label:"C",         A:"--3----------------------", E:"--0----------------------", C:"--0----------------------", G:"--0----------------------" },
 ];
 
 function _tabEventCols(block){
@@ -2436,7 +2437,8 @@ function drawBigHeadstockLabel(ctx, group){
 
   if(!nm) return;
 
-  const cx = 75; // Center of Headstock (0 to 150)
+  // ===== CHANGED: Move further left (40) so it doesn't overlap string labels at 110 =====
+  const cx = 40; // Center of Headstock (0 to 110 area)
   const cy = canvas.height / 2;
   
   // Blink if waiting on this specific group
@@ -2448,20 +2450,21 @@ function drawBigHeadstockLabel(ctx, group){
   ctx.fillStyle = "#fff";
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 6;
-  ctx.font = "900 64px system-ui, -apple-system, sans-serif";
+  // ===== CHANGED: Smaller font (52px) to fit in the narrower space =====
+  ctx.font = "900 52px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   // Draw background plate to separate from background/tuning pegs
   const tw = ctx.measureText(nm).width;
-  const bw = tw + 40;
-  const bh = 80;
+  const bw = tw + 30; // less padding
+  const bh = 70;      // smaller box
   
   ctx.save();
   ctx.globalAlpha = alpha * 0.6;
   ctx.fillStyle = "#4a3728"; // Dark brown background
   ctx.beginPath();
-  const r = 16;
+  const r = 14;
   const bx = cx - bw/2, by = cy - bh/2;
   ctx.moveTo(bx+r, by);
   ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);

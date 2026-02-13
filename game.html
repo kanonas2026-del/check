@@ -166,6 +166,28 @@
     #score-panel { top: calc(60px + var(--ui-top, 0px) + env(safe-area-inset-top)); right: calc(12px + var(--ui-right, 0px) + env(safe-area-inset-right)); }
     #timer-panel { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); font-size: 16px; }
 
+    /* +5秒ボーナス用ポップアップ */
+    #timeBonusPopup {
+      position: fixed;
+      top: calc(50px + env(safe-area-inset-top));
+      right: calc(20px + env(safe-area-inset-right));
+      color: #ff3366;
+      font-size: 28px;
+      font-weight: 900;
+      text-shadow: 0 4px 0 #fff, 2px 2px 0 #fff, -2px 2px 0 #fff, 2px -2px 0 #fff, -2px -2px 0 #fff, 0 8px 16px rgba(0,0,0,0.3);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 1000;
+    }
+    #timeBonusPopup.show {
+      animation: floatUpFade 1.2s ease-out forwards;
+    }
+    @keyframes floatUpFade {
+      0% { transform: translateY(0) scale(0.8); opacity: 0; }
+      20% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+      100% { transform: translateY(-60px) scale(1); opacity: 0; }
+    }
+
     #stopBtn {
       position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 180; display: none;
       border: none; border-radius: 16px; padding: 12px 18px;
@@ -847,7 +869,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="fxMsg"></div>
 <div id="comboBig"></div>
 <div id="lyrics-area"></div>
-<div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
+<div id="timeBonusPopup">+5秒！</div> <div id="combo-panel"><div class="t1">COMBO</div><div class="t2"><span id="comboNum">0</span> 連続</div></div>
 <div id="score-panel">⭐ <span id="score">0</span></div>
 <div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
 <div aria-hidden="true" id="chordHud"></div>
@@ -878,6 +900,19 @@ body.is-uke .vol-inline{ display:none !important; }
 <canvas id="gameCanvas"></canvas>
 </div>
 <script>
+
+// --- 音を離した時に消すためのグローバル変数 ---
+window.activeSynths = [];
+window.releaseAllNotes = function() {
+    if(!tapAudioCtx) return;
+    const now = tapAudioCtx.currentTime;
+    window.activeSynths.forEach(stopFn => stopFn(now));
+    window.activeSynths = [];
+};
+window.addEventListener('touchend', window.releaseAllNotes);
+window.addEventListener('mouseup', window.releaseAllNotes);
+window.addEventListener('touchcancel', window.releaseAllNotes);
+
 
 // --- v28: prevent iOS/PC page scrolling & double-tap zoom during play ---
 (function preventPageScroll(){
@@ -1012,8 +1047,8 @@ function bindSongSpeedUI(){
 
 // ===== 基本設定 =====
 const BASE_SPEED_MULT = 1.15; // 全体のベース速度倍率（少しゆっくり）
-const SPEEDUP_MULT = 1.25;     // 5HITごと加速（1.7だと速すぎるため、1.25程度に修正）
-const PRACTICE_BOOST_CAP = 100; // practice(コード2モード)の5HIT加速の上限を撤廃（実質無限）
+const SPEEDUP_MULT = 1.7;     // 5HITごと加速（practice/scaleのみ）     // 途中スピードアップはしない（固定）
+const PRACTICE_BOOST_CAP = 3; // practice(コード2モード)の5HIT加速は最大3段まで（x1.7, x2.9, x4.9）
 
 const ENABLE_SPEED_UP = false; // speed is selected at start; no mid-song speed-up
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -1143,34 +1178,37 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // teacher fret hints (MOVED TO TOP EDGE - OUTSIDE)
+  // teacher fret hints (inside neck top edge)
   (function(){
     ctx.save();
-    
+    const born = (window.__fretHintBorn ?? (window.__fretHintBorn = performance.now()));
+    const dt = performance.now() - born;
+    // brief "noticeable" pulse on load, then settle subtle
+    const boost = dt < 900 ? (2.2 - 1.2*(dt/900)) : 1.0;
+
     ctx.font = STAGE.FRET_HINT_FONT;
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom"; // Anchor to bottom to sit on top of neck
-    
-    // NEW POSITION: ネックの上端(g.y)より少し上に表示
-    const yTxt = g.y - 4;
+    ctx.textBaseline = "top";
+    const yTxt = g.y + STAGE.FRET_HINT_Y_PAD;
 
-    ctx.fillStyle = "#fff"; // White text
+    const baseA = 0.65; // keep subtle but readable
+    ctx.globalAlpha = Math.min(1, baseA * boost);
 
+    // outline for readability on brown neck
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.28)";
+    ctx.fillStyle = STAGE.FRET_HINT_COLOR;
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
     for (const n of STAGE.FRET_HINTS){
       if (n < 1 || n > STAGE.FRET_COUNT) continue;
       const x = nutX + g.fretW * n;
       const s = String(n);
-      
-      // Bubble background for visibility
-      ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.beginPath();
-      ctx.arc(x, yTxt - 7, 12, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-
+      ctx.strokeText(s, x, yTxt);
+      ctx.strokeText(s, x, yTxt);
       ctx.fillText(s, x, yTxt);
-    }
+      }
     ctx.restore();
   })();
 
@@ -1272,6 +1310,96 @@ function ensureTapAudio(){
     }
   }catch(e){}
 }
+function noteFreqFromTarget(t){
+  try{
+    if(t && t.noteKey){
+      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
+      if(map[t.noteKey]) return map[t.noteKey];
+    }
+    const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
+    const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
+    const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
+    if(m[base]) return m[base];
+    if(n.toUpperCase().startsWith('G7')) return 392.00;
+    if(n.toUpperCase().startsWith('AM')) return 440.00;
+    if(n.toUpperCase().startsWith('DM')) return 293.66;
+    if(n.toUpperCase().startsWith('EM')) return 329.63;
+    if(n.toUpperCase().startsWith('A7')) return 440.00;
+    if(n.toUpperCase().startsWith('D7')) return 293.66;
+  }catch(e){}
+  return 440.00;
+}
+function playTapHitSound(target){
+  // Only for TAP entry (タップであそぶ)
+  if(!isTapMode()) return;
+  ensureTapAudio();
+  applyTapVolumeToGain();
+  if(!tapAudioCtx || !tapMaster) return;
+  const now = tapAudioCtx.currentTime;
+  const vol = getTapVolume01();
+  const amp = Math.pow(vol, 2.2);
+  // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
+  try{
+    const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
+    if(fingers && fingers.length>1){
+      const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
+      const freqs = fingers.map(fg=>{
+        const s = Number(fg && fg.s);
+        const fret = Number(fg && fg.f);
+        const base = baseMap[s] || 440.00;
+        const f = (Number.isFinite(fret) ? fret : 0);
+        return base * Math.pow(2, f/12);
+      });
+      const dur = (target && target.isShort) ? 0.10 : 0.18;
+      freqs.forEach((ff, idx)=>{
+        try{
+          const o = tapAudioCtx.createOscillator();
+          const g = tapAudioCtx.createGain();
+          const a = Math.max(0.0001, (0.35/Math.max(1,freqs.length)) * (0.15 + 0.85*amp));
+          g.gain.setValueAtTime(a, now);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          o.frequency.setValueAtTime(ff, now);
+          o.type = 'triangle';
+          o.connect(g); g.connect(tapMaster);
+          o.start(now); o.stop(now + dur + 0.01);
+        }catch(e){}
+      });
+      return;
+    }
+  }catch(e){}
+
+  const f = noteFreqFromTarget(target);
+  try{
+    // main pluck
+    const o = tapAudioCtx.createOscillator();
+    const g = tapAudioCtx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, now);
+    g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    o.connect(g).connect(tapMaster);
+    o.start(now);
+    o.stop(now + 0.24);
+
+    // little "pick" click
+    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
+    const d = nbuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
+    const ns = tapAudioCtx.createBufferSource();
+    ns.buffer = nbuf;
+    const nf = tapAudioCtx.createBiquadFilter();
+    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
+    const ng = tapAudioCtx.createGain();
+    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
+    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    ns.connect(nf).connect(ng).connect(tapMaster);
+    ns.start(now);
+    ns.stop(now + 0.06);
+  }catch(e){}
+}
+
 
 function enhanceRangeSlider(el){
   if(!el) return;
@@ -1520,13 +1648,14 @@ function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
   el.textContent = text;
-  // place FX in the upper-center of the screen (avoiding the left chord label and the neck)
+  // place FX on the neck area (do not cover the next-chord label)
   try{
-    // Center X
-    const px = (canvas ? canvas.width/2 : window.innerWidth/2);
-    // Upper Y (above the neck)
-    const py = (canvas ? canvas.height/2 : window.innerHeight/2) - 90;
-    
+    const cx = canvas ? canvas.width : window.innerWidth;
+    const cy2 = canvas ? canvas.height/2 : window.innerHeight/2;
+    const baseX = (typeof NUT_X !== 'undefined') ? (NUT_X + 320) : (cx*0.45);
+    const baseY = (typeof STAGE !== 'undefined' && STAGE.LANE_DY) ? (cy2 + STAGE.LANE_DY*0.9) : (cy2 + 80);
+    const px = (opts.x != null) ? opts.x : baseX;
+    const py = (opts.y != null) ? opts.y : baseY;
     el.style.left = px + 'px';
     el.style.top  = py + 'px';
     el.style.transform = 'translate(-50%,-50%)';
@@ -1573,7 +1702,7 @@ function applySpeed(){
 }
 
 
-// データ
+// データ ★大幅に和音の種類を増やしました（20種類）
 const NUT_X = STAGE.NUT_X;
 const STRING_COLORS = ['#ff5757', '#ffde59', '#7ed957', '#5ce1e6'];
 const CHORD_LIB = {
@@ -1585,7 +1714,18 @@ const CHORD_LIB = {
   'A7': { name: 'A7', targetIdx: 0, fingers: [{s: 3, f: 1, txt: '人'}] },
   'Dm': { name: 'Dm', targetIdx: 0, fingers: [{s: 4, f: 2, txt: '中'}, {s: 3, f: 1, txt: '人'}, {s: 2, f: 1, txt: '人'}] },
   'Em': { name: 'Em', targetIdx: 0, fingers: [{s: 3, f: 4, txt: '小'}, {s: 2, f: 3, txt: '薬'}, {s: 1, f: 2, txt: '中'}] },
-  'D7': { name: 'D7', targetIdx: 0, fingers: [{s: 2, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}, {s: 4, f: 2, txt: '人'}] }
+  'D7': { name: 'D7', targetIdx: 0, fingers: [{s: 2, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}, {s: 4, f: 2, txt: '人'}] },
+  'C7': { name: 'C7', targetIdx: 0, fingers: [{s: 1, f: 1, txt: '人'}] },
+  'Cmaj7': { name: 'Cmaj7', targetIdx: 0, fingers: [{s: 1, f: 2, txt: '中'}] },
+  'D':  { name: 'D',  targetIdx: 0, fingers: [{s: 2, f: 2, txt: '薬'}, {s: 3, f: 2, txt: '中'}, {s: 4, f: 2, txt: '人'}] },
+  'E':  { name: 'E',  targetIdx: 0, fingers: [{s: 1, f: 2, txt: '中'}, {s: 3, f: 4, txt: '小'}, {s: 4, f: 1, txt: '人'}] },
+  'E7': { name: 'E7', targetIdx: 0, fingers: [{s: 1, f: 2, txt: '中'}, {s: 3, f: 2, txt: '薬'}, {s: 4, f: 1, txt: '人'}] },
+  'Fm': { name: 'Fm', targetIdx: 0, fingers: [{s: 1, f: 3, txt: '小'}, {s: 2, f: 1, txt: '中'}, {s: 4, f: 1, txt: '人'}] },
+  'Gm': { name: 'Gm', targetIdx: 0, fingers: [{s: 1, f: 1, txt: '人'}, {s: 2, f: 3, txt: '薬'}, {s: 3, f: 2, txt: '中'}] },
+  'A':  { name: 'A',  targetIdx: 0, fingers: [{s: 3, f: 1, txt: '人'}, {s: 4, f: 2, txt: '中'}] },
+  'Bm': { name: 'Bm', targetIdx: 0, fingers: [{s: 1, f: 2, txt: '人'}, {s: 2, f: 2, txt: '人'}, {s: 3, f: 2, txt: '人'}, {s: 4, f: 4, txt: '薬'}] },
+  'B7': { name: 'B7', targetIdx: 0, fingers: [{s: 1, f: 2, txt: '人'}, {s: 2, f: 2, txt: '人'}, {s: 3, f: 3, txt: '中'}, {s: 4, f: 2, txt: '人'}] },
+  'Cm': { name: 'Cm', targetIdx: 0, fingers: [{s: 1, f: 3, txt: '人'}, {s: 2, f: 3, txt: '人'}, {s: 3, f: 3, txt: '人'}] }
 };
 const SOLO_LIB = {
   'do':  { name:'ド', targetIdx:0, fingers:[{s:3,f:0,txt:'0'}]},
@@ -1677,8 +1817,6 @@ const KIRAKIRA_TAB_BLOCKS = [
   { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
   // 6) G7 → C → G7 → C
   { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
-  // 7) C (End)
-  { label:"C",         A:"--3----------------------", E:"--0----------------------", C:"--0----------------------", G:"--0----------------------" },
 ];
 
 function _tabEventCols(block){
@@ -1948,7 +2086,8 @@ function startGameByType(type){
   lastStartParams = type;
   if(type==='scale') initGame('scale', null, {speedBase:3.4});
   else if(type==='easy') initGame('practice', ['C','F','G7','Am'], {speedBase:3.2});
-  else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7'], {speedBase:3.35});
+  // ★ちょいむず：20種類のコードをすべて渡す
+  else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7','C7','Cmaj7','D','E','E7','Fm','Gm','A','Bm','B7','Cm'], {speedBase:3.35});
   else if(type==='song') initGame('song', 'きらきら星', {speedBase:getSongSpeedBase(), disableSpeedUp:true});
 }
 
@@ -2049,7 +2188,15 @@ function gameLoop(time){
         groups.push(g);
         scaleIndex++;
       } else {
-        const k = currentLevelChords[practiceIndex % currentLevelChords.length];
+        // ★practice（コードモード）生成部分
+        let k;
+        if (currentLevelChords.length > 8) {
+          // 「コードちょいむず」の場合はランダムに選出
+          k = currentLevelChords[Math.floor(Math.random() * currentLevelChords.length)];
+        } else {
+          // 「コードかんたん」の場合は順番通り（覚えやすさ重視）
+          k = currentLevelChords[practiceIndex % currentLevelChords.length];
+        }
         groups.push(new ChordGroup(CHORD_LIB[k], ""));
         practiceIndex++;
       }
@@ -2080,26 +2227,6 @@ function gameLoop(time){
     groups[i].update(); groups[i].draw();
     if(groups[i].x < -300) groups.splice(i,1);
   }
-
-  // --- NEW: Draw Current Chord Label (Fixed at Headstock) ---
-  // Priority: 1. Waiting target (missed), 2. Front-most active group on screen
-  let hudGroup = waitTargetGroup;
-  if(!hudGroup){
-    // Find closest active group that has started appearing (or is about to)
-    // We want the one closest to the Nut (x=150) but still active.
-    // Since we iterate right-to-left, we want the one with smallest x that is > -something
-    let minX = Infinity;
-    for(const g of groups){
-      if(g.active && g.x < canvas.width + 100){
-        if(g.x < minX){ minX = g.x; hudGroup = g; }
-      }
-    }
-  }
-  
-  if(hudGroup){
-    drawBigHeadstockLabel(ctx, hudGroup);
-  }
-
 
   // 曲モード：最後まで流れ切ったら終了
   if(isSongMode){
@@ -2250,7 +2377,7 @@ function handleAction(){
 
       const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
 
-      // ===== スピードアップ判定 =====
+      // ===== スピードアップ判定 & +5秒ボーナス =====
       if(gameMode==='scale'){
         // scaleは「doからdo2まで(8音)をノーミス達成」でのみ1.7倍
         if(!scaleSpeedBoosted){
@@ -2280,17 +2407,30 @@ function handleAction(){
 }
 
       } else {
-        // practice(コード2モード)は「5連続HITごとに累積加速」 / song(きらきら星)は速度固定
+        // practice(コード2モード)は「5連続HITごと」にスピードアップ ＆ 【+5秒ボーナス】
         const canSpeedUp = (gameMode === 'practice');
         const hitMilestone = (canSpeedUp && !disableSpeedUpActive && comboStreak > 0 && (comboStreak % 5 === 0));
+        
         if(hitMilestone){
+          // ★ボーナスタイム追加
+          if (gameEndAt != null) {
+              gameEndAt += 5000; // 5秒追加
+              // ポップアップアニメーション起動
+              const tbPopup = document.getElementById('timeBonusPopup');
+              if (tbPopup) {
+                  tbPopup.classList.remove('show');
+                  void tbPopup.offsetWidth; // アニメーションリセット用
+                  tbPopup.classList.add('show');
+              }
+          }
+
           practiceBoostCount = Math.min(practiceBoostCount + 1, PRACTICE_BOOST_CAP);
           const mult = Math.pow(SPEEDUP_MULT, practiceBoostCount);
           currentScrollSpeed = baseScrollSpeed * mult;
           if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
           // flashScreen(); // 重いので無効化
-          showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! x${mult.toFixed(1)}`, 'speed', { mega:true, durationMs: 2000 });
+          showFx(`💥 ${comboStreak} COMBO!! 💥\nタイム+5秒 ＆ スピードUP!!`, 'speed', { mega:true, durationMs: 2000 });
           try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
         } else {
           const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
@@ -2320,67 +2460,6 @@ if(isWaitMode()){
       }
     }
   }
-}
-
-// --- NEW LABEL DRAWER ---
-function drawBigHeadstockLabel(ctx, group){
-  if(!group || !group.chord) return;
-
-  const nmRaw = group.chord.name || "";
-  let nm = nmRaw;
-  
-  // Decide what text to show (same logic as before)
-  const isScale = (gameMode === 'scale');
-  const isSong = !!isSongMode;
-  if(isSong && !isScale){
-    if(group.chord.fingers && group.chord.fingers.length === 1){
-      try{ nm = noteNameForFinger(group.chord.fingers[0]); }catch(e){ nm = ''; }
-    }
-  }
-
-  if(!nm) return;
-
-  // ===== CHANGED: Move further left and shrink font to fit in headstock =====
-  const cx = 50; // Center of Headstock (moved from 40 to 50 to avoid left cutoff)
-  const cy = canvas.height / 2;
-  
-  // Blink if waiting on this specific group
-  const isWaiting = (waitHold && waitTargetGroup === group);
-  const alpha = isWaiting ? (0.6 + 0.4*Math.sin(performance.now()/80)) : 1.0;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 6;
-  // ===== CHANGED: Smaller font (42px) to prevent overlap with string labels =====
-  ctx.font = "900 42px system-ui, -apple-system, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Draw background plate to separate from background/tuning pegs
-  const tw = ctx.measureText(nm).width;
-  const bw = tw + 24; // less padding
-  const bh = 60;      // smaller box
-  
-  ctx.save();
-  ctx.globalAlpha = alpha * 0.6;
-  ctx.fillStyle = "#4a3728"; // Dark brown background
-  ctx.beginPath();
-  const r = 12;
-  const bx = cx - bw/2, by = cy - bh/2;
-  ctx.moveTo(bx+r, by);
-  ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
-  ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
-  ctx.arcTo(bx, by+bh, bx, by, r);
-  ctx.arcTo(bx, by, bx+bw, by, r);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.strokeText(nm, cx, cy);
-  ctx.fillText(nm, cx, cy);
-
-  ctx.restore();
 }
 
 
@@ -2502,9 +2581,183 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
-    
-    // 表示：コード名・単音名のテキスト描画はここでは行わない（drawCurrentChordLabelで固定表示）
-    // （元のコード描画ロジックは削除・無効化）
+    // 表示：スケール(ドレミ)は「弦ごと」に大きく、コードは「手前に大きく」流す（中央HUDは使わない）
+    // 表示名：songのアルペジオ(単音)はコード名ではなく音名(ドレミ)を出す
+    const nmRaw = (this.chord && this.chord.name) ? this.chord.name : "";
+    const isScale = (gameMode === 'scale');
+    const isSong = !!isSongMode;
+    let nm = nmRaw;
+    if(isSong && !isScale){
+      // chordObjForPick は「その8分で鳴らす弦だけ」fingersに入る。
+      // 単音(アルペジオ)のときは、音名を表示して混乱を避ける。
+      if(this.chord && this.chord.fingers && this.chord.fingers.length === 1){
+        try{ nm = noteNameForFinger(this.chord.fingers[0]); }catch(e){ console.error(e); nm = ''; }
+      }
+    }
+
+    if(nm){
+      const fw2 = fw;
+      // どのモードか
+      
+      const isCodeMode = (gameMode === 'practice' || isSongMode);
+
+      if(isScale){
+        // スケール（ドレミファ）：コード2モード/曲(単音)と同じ考え方で
+        // 「指◯の左側（判定ライン寄り）」に、弦の中央（上下センター）で先に表示する
+        ctx.save();
+        const cy0 = canvas.height/2;
+
+        // 基本スタイル（songの単音ラベル相当）
+        const isSmallH = (window.innerHeight && window.innerHeight < 520);
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.34)";
+        ctx.lineWidth = 7;
+        ctx.font = (isSmallH ? "900 28px system-ui, -apple-system, sans-serif"
+                             : "900 32px system-ui, -apple-system, sans-serif");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const neckTop = cy0 - 150;
+        const neckBot = cy0 + 150;
+        const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
+
+        // スケールは基本1音（念のため複数でも先頭の指で代表）
+        const f0 = (this.chord && this.chord.fingers && this.chord.fingers.length)
+          ? this.chord.fingers[0] : null;
+        if(f0){
+          const fx = fretToX(f0.f);
+          const fy = cy0 + (f0.s-2.5)*75;
+          const labelY = clamp(fy, neckTop + 34, neckBot - 34);
+
+          // 背景プレート（中心基準でズレない）
+          const padX = 12, padY = 6;
+          const tw = ctx.measureText(nm).width;
+          const bw = tw + padX*2;
+          const bh = 34 + padY*2;
+
+          // 指◯(半径40)に被らないよう、プレート右端と指◯左端の間に少し隙間を作る
+          const circleR = 40;
+          const gap = 16;
+          const nx = Math.max(-180, fx - (bw/2 + circleR + gap));
+
+          const bx = nx - bw/2;
+          const by = labelY - bh/2;
+
+          ctx.save();
+          ctx.globalAlpha = 0.34; // 軽め
+          ctx.fillStyle = "#000";
+          ctx.beginPath();
+          const r = 12;
+          ctx.moveTo(bx+r, by);
+          ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
+          ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
+          ctx.arcTo(bx, by+bh, bx, by, r);
+          ctx.arcTo(bx, by, bx+bw, by, r);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          ctx.strokeText(nm, nx, labelY);
+          ctx.fillText(nm, nx, labelY);
+        }
+        ctx.restore();
+      }
+
+      if(isCodeMode && !isScale){
+        // コード表示：
+        // - practice(コード2モード)では「指◯に被らない」ように、弦の上側に大きめで
+        //   かつ「少し手前(右側)」に流す（縦ラインには合わせない）。
+        // - song側の見た目は変えないため、songは従来の小さめ表示のまま。
+        const ax = (this.getAnchorX ? this.getAnchorX() : this.x);
+        const isPractice = (gameMode === 'practice' && !isSongMode);
+        const isSongLabel = (!!isSongMode && gameMode !== 'scale');
+        const usePracticeStyle = isPractice || isSongLabel;
+
+        // 位置：
+        // - practice / song は「指◯の左側（判定ライン寄り）」に寄せて、先にラベル→あとから指◯が来るイメージ
+        // - 右→左に流れるので、左側(小さいX)に置くほど「先に通過」します。
+        const lead = usePracticeStyle
+          ? (Math.max(isPractice ? 70 : 52, fw2*0.80) + (isPractice ? 26 : 18))
+          : Math.max(18, fw2*0.65);
+
+        const nx = usePracticeStyle
+          ? Math.max(-180, ax - lead)          // 左へ（判定ライン寄り）。左側(フック外)も表示する
+          : (ax + lead);
+
+ctx.save();
+        const isWaitingThis = (waitHold && waitTargetGroup===this);
+
+        // 透明度：practiceはWAIT中だけ薄く。songは通常少しだけ控えめに。
+        ctx.globalAlpha = usePracticeStyle
+          ? (isWaitingThis ? 0.55 : (isPractice ? 0.96 : 0.92))
+          : 0.92;
+
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = "rgba(0,0,0,0.34)";
+        ctx.lineWidth = usePracticeStyle ? (isPractice ? 8 : 7) : 6;
+
+        const isSmallH = (window.innerHeight && window.innerHeight < 520);
+        ctx.font = isPractice
+          ? (isSmallH ? "900 38px system-ui, -apple-system, sans-serif" : "900 46px system-ui, -apple-system, sans-serif")
+          : (isSongLabel
+              ? (isSmallH ? "900 28px system-ui, -apple-system, sans-serif" : "900 32px system-ui, -apple-system, sans-serif")
+              : (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif"));
+
+        ctx.textAlign = usePracticeStyle ? "center" : "left";
+        ctx.textBaseline = usePracticeStyle ? "middle" : "alphabetic";
+
+const cy0 = canvas.height/2;
+        const neckTop = cy0 - 150;
+        const neckBot = cy0 + 150;
+
+        // 指◯の集合の上下幅の「中央」にコード名を置く（弦の中心＝見やすい）
+        let minY = Infinity, maxY = -Infinity;
+        for(const f of this.chord.fingers){
+          const fy = cy0 + (f.s-2.5)*75;
+          if(fy < minY) minY = fy;
+          if(fy > maxY) maxY = fy;
+        }
+        const yMid = (minY + maxY) * 0.5;
+
+        const clamp = (v, a, b)=> Math.max(a, Math.min(b, v));
+
+        // practice(コード2モード)：ネック上で、指◯より「左側（判定ライン寄り）」にコード名を先出し
+        const labelY = usePracticeStyle
+          ? clamp(yMid, neckTop + 38, neckBot - 38)
+          : (neckTop + 52);
+
+        // 背景プレート（可読性UP：軽量）※文字とズレないように「中心基準」で作る
+        const padX = usePracticeStyle ? 14 : 10;
+        const padY = usePracticeStyle ? 8  : 6;
+        const tw = ctx.measureText(nm).width;
+        const bw = tw + padX*2;
+        const bhBase = isPractice ? 52 : (isSongLabel ? 42 : 34);
+        const bh = bhBase + padY*2;
+
+        // practice / song は textBaseline=middle なので、矩形も中心で合わせる
+        const bx = usePracticeStyle ? (nx - bw/2) : (nx - padX);
+        const by = usePracticeStyle ? (labelY - bh/2) : (labelY - 28 - padY);
+
+        ctx.save();
+        ctx.globalAlpha = usePracticeStyle ? (isPractice ? 0.38 : 0.34) : 0.35;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        const r = usePracticeStyle ? 12 : 10;
+        ctx.moveTo(bx+r, by);
+        ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
+        ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
+        ctx.arcTo(bx, by+bh, bx, by, r);
+        ctx.arcTo(bx, by, bx+bw, by, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeText(nm, nx, labelY);
+        ctx.fillText(nm, nx, labelY);
+        ctx.restore();
+      }
+    }
   }
 }
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){
@@ -2706,47 +2959,18 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){ return null; }
   }
 
-  // --- SUSTAIN MANAGEMENT (v80) ---
-  const activeVoices = []; // {osc, gain, startTime}
-
-  function stopAllVoices(){
-    const now = tapAudioCtx.currentTime;
-    // release nicely to avoid destruction sound
-    activeVoices.forEach(v => {
-      try {
-        v.gain.gain.cancelScheduledValues(now);
-        v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // fade out
-        v.osc.stop(now + 0.15);
-      } catch(e){}
-    });
-    activeVoices.length = 0;
-  }
-
-  // Tap Release Handler
-  window.addEventListener('touchend', stopAllVoices, {passive:true});
-  window.addEventListener('mouseup', stopAllVoices, {passive:true});
-  window.addEventListener('pointerup', stopAllVoices, {passive:true});
-
-  // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮 + Sustain Support
+  // ★音質改善3：長押し対応（指を離すとミュートする）
   function playFreqs(freqs, dur){
     try{
       ensureTapAudio();
-      stopAllVoices(); // kill previous note if overlap (monophonic feel per tap)
-      
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
-      // 音量調整
       const baseGain = 0.55 / N; 
-      // Sustain level (hold while pressing)
-      const sustainLevel = baseGain * 0.6; 
-      const decayTime = 0.3; // Time to reach sustain level
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(1500, Number(f0) || 440));
         
-        // ★修正：ストローク間隔を0.03→0.012へ短縮（もたつき解消）
         const strumDelay = i * 0.012; 
         const startTime = now + strumDelay;
 
@@ -2754,21 +2978,20 @@ window.addEventListener('pageshow', ()=>{
         const gain = tapAudioCtx.createGain();
         const filter = tapAudioCtx.createBiquadFilter();
 
-        // 1. 基本波形：Triangle（丸みのある波形）
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(f, startTime);
 
-        // 2. フィルタ：高域をバッサリ削って「箱鳴り」感を出す
         filter.type = 'lowpass';
         filter.Q.value = 1.0; 
         filter.frequency.setValueAtTime(2200, startTime); 
         filter.frequency.exponentialRampToValueAtTime(180, startTime + 0.12); 
 
-        // 3. エンベロープ：Attack -> Decay -> Sustain (Not release yet)
+        // アタック（弾いた瞬間）
         gain.gain.setValueAtTime(0, startTime);
         gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.005);
-        // Decay to sustain level (hold there)
-        gain.gain.linearRampToValueAtTime(sustainLevel, startTime + decayTime);
+        
+        // ★長押し中の余韻（最大4秒ほど自然に減衰させる）
+        gain.gain.exponentialRampToValueAtTime(baseGain * 0.1, startTime + 4.0);
 
         osc.connect(filter);
         filter.connect(gain);
@@ -2776,10 +2999,21 @@ window.addEventListener('pageshow', ()=>{
 
         osc.start(startTime);
         
-        // Auto-stop just in case user never releases (safety: 4 sec)
-        osc.stop(startTime + 4.0);
-        
-        activeVoices.push({osc, gain, startTime});
+        // 念のため最大6秒で強制停止させる
+        osc.stop(startTime + 6.0);
+
+        // ★指を離した時に呼ばれるストップ処理を登録
+        window.activeSynths.push((stopTime) => {
+            try {
+                // スケジュールされていた減衰をキャンセル
+                gain.gain.cancelScheduledValues(stopTime);
+                gain.gain.setValueAtTime(gain.gain.value, stopTime);
+                // 0.15秒で素早く音を消す（ミュート）
+                gain.gain.exponentialRampToValueAtTime(0.0001, stopTime + 0.15);
+                osc.stop(stopTime + 0.16);
+            } catch(e){}
+        });
+
       });
     }catch(e){ console.error(e); }
   }
@@ -2795,7 +3029,18 @@ window.addEventListener('pageshow', ()=>{
     'A7': [0,0,1,0], 
     'Dm': [0,1,2,2], 
     'Em': [2,3,4,0], 
-    'D7': [0,2,2,2]  
+    'D7': [0,2,2,2],
+    'C7': [1,0,0,0],
+    'Cmaj7': [2,0,0,0],
+    'D':  [0,2,2,2],
+    'E':  [2,0,4,1],
+    'E7': [2,0,2,1],
+    'Fm': [3,1,0,1],
+    'Gm': [1,3,2,0],
+    'A':  [0,0,1,2],
+    'Bm': [2,2,2,4],
+    'B7': [2,2,3,2],
+    'Cm': [3,3,3,0]
   };
 
   function getFreqsFromTarget(target){

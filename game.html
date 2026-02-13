@@ -1143,7 +1143,7 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // teacher fret hints (inside neck top edge)
+  // teacher fret hints (MOVED TO TOP EDGE)
   (function(){
     ctx.save();
     const born = (window.__fretHintBorn ?? (window.__fretHintBorn = performance.now()));
@@ -1153,27 +1153,31 @@ function drawFretboardBase(ctx, canvas, stringColors){
 
     ctx.font = STAGE.FRET_HINT_FONT;
     ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const yTxt = g.y + STAGE.FRET_HINT_Y_PAD;
+    ctx.textBaseline = "bottom"; // Anchor to bottom to sit on top of neck
+    
+    // NEW POSITION: On top of the neck (g.y) with a little gap
+    const yTxt = g.y - 6;
 
-    const baseA = 0.65; // keep subtle but readable
+    const baseA = 0.95; // More visibility
     ctx.globalAlpha = Math.min(1, baseA * boost);
 
-    // outline for readability on brown neck
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.28)";
-    ctx.fillStyle = STAGE.FRET_HINT_COLOR;
+    ctx.fillStyle = "#fff"; // White text
 
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.18)";
     for (const n of STAGE.FRET_HINTS){
       if (n < 1 || n > STAGE.FRET_COUNT) continue;
       const x = nutX + g.fretW * n;
       const s = String(n);
-      ctx.strokeText(s, x, yTxt);
-      ctx.strokeText(s, x, yTxt);
+      
+      // Bubble background for visibility
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.beginPath();
+      ctx.arc(x, yTxt - 6, 11, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+
       ctx.fillText(s, x, yTxt);
-      }
+    }
     ctx.restore();
   })();
 
@@ -2173,6 +2177,26 @@ function gameLoop(time){
     if(groups[i].x < -300) groups.splice(i,1);
   }
 
+  // --- NEW: Draw Current Chord Label (Fixed at Headstock) ---
+  // Priority: 1. Waiting target (missed), 2. Front-most active group on screen
+  let hudGroup = waitTargetGroup;
+  if(!hudGroup){
+    // Find closest active group that has started appearing (or is about to)
+    // We want the one closest to the Nut (x=150) but still active.
+    // Since we iterate right-to-left, we want the one with smallest x that is > -something
+    let minX = Infinity;
+    for(const g of groups){
+      if(g.active && g.x < canvas.width + 100){
+        if(g.x < minX){ minX = g.x; hudGroup = g; }
+      }
+    }
+  }
+  
+  if(hudGroup){
+    drawBigHeadstockLabel(ctx, hudGroup);
+  }
+
+
   // 曲モード：最後まで流れ切ったら終了
   if(isSongMode){
     const done = (songFinished || songIndex >= SONG_DATA.length);
@@ -2394,6 +2418,65 @@ if(isWaitMode()){
   }
 }
 
+// --- NEW LABEL DRAWER ---
+function drawBigHeadstockLabel(ctx, group){
+  if(!group || !group.chord) return;
+
+  const nmRaw = group.chord.name || "";
+  let nm = nmRaw;
+  
+  // Decide what text to show (same logic as before)
+  const isScale = (gameMode === 'scale');
+  const isSong = !!isSongMode;
+  if(isSong && !isScale){
+    if(group.chord.fingers && group.chord.fingers.length === 1){
+      try{ nm = noteNameForFinger(group.chord.fingers[0]); }catch(e){ nm = ''; }
+    }
+  }
+
+  if(!nm) return;
+
+  const cx = 75; // Center of Headstock (0 to 150)
+  const cy = canvas.height / 2;
+  
+  // Blink if waiting on this specific group
+  const isWaiting = (waitHold && waitTargetGroup === group);
+  const alpha = isWaiting ? (0.6 + 0.4*Math.sin(performance.now()/80)) : 1.0;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.lineWidth = 6;
+  ctx.font = "900 64px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Draw background plate to separate from background/tuning pegs
+  const tw = ctx.measureText(nm).width;
+  const bw = tw + 40;
+  const bh = 80;
+  
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.6;
+  ctx.fillStyle = "#4a3728"; // Dark brown background
+  ctx.beginPath();
+  const r = 16;
+  const bx = cx - bw/2, by = cy - bh/2;
+  ctx.moveTo(bx+r, by);
+  ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
+  ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
+  ctx.arcTo(bx, by+bh, bx, by, r);
+  ctx.arcTo(bx, by, bx+bw, by, r);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeText(nm, cx, cy);
+  ctx.fillText(nm, cx, cy);
+
+  ctx.restore();
+}
+
 
 // --- 描画クラス ---
 class ChordGroup {
@@ -2513,183 +2596,9 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
-    // 表示：スケール(ドレミ)は「弦ごと」に大きく、コードは「手前に大きく」流す（中央HUDは使わない）
-    // 表示名：songのアルペジオ(単音)はコード名ではなく音名(ドレミ)を出す
-    const nmRaw = (this.chord && this.chord.name) ? this.chord.name : "";
-    const isScale = (gameMode === 'scale');
-    const isSong = !!isSongMode;
-    let nm = nmRaw;
-    if(isSong && !isScale){
-      // chordObjForPick は「その8分で鳴らす弦だけ」fingersに入る。
-      // 単音(アルペジオ)のときは、音名を表示して混乱を避ける。
-      if(this.chord && this.chord.fingers && this.chord.fingers.length === 1){
-        try{ nm = noteNameForFinger(this.chord.fingers[0]); }catch(e){ console.error(e); nm = ''; }
-      }
-    }
-
-    if(nm){
-      const fw2 = fw;
-      // どのモードか
-      
-      const isCodeMode = (gameMode === 'practice' || isSongMode);
-
-      if(isScale){
-        // スケール（ドレミファ）：コード2モード/曲(単音)と同じ考え方で
-        // 「指◯の左側（判定ライン寄り）」に、弦の中央（上下センター）で先に表示する
-        ctx.save();
-        const cy0 = canvas.height/2;
-
-        // 基本スタイル（songの単音ラベル相当）
-        const isSmallH = (window.innerHeight && window.innerHeight < 520);
-        ctx.globalAlpha = 0.94;
-        ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "rgba(0,0,0,0.34)";
-        ctx.lineWidth = 7;
-        ctx.font = (isSmallH ? "900 28px system-ui, -apple-system, sans-serif"
-                             : "900 32px system-ui, -apple-system, sans-serif");
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        const neckTop = cy0 - 150;
-        const neckBot = cy0 + 150;
-        const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
-
-        // スケールは基本1音（念のため複数でも先頭の指で代表）
-        const f0 = (this.chord && this.chord.fingers && this.chord.fingers.length)
-          ? this.chord.fingers[0] : null;
-        if(f0){
-          const fx = fretToX(f0.f);
-          const fy = cy0 + (f0.s-2.5)*75;
-          const labelY = clamp(fy, neckTop + 34, neckBot - 34);
-
-          // 背景プレート（中心基準でズレない）
-          const padX = 12, padY = 6;
-          const tw = ctx.measureText(nm).width;
-          const bw = tw + padX*2;
-          const bh = 34 + padY*2;
-
-          // 指◯(半径40)に被らないよう、プレート右端と指◯左端の間に少し隙間を作る
-          const circleR = 40;
-          const gap = 16;
-          const nx = Math.max(-180, fx - (bw/2 + circleR + gap));
-
-          const bx = nx - bw/2;
-          const by = labelY - bh/2;
-
-          ctx.save();
-          ctx.globalAlpha = 0.34; // 軽め
-          ctx.fillStyle = "#000";
-          ctx.beginPath();
-          const r = 12;
-          ctx.moveTo(bx+r, by);
-          ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
-          ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
-          ctx.arcTo(bx, by+bh, bx, by, r);
-          ctx.arcTo(bx, by, bx+bw, by, r);
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-
-          ctx.strokeText(nm, nx, labelY);
-          ctx.fillText(nm, nx, labelY);
-        }
-        ctx.restore();
-      }
-
-      if(isCodeMode && !isScale){
-        // コード表示：
-        // - practice(コード2モード)では「指◯に被らない」ように、弦の上側に大きめで
-        //   かつ「少し手前(右側)」に流す（縦ラインには合わせない）。
-        // - song側の見た目は変えないため、songは従来の小さめ表示のまま。
-        const ax = (this.getAnchorX ? this.getAnchorX() : this.x);
-        const isPractice = (gameMode === 'practice' && !isSongMode);
-        const isSongLabel = (!!isSongMode && gameMode !== 'scale');
-        const usePracticeStyle = isPractice || isSongLabel;
-
-        // 位置：
-        // - practice / song は「指◯の左側（判定ライン寄り）」に寄せて、先にラベル→あとから指◯が来るイメージ
-        // - 右→左に流れるので、左側(小さいX)に置くほど「先に通過」します。
-        const lead = usePracticeStyle
-          ? (Math.max(isPractice ? 70 : 52, fw2*0.80) + (isPractice ? 26 : 18))
-          : Math.max(18, fw2*0.65);
-
-        const nx = usePracticeStyle
-          ? Math.max(-180, ax - lead)          // 左へ（判定ライン寄り）。左側(フック外)も表示する
-          : (ax + lead);
-
-ctx.save();
-        const isWaitingThis = (waitHold && waitTargetGroup===this);
-
-        // 透明度：practiceはWAIT中だけ薄く。songは通常少しだけ控えめに。
-        ctx.globalAlpha = usePracticeStyle
-          ? (isWaitingThis ? 0.55 : (isPractice ? 0.96 : 0.92))
-          : 0.92;
-
-        ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "rgba(0,0,0,0.34)";
-        ctx.lineWidth = usePracticeStyle ? (isPractice ? 8 : 7) : 6;
-
-        const isSmallH = (window.innerHeight && window.innerHeight < 520);
-        ctx.font = isPractice
-          ? (isSmallH ? "900 38px system-ui, -apple-system, sans-serif" : "900 46px system-ui, -apple-system, sans-serif")
-          : (isSongLabel
-              ? (isSmallH ? "900 28px system-ui, -apple-system, sans-serif" : "900 32px system-ui, -apple-system, sans-serif")
-              : (isSmallH ? "900 26px system-ui, -apple-system, sans-serif" : "900 30px system-ui, -apple-system, sans-serif"));
-
-        ctx.textAlign = usePracticeStyle ? "center" : "left";
-        ctx.textBaseline = usePracticeStyle ? "middle" : "alphabetic";
-
-const cy0 = canvas.height/2;
-        const neckTop = cy0 - 150;
-        const neckBot = cy0 + 150;
-
-        // 指◯の集合の上下幅の「中央」にコード名を置く（弦の中心＝見やすい）
-        let minY = Infinity, maxY = -Infinity;
-        for(const f of this.chord.fingers){
-          const fy = cy0 + (f.s-2.5)*75;
-          if(fy < minY) minY = fy;
-          if(fy > maxY) maxY = fy;
-        }
-        const yMid = (minY + maxY) * 0.5;
-
-        const clamp = (v, a, b)=> Math.max(a, Math.min(b, v));
-
-        // practice(コード2モード)：ネック上で、指◯より「左側（判定ライン寄り）」にコード名を先出し
-        const labelY = usePracticeStyle
-          ? clamp(yMid, neckTop + 38, neckBot - 38)
-          : (neckTop + 52);
-
-        // 背景プレート（可読性UP：軽量）※文字とズレないように「中心基準」で作る
-        const padX = usePracticeStyle ? 14 : 10;
-        const padY = usePracticeStyle ? 8  : 6;
-        const tw = ctx.measureText(nm).width;
-        const bw = tw + padX*2;
-        const bhBase = isPractice ? 52 : (isSongLabel ? 42 : 34);
-        const bh = bhBase + padY*2;
-
-        // practice / song は textBaseline=middle なので、矩形も中心で合わせる
-        const bx = usePracticeStyle ? (nx - bw/2) : (nx - padX);
-        const by = usePracticeStyle ? (labelY - bh/2) : (labelY - 28 - padY);
-
-        ctx.save();
-        ctx.globalAlpha = usePracticeStyle ? (isPractice ? 0.38 : 0.34) : 0.35;
-        ctx.fillStyle = "#000";
-        ctx.beginPath();
-        const r = usePracticeStyle ? 12 : 10;
-        ctx.moveTo(bx+r, by);
-        ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
-        ctx.arcTo(bx+bw, by+bh, bx, by+bh, r);
-        ctx.arcTo(bx, by+bh, bx, by, r);
-        ctx.arcTo(bx, by, bx+bw, by, r);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-
-        ctx.strokeText(nm, nx, labelY);
-        ctx.fillText(nm, nx, labelY);
-        ctx.restore();
-      }
-    }
+    
+    // 表示：コード名・単音名のテキスト描画はここでは行わない（drawCurrentChordLabelで固定表示）
+    // （元のコード描画ロジックは削除・無効化）
   }
 }
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){

@@ -2891,45 +2891,43 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){ return null; }
   }
 
-  // ★音質改善：安全な減算合成方式（ウクレレ風）
-  // 以前の物理モデル音源(Delay Feedback)は発振しやすいため廃止し、
-  // 三角波＋ローパスフィルタによる安全で温かみのある音色に変更。
+  // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮
   function playFreqs(freqs, dur){
     try{
       ensureTapAudio();
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
-      // 音量調整：和音数に応じて下げる（音割れ防止）
+      // 音量調整
       const baseGain = 0.55 / N; 
-      // 余韻を長く
-      const tail = 1.0; 
+      const tail = 1.2; 
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(1500, Number(f0) || 440));
         
-        // ストローク表現：弦をはじくタイミングを少しずらす
-        const strumDelay = i * 0.03; 
+        // ★修正：ストローク間隔を0.03→0.012へ短縮（もたつき解消）
+        const strumDelay = i * 0.012; 
         const startTime = now + strumDelay;
 
         const osc = tapAudioCtx.createOscillator();
         const gain = tapAudioCtx.createGain();
         const filter = tapAudioCtx.createBiquadFilter();
 
-        // 1. 基本波形：ナイロン弦に近い「Triangle」
+        // 1. 基本波形：Triangle（丸みのある波形）
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(f, startTime);
 
-        // 2. フィルタ：弾いた瞬間の「硬さ」→すぐ「柔らかく」なる変化
+        // 2. フィルタ：高域をバッサリ削って「箱鳴り」感を出す
+        // startFreq: 2200Hz (以前より下げて電子感を消す) -> endFreq: 180Hz (ほぼ正弦波へ)
         filter.type = 'lowpass';
-        filter.Q.value = 0.5; // レゾナンス控えめ
-        filter.frequency.setValueAtTime(3000, startTime); // 最初は明るく
-        filter.frequency.exponentialRampToValueAtTime(400, startTime + 0.15); // すぐ丸くなる
+        filter.Q.value = 1.0; // 少しレゾナンスをつけて木の響きっぽく
+        filter.frequency.setValueAtTime(2200, startTime); 
+        filter.frequency.exponentialRampToValueAtTime(180, startTime + 0.12); 
 
-        // 3. エンベロープ（音量変化）：アタック感と減衰
+        // 3. エンベロープ：アタックを少し遅らせて「パチッ」というクリックノイズを軽減
         gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.01); // アタック
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + tail); // 減衰
+        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
 
         osc.connect(filter);
         filter.connect(gain);

@@ -1012,8 +1012,8 @@ function bindSongSpeedUI(){
 
 // ===== 基本設定 =====
 const BASE_SPEED_MULT = 1.15; // 全体のベース速度倍率（少しゆっくり）
-const SPEEDUP_MULT = 1.7;     // 5HITごと加速（practice/scaleのみ）     // 途中スピードアップはしない（固定）
-const PRACTICE_BOOST_CAP = 3; // practice(コード2モード)の5HIT加速は最大3段まで（x1.7, x2.9, x4.9）
+const SPEEDUP_MULT = 1.25;     // 5HITごと加速（1.7だと速すぎるため、1.25程度に修正）
+const PRACTICE_BOOST_CAP = 100; // practice(コード2モード)の5HIT加速の上限を撤廃（実質無限）
 
 const ENABLE_SPEED_UP = false; // speed is selected at start; no mid-song speed-up
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -1143,23 +1143,16 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // teacher fret hints (MOVED TO TOP EDGE)
+  // teacher fret hints (MOVED TO TOP EDGE - OUTSIDE)
   (function(){
     ctx.save();
-    const born = (window.__fretHintBorn ?? (window.__fretHintBorn = performance.now()));
-    const dt = performance.now() - born;
-    // brief "noticeable" pulse on load, then settle subtle
-    const boost = dt < 900 ? (2.2 - 1.2*(dt/900)) : 1.0;
-
+    
     ctx.font = STAGE.FRET_HINT_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom"; // Anchor to bottom to sit on top of neck
     
-    // NEW POSITION: On top of the neck (g.y) with a little gap
-    const yTxt = g.y - 6;
-
-    const baseA = 0.95; // More visibility
-    ctx.globalAlpha = Math.min(1, baseA * boost);
+    // NEW POSITION: ネックの上端(g.y)より少し上に表示
+    const yTxt = g.y - 4;
 
     ctx.fillStyle = "#fff"; // White text
 
@@ -1172,7 +1165,7 @@ function drawFretboardBase(ctx, canvas, stringColors){
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.3)";
       ctx.beginPath();
-      ctx.arc(x, yTxt - 6, 11, 0, Math.PI*2);
+      ctx.arc(x, yTxt - 7, 12, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
 
@@ -1279,96 +1272,6 @@ function ensureTapAudio(){
     }
   }catch(e){}
 }
-function noteFreqFromTarget(t){
-  try{
-    if(t && t.noteKey){
-      const map = {do:261.63, re:293.66, mi:329.63, fa:349.23, so:392.00, la:440.00, si:493.88, do2:523.25};
-      if(map[t.noteKey]) return map[t.noteKey];
-    }
-    const n = (t && t.chord && t.chord.name) ? String(t.chord.name) : '';
-    const base = n.replace(/[^A-Ga-g]/g,'').toUpperCase();
-    const m = {C:261.63, D:293.66, E:329.63, F:349.23, G:392.00, A:440.00, B:493.88};
-    if(m[base]) return m[base];
-    if(n.toUpperCase().startsWith('G7')) return 392.00;
-    if(n.toUpperCase().startsWith('AM')) return 440.00;
-    if(n.toUpperCase().startsWith('DM')) return 293.66;
-    if(n.toUpperCase().startsWith('EM')) return 329.63;
-    if(n.toUpperCase().startsWith('A7')) return 440.00;
-    if(n.toUpperCase().startsWith('D7')) return 293.66;
-  }catch(e){}
-  return 440.00;
-}
-function playTapHitSound(target){
-  // Only for TAP entry (タップであそぶ)
-  if(!isTapMode()) return;
-  ensureTapAudio();
-  applyTapVolumeToGain();
-  if(!tapAudioCtx || !tapMaster) return;
-  const now = tapAudioCtx.currentTime;
-  const vol = getTapVolume01();
-  const amp = Math.pow(vol, 2.2);
-  // chord via fingers (including open string 0) – supports kirakira短音もここで鳴らす
-  try{
-    const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
-    if(fingers && fingers.length>1){
-      const baseMap = {1:440.00, 2:329.63, 3:261.63, 4:392.00}; // A,E,C,G
-      const freqs = fingers.map(fg=>{
-        const s = Number(fg && fg.s);
-        const fret = Number(fg && fg.f);
-        const base = baseMap[s] || 440.00;
-        const f = (Number.isFinite(fret) ? fret : 0);
-        return base * Math.pow(2, f/12);
-      });
-      const dur = (target && target.isShort) ? 0.10 : 0.18;
-      freqs.forEach((ff, idx)=>{
-        try{
-          const o = tapAudioCtx.createOscillator();
-          const g = tapAudioCtx.createGain();
-          const a = Math.max(0.0001, (0.35/Math.max(1,freqs.length)) * (0.15 + 0.85*amp));
-          g.gain.setValueAtTime(a, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-          o.frequency.setValueAtTime(ff, now);
-          o.type = 'triangle';
-          o.connect(g); g.connect(tapMaster);
-          o.start(now); o.stop(now + dur + 0.01);
-        }catch(e){}
-      });
-      return;
-    }
-  }catch(e){}
-
-  const f = noteFreqFromTarget(target);
-  try{
-    // main pluck
-    const o = tapAudioCtx.createOscillator();
-    const g = tapAudioCtx.createGain();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(f, now);
-    g.gain.setValueAtTime(Math.max(0.0001, (0.0001) * (0.15 + 0.85*amp)), now);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.9, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    o.connect(g).connect(tapMaster);
-    o.start(now);
-    o.stop(now + 0.24);
-
-    // little "pick" click
-    const nbuf = tapAudioCtx.createBuffer(1, Math.floor(tapAudioCtx.sampleRate * 0.03), tapAudioCtx.sampleRate);
-    const d = nbuf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length/6));
-    const ns = tapAudioCtx.createBufferSource();
-    ns.buffer = nbuf;
-    const nf = tapAudioCtx.createBiquadFilter();
-    nf.type='highpass'; nf.frequency.setValueAtTime(900, now);
-    const ng = tapAudioCtx.createGain();
-    ng.gain.setValueAtTime(0.0001, now);
-    ng.gain.exponentialRampToValueAtTime(Math.max(0.0001, tapVol) * 0.25, now + 0.002);
-    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-    ns.connect(nf).connect(ng).connect(tapMaster);
-    ns.start(now);
-    ns.stop(now + 0.06);
-  }catch(e){}
-}
-
 
 function enhanceRangeSlider(el){
   if(!el) return;
@@ -2437,8 +2340,8 @@ function drawBigHeadstockLabel(ctx, group){
 
   if(!nm) return;
 
-  // ===== CHANGED: Move further left (40) so it doesn't overlap string labels at 110 =====
-  const cx = 40; // Center of Headstock (0 to 110 area)
+  // ===== CHANGED: Move further left and shrink font to fit in headstock =====
+  const cx = 50; // Center of Headstock (moved from 40 to 50 to avoid left cutoff)
   const cy = canvas.height / 2;
   
   // Blink if waiting on this specific group
@@ -2450,21 +2353,21 @@ function drawBigHeadstockLabel(ctx, group){
   ctx.fillStyle = "#fff";
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 6;
-  // ===== CHANGED: Smaller font (52px) to fit in the narrower space =====
-  ctx.font = "900 52px system-ui, -apple-system, sans-serif";
+  // ===== CHANGED: Smaller font (42px) to prevent overlap with string labels =====
+  ctx.font = "900 42px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   // Draw background plate to separate from background/tuning pegs
   const tw = ctx.measureText(nm).width;
-  const bw = tw + 30; // less padding
-  const bh = 70;      // smaller box
+  const bw = tw + 24; // less padding
+  const bh = 60;      // smaller box
   
   ctx.save();
   ctx.globalAlpha = alpha * 0.6;
   ctx.fillStyle = "#4a3728"; // Dark brown background
   ctx.beginPath();
-  const r = 14;
+  const r = 12;
   const bx = cx - bw/2, by = cy - bh/2;
   ctx.moveTo(bx+r, by);
   ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
@@ -2803,16 +2706,42 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){ return null; }
   }
 
-  // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮
+  // --- SUSTAIN MANAGEMENT (v80) ---
+  const activeVoices = []; // {osc, gain, startTime}
+
+  function stopAllVoices(){
+    const now = tapAudioCtx.currentTime;
+    // release nicely to avoid destruction sound
+    activeVoices.forEach(v => {
+      try {
+        v.gain.gain.cancelScheduledValues(now);
+        v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
+        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // fade out
+        v.osc.stop(now + 0.15);
+      } catch(e){}
+    });
+    activeVoices.length = 0;
+  }
+
+  // Tap Release Handler
+  window.addEventListener('touchend', stopAllVoices, {passive:true});
+  window.addEventListener('mouseup', stopAllVoices, {passive:true});
+  window.addEventListener('pointerup', stopAllVoices, {passive:true});
+
+  // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮 + Sustain Support
   function playFreqs(freqs, dur){
     try{
       ensureTapAudio();
+      stopAllVoices(); // kill previous note if overlap (monophonic feel per tap)
+      
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
       // 音量調整
       const baseGain = 0.55 / N; 
-      const tail = 1.2; 
+      // Sustain level (hold while pressing)
+      const sustainLevel = baseGain * 0.6; 
+      const decayTime = 0.3; // Time to reach sustain level
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(1500, Number(f0) || 440));
@@ -2830,23 +2759,27 @@ window.addEventListener('pageshow', ()=>{
         osc.frequency.setValueAtTime(f, startTime);
 
         // 2. フィルタ：高域をバッサリ削って「箱鳴り」感を出す
-        // startFreq: 2200Hz (以前より下げて電子感を消す) -> endFreq: 180Hz (ほぼ正弦波へ)
         filter.type = 'lowpass';
-        filter.Q.value = 1.0; // 少しレゾナンスをつけて木の響きっぽく
+        filter.Q.value = 1.0; 
         filter.frequency.setValueAtTime(2200, startTime); 
         filter.frequency.exponentialRampToValueAtTime(180, startTime + 0.12); 
 
-        // 3. エンベロープ：アタックを少し遅らせて「パチッ」というクリックノイズを軽減
+        // 3. エンベロープ：Attack -> Decay -> Sustain (Not release yet)
         gain.gain.setValueAtTime(0, startTime);
         gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
+        // Decay to sustain level (hold there)
+        gain.gain.linearRampToValueAtTime(sustainLevel, startTime + decayTime);
 
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(tapMaster);
 
         osc.start(startTime);
-        osc.stop(startTime + tail + 0.1);
+        
+        // Auto-stop just in case user never releases (safety: 4 sec)
+        osc.stop(startTime + 4.0);
+        
+        activeVoices.push({osc, gain, startTime});
       });
     }catch(e){ console.error(e); }
   }

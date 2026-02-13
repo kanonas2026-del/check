@@ -166,6 +166,43 @@
     #score-panel { top: calc(60px + var(--ui-top, 0px) + env(safe-area-inset-top)); right: calc(12px + var(--ui-right, 0px) + env(safe-area-inset-right)); }
     #timer-panel { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); font-size: 16px; }
 
+    /* Time Bonus Popup Animation */
+    @keyframes popUpFade {
+      0% { transform: translateY(0) scale(0.8); opacity: 0; }
+      20% { transform: translateY(-10px) scale(1.2); opacity: 1; }
+      100% { transform: translateY(-40px) scale(1.0); opacity: 0; }
+    }
+    .time-bonus {
+      position: fixed;
+      top: calc(40px + env(safe-area-inset-top));
+      right: calc(80px + env(safe-area-inset-right));
+      color: #ff3d3d;
+      font-weight: 1000;
+      font-size: 24px;
+      text-shadow: 0 2px 0 #fff, 0 0 10px rgba(255,255,255,0.8);
+      pointer-events: none;
+      z-index: 95;
+      animation: popUpFade 1.2s ease-out forwards;
+    }
+
+    /* Screen Edge Rainbow Flash (Fever) */
+    #screenRainbow {
+      position: fixed; inset: 0; z-index: 80; pointer-events: none;
+      box-shadow: inset 0 0 0 0px rgba(255,255,0,0);
+      transition: box-shadow 0.1s;
+    }
+    #screenRainbow.active {
+      animation: rainbowFlash 0.6s ease-out;
+    }
+    @keyframes rainbowFlash {
+      0% { box-shadow: inset 0 0 60px 20px rgba(255,0,0,0.6); }
+      20% { box-shadow: inset 0 0 60px 20px rgba(255,255,0,0.6); }
+      40% { box-shadow: inset 0 0 60px 20px rgba(0,255,0,0.6); }
+      60% { box-shadow: inset 0 0 60px 20px rgba(0,255,255,0.6); }
+      80% { box-shadow: inset 0 0 60px 20px rgba(0,0,255,0.6); }
+      100% { box-shadow: inset 0 0 0 0 rgba(0,0,0,0); }
+    }
+
     #stopBtn {
       position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 180; display: none;
       border: none; border-radius: 16px; padding: 12px 18px;
@@ -780,12 +817,12 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id="buildBadge">v0.2</div>
+<div id="buildBadge">v0.3</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.2</div>
+<div id="verTag">v0.3</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -844,6 +881,7 @@ body.is-uke .vol-inline{ display:none !important; }
 </div>
 </div>
 <div id="screenFlash"></div>
+<div id="screenRainbow"></div>
 <div id="fxMsg"></div>
 <div id="comboBig"></div>
 <div id="lyrics-area"></div>
@@ -1480,8 +1518,8 @@ let scaleSpeedBoosted = false; // scale専用
   const big=document.getElementById('comboBig'); if(big) big.style.display='none';
 let currentScrollSpeed = 3.5;
 const SPEED_UP_EVERY = 5;    // 5連続で加速
-const SPEED_STEP = 0.375;   // 1段階の加速量（×1.5）
-const SPEED_MAX_ADD = 2.25; // 上限（×1.5）
+const SPEED_STEP = 0.5;   // ★変更：1段階の加速量（×0.5ずつ）
+//const SPEED_MAX_ADD = 2.25; // 上限（撤廃）
 
 let _fxTimer = 0;
 const CHEER_PHRASES = ['その調子！','いいぞ！','ナイス！','いい音！','指ばっちり！','リズム完璧！','ノってる！','キター！','最高！','つづけ！','いける！','落ち着いていこう！','今のきれい！'];
@@ -1491,6 +1529,22 @@ function flashScreen(){
   f.classList.remove('flash');
   void f.offsetWidth;
   f.classList.add('flash');
+}
+
+function triggerRainbowFlash(){
+  const r = document.getElementById('screenRainbow');
+  if(!r) return;
+  r.classList.remove('active');
+  void r.offsetWidth;
+  r.classList.add('active');
+}
+
+function showTimeBonus(msg){
+  const el = document.createElement('div');
+  el.className = 'time-bonus';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 1500);
 }
 
 function updateComboUI(){ /* disabled */ }
@@ -1565,8 +1619,10 @@ function resetSpeedState(){
   }
 }
 function applySpeed(){
-  const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD;
-  currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
+  // const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD; // 上限なし
+  // currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
+  currentScrollSpeed = baseScrollSpeed + (speedLevel * SPEED_STEP);
+
   if(gameState === 'PLAY' && !waitHold){
     scrollSpeed = currentScrollSpeed;
   }
@@ -2283,15 +2339,26 @@ function handleAction(){
         // practice(コード2モード)は「5連続HITごとに累積加速」 / song(きらきら星)は速度固定
         const canSpeedUp = (gameMode === 'practice');
         const hitMilestone = (canSpeedUp && !disableSpeedUpActive && comboStreak > 0 && (comboStreak % 5 === 0));
+        
         if(hitMilestone){
-          practiceBoostCount = Math.min(practiceBoostCount + 1, PRACTICE_BOOST_CAP);
-          const mult = Math.pow(SPEEDUP_MULT, practiceBoostCount);
-          currentScrollSpeed = baseScrollSpeed * mult;
-          if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
+          // ★ルール変更： +0.5スピードUP（上限なし）、+5秒延長
+          practiceBoostCount++;
+          // currentScrollSpeed = baseScrollSpeed * Math.pow(SPEEDUP_MULT, practiceBoostCount); // 旧ロジック
+          currentScrollSpeed += SPEED_STEP; // 新ロジック：0.5ずつ加算
 
-          // flashScreen(); // 重いので無効化
-          showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! x${mult.toFixed(1)}`, 'speed', { mega:true, durationMs: 2000 });
-          try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
+          if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
+          
+          // Time Extension Rule
+          if(gameEndAt != null) {
+            gameEndAt += 5000; // +5 seconds
+            showTimeBonus("+5秒!");
+          }
+          
+          // Visuals
+          triggerRainbowFlash();
+          showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! (${currentScrollSpeed.toFixed(1)})`, 'speed', { mega:true, durationMs: 2000 });
+          try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(20, p.x, p.y, 2); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
+
         } else {
           const label = (best<50) ? '✨PERFECT!!✨' : '🔥NICE!!🔥';
           try{const p=getFxPointFromGroup(target); showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 , x:p.x, y:p.y});}catch(e){ showFx(`${label}\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1800 });}
@@ -2340,8 +2407,8 @@ function drawBigHeadstockLabel(ctx, group){
 
   if(!nm) return;
 
-  // ===== CHANGED: Move further left and shrink font to fit in headstock =====
-  const cx = 50; // Center of Headstock (moved from 40 to 50 to avoid left cutoff)
+  // ===== CHANGED: Move further left (x=36) and shrink font to 34px to avoid overlap with string labels (x=110) =====
+  const cx = 36; // 左端ギリギリに寄せ、右側の110pxエリアとの干渉を避ける
   const cy = canvas.height / 2;
   
   // Blink if waiting on this specific group
@@ -2353,21 +2420,21 @@ function drawBigHeadstockLabel(ctx, group){
   ctx.fillStyle = "#fff";
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 6;
-  // ===== CHANGED: Smaller font (42px) to prevent overlap with string labels =====
-  ctx.font = "900 42px system-ui, -apple-system, sans-serif";
+  // Font reduced to 34px
+  ctx.font = "900 34px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   // Draw background plate to separate from background/tuning pegs
   const tw = ctx.measureText(nm).width;
-  const bw = tw + 24; // less padding
-  const bh = 60;      // smaller box
+  const bw = tw + 20; // less padding
+  const bh = 54;      // smaller box
   
   ctx.save();
   ctx.globalAlpha = alpha * 0.6;
   ctx.fillStyle = "#4a3728"; // Dark brown background
   ctx.beginPath();
-  const r = 12;
+  const r = 10;
   const bx = cx - bw/2, by = cy - bh/2;
   ctx.moveTo(bx+r, by);
   ctx.arcTo(bx+bw, by, bx+bw, by+bh, r);
@@ -2929,7 +2996,7 @@ window.addEventListener('pageshow', ()=>{
   });
 })();
 </script>
-<div class="verBadge">v0.2</div>
+<div class="verBadge">v0.3</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

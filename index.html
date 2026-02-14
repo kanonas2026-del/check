@@ -188,8 +188,8 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
   pointer-events: none;
 }
 /* スマホで高さが低い時は、さらに少し下へ */
-.guide-bubble .bunny { font-size: 26px; }
-.guide-bubble .text  { font-size: 15px; font-weight: 900; color: #555; }
+.guide-bubble .bunny { font-size: 32px; }
+.guide-bubble .text  { font-size: 24px; font-weight: 900; color: #555; }
 .guide-bubble::after {
   content: ""; position: absolute;
   bottom: -8px; left: var(--tail-left, 50%); transform: translateX(-50%);
@@ -494,7 +494,16 @@ top: clamp(138px, 26vh, 210px); /* 画面サイズに応じて上下 */
     </div>
 
     <div id="btnUke" class="play-btn btn-uke" onclick="goFlip('ukulele.html')">
-      <span class="btn-icon">🎸</span>
+      <span class="btn-icon">
+        <svg width="1em" height="1em" viewBox="0 0 64 64" style="vertical-align: -0.125em;">
+          <g transform="rotate(45 32 32)">
+            <rect x="28" y="10" width="8" height="24" fill="#8B5A2B" />
+            <rect x="26" y="4" width="12" height="10" fill="#5C3A21" rx="2" />
+            <path d="M22,32 C12,32 12,44 20,48 C16,54 18,62 32,62 C46,62 48,54 44,48 C52,44 52,32 42,32 C38,32 36,36 32,36 C28,36 26,32 22,32 Z" fill="#E6A15C"/>
+            <circle cx="32" cy="46" r="5" fill="#3D2314"/>
+          </g>
+        </svg>
+      </span>
       <h2 class="btn-title">ウクレレで<br>あそぶ</h2>
       <span class="btn-desc">楽器をつかうよ</span>
     </div>
@@ -546,9 +555,12 @@ window.addEventListener('pageshow', ()=>{
 
     const msgs = [
       { text: "どっちで あそぶ？", target: "center" },
-      { text: "タップで すぐ あそべるよ！", target: "tap" },
-      { text: "HITしたら おとが なるよ♪", target: "tap" },
-      { text: "ウクレレが あるなら こっち！", target: "uke" }
+      { text: "タップで すぐ", target: "tap" },
+      { text: "あそべるよ！", target: "tap" },
+      { text: "HITしたら", target: "tap" },
+      { text: "おとが なるよ♪", target: "tap" },
+      { text: "ウクレレが あるなら", target: "uke" },
+      { text: "こっち！", target: "uke" }
     ];
 
     let cur = 0;

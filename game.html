@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
@@ -742,6 +741,7 @@ body.is-uke .vol-inline{ display:none !important; }
   font-weight: 800;
   font-size: 12px;
   pointer-events: none;
+  display: none !important; /* v81: 完全消去 */
 }
 
 
@@ -817,7 +817,6 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </head>
 <body class="menuOpen">
-<div id="buildBadge">v0.3</div>
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
@@ -1959,7 +1958,19 @@ async function prepGame(type){
   try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
   // タップモードならマイク不要
-  if(isTapMode()){ startGameByType(type); return; }
+  if(isTapMode()){ 
+      // ★NEW: 音量チェック
+      try{
+        const v = getTapVolume01();
+        // 音量が小さい、またはAudioContextが止まっている場合に警告
+        if(v < 0.1 || (tapAudioCtx && tapAudioCtx.state === 'suspended')){
+            showFx('🎵 音量をONにしてね', 'speed', { durationMs: 2500 });
+        }
+      }catch(e){}
+      
+      startGameByType(type); 
+      return; 
+  }
 
   // マイク準備
   document.getElementById('loading-overlay').style.display = 'flex';
@@ -2034,7 +2045,7 @@ function initGame(mode, levelData, opts){
   resetSpeedState();
   gameMode = mode;
   isSongMode = (mode==='song');
-  disableSpeedUpActive = !!(opts && opts.disableSpeedUp); // songのみ固定、practice/scaleは途中UPあり
+  disableSpeedUpActive = !!(opts.disableSpeedUp); // songのみ固定、practice/scaleは途中UPあり
   currentLevelChords = levelData || [];
   practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
   spawnInterval = 2800; // デフォルト
@@ -2796,55 +2807,91 @@ window.addEventListener('pageshow', ()=>{
   window.addEventListener('pointerup', stopAllVoices, {passive:true});
 
   // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮 + Sustain Support
+  // Bright Tropical Ukulele Tone
   function playFreqs(freqs, dur){
     try{
       ensureTapAudio();
-      stopAllVoices(); // kill previous note if overlap (monophonic feel per tap)
+      stopAllVoices(); 
       
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
-      // 音量調整
-      const baseGain = 0.55 / N; 
-      // Sustain level (hold while pressing)
-      const sustainLevel = baseGain * 0.6; 
-      const decayTime = 0.3; // Time to reach sustain level
+      // Volume & Tuning
+      const baseGain = 0.50 / N; 
+      const sustainLevel = baseGain * 0.4; 
+      const decayTime = 0.25; 
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(1500, Number(f0) || 440));
         
-        // ★修正：ストローク間隔を0.03→0.012へ短縮（もたつき解消）
-        const strumDelay = i * 0.012; 
+        // Strumming effect: slightly irregular fast strum (up/down feel simulation not needed, just fast strum)
+        // Add random micro-delay to simulate human imperfection
+        const humanize = (Math.random() - 0.5) * 0.005;
+        const strumDelay = i * 0.015 + humanize; 
         const startTime = now + strumDelay;
 
+        // --- 1. Pluck Noise (The "Click" / Attack) ---
+        // Generates a tiny burst of noise to simulate finger hitting string
+        const noiseOsc = tapAudioCtx.createOscillator();
+        const noiseGain = tapAudioCtx.createGain();
+        noiseOsc.type = 'square'; // Square wave as a cheap noise source when short
+        // High frequency chirp
+        noiseOsc.frequency.setValueAtTime(800, startTime);
+        noiseOsc.frequency.exponentialRampToValueAtTime(100, startTime + 0.015);
+        
+        noiseGain.gain.setValueAtTime(0.04, startTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.01);
+        
+        noiseOsc.connect(noiseGain);
+        noiseGain.connect(tapMaster);
+        noiseOsc.start(startTime);
+        noiseOsc.stop(startTime + 0.02);
+
+
+        // --- 2. String Tone (Sawtooth + Filtering) ---
         const osc = tapAudioCtx.createOscillator();
         const gain = tapAudioCtx.createGain();
-        const filter = tapAudioCtx.createBiquadFilter();
+        
+        // Main Filter: Cuts the harsh buzz of sawtooth
+        const toneFilter = tapAudioCtx.createBiquadFilter();
+        
+        // Body Resonance Filter: Simulates the wooden box (formant) around 600Hz
+        const bodyFilter = tapAudioCtx.createBiquadFilter();
 
-        // 1. 基本波形：Triangle（丸みのある波形）
-        osc.type = 'triangle';
+        // 2a. Oscillator: Sawtooth is richer than Triangle (closer to strings)
+        osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(f, startTime);
 
-        // 2. フィルタ：高域をバッサリ削って「箱鳴り」感を出す
-        filter.type = 'lowpass';
-        filter.Q.value = 1.0; 
-        filter.frequency.setValueAtTime(2200, startTime); 
-        filter.frequency.exponentialRampToValueAtTime(180, startTime + 0.12); 
+        // 2b. Tone Filter (Lowpass)
+        toneFilter.type = 'lowpass';
+        toneFilter.Q.value = 0.5;
+        // Start bright (pluck) then dulls quickly
+        toneFilter.frequency.setValueAtTime(3500, startTime); 
+        toneFilter.frequency.exponentialRampToValueAtTime(1000, startTime + 0.2); 
 
-        // 3. エンベロープ：Attack -> Decay -> Sustain (Not release yet)
+        // 2c. Body Filter (Peaking) - The "Tropical" wood sound
+        bodyFilter.type = 'peaking';
+        bodyFilter.frequency.value = 550; // Ukulele body resonance
+        bodyFilter.Q.value = 1.0;
+        bodyFilter.gain.value = 4; // Slight boost
+
+        // 2d. Envelope
         gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.005);
-        // Decay to sustain level (hold there)
-        gain.gain.linearRampToValueAtTime(sustainLevel, startTime + decayTime);
+        // Sharp attack
+        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.006);
+        // Decay to sustain
+        gain.gain.exponentialRampToValueAtTime(sustainLevel, startTime + decayTime);
 
-        osc.connect(filter);
-        filter.connect(gain);
+        // Connect: Osc -> ToneFilter -> BodyFilter -> Gain -> Master
+        osc.connect(toneFilter);
+        toneFilter.connect(bodyFilter);
+        bodyFilter.connect(gain);
         gain.connect(tapMaster);
 
         osc.start(startTime);
         
-        // Auto-stop just in case user never releases (safety: 4 sec)
-        osc.stop(startTime + 4.0);
+        // Safety stop
+        osc.stop(startTime + 3.0);
         
         activeVoices.push({osc, gain, startTime});
       });
@@ -2990,13 +3037,26 @@ window.addEventListener('pageshow', ()=>{
     s.addEventListener('change', apply, {passive:true});
   }
 
+  // ★NEW: Unlock Audio on First Touch (Global)
+  // This solves the "initial silence" issue by forcing a resume on the very first touch anywhere.
+  function unlockAudioGlobal(){
+    try{
+      if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
+      if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }catch(e){}
+    document.removeEventListener('touchstart', unlockAudioGlobal);
+    document.removeEventListener('click', unlockAudioGlobal);
+  }
+  document.addEventListener('touchstart', unlockAudioGlobal, {once:true, passive:true});
+  document.addEventListener('click', unlockAudioGlobal, {once:true, passive:true});
+
+
   window.addEventListener('DOMContentLoaded', ()=>{
     hookSlider();
     try{ bindSongSpeedUI(); }catch(e){}
   });
 })();
 </script>
-<div class="verBadge">v0.3</div>
 <div aria-hidden="true" id="pageFlip"></div>
 <div aria-live="polite" id="pandaHint" style="
   position:fixed;

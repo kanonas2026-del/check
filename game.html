@@ -2253,12 +2253,59 @@ if(isWaitMode()){
 }
 
 function endGame(){
+  if(gameState === 'RESULT') return;
   try{ document.body.classList.remove('playing'); }catch(e){}
   gameState='RESULT';
   cancelAnimationFrame(rafId);
-  document.getElementById('result-score').innerText = score;
-  document.getElementById('result-msg').innerText = score>300 ? "Amazing!!" : "Good Job!";
-  document.getElementById('result-overlay').style.display='flex';
+  
+  // FINISH演出
+  const finishEl = document.createElement('div');
+  finishEl.style.cssText = `
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+    z-index: 9999; pointer-events: none; opacity: 0;
+    font-size: 64px; font-weight: 900; color: #fff;
+    text-shadow: 0 4px 0 #ff7a3d, 0 10px 20px rgba(0,0,0,0.4);
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.6s ease;
+    white-space: nowrap;
+  `;
+  finishEl.innerText = "FINISH!!";
+  document.getElementById('app').appendChild(finishEl);
+
+  // 少し遅れて表示と音
+  setTimeout(()=>{
+    finishEl.style.transform = "translate(-50%, -50%) scale(1)";
+    finishEl.style.opacity = "1";
+    // ジャーンと鳴らす (Cコード)
+    try{ 
+        if(typeof playFreqs === 'function') {
+            playFreqs([261.63, 329.63, 392.00, 523.25], 1.0); 
+        }
+    }catch(e){}
+  }, 100);
+
+  // 2秒後にリザルト表示
+  setTimeout(()=>{
+    finishEl.style.opacity = "0";
+    finishEl.style.transform = "translate(-50%, -50%) scale(1.5)";
+    setTimeout(()=>finishEl.remove(), 600);
+
+    document.getElementById('result-score').innerText = score;
+    let msg = "Good Job!";
+    if(score > 600) msg = "Amazing!! 🏆";
+    else if(score > 300) msg = "Great!! 🌟";
+    else if(score > 100) msg = "Nice! 👍";
+    document.getElementById('result-msg').innerText = msg;
+    document.getElementById('result-overlay').style.display='flex';
+    
+    // ファンファーレ的な音
+    setTimeout(()=>{
+       try{ 
+           if(typeof playFreqs === 'function') {
+               playFreqs([261.63, 329.63, 392.00, 523.25, 659.25], 1.5); 
+           }
+       }catch(e){}
+    }, 300);
+  }, 2200);
 }
 
 // --- 入力判定 ---
@@ -2822,7 +2869,7 @@ window.addEventListener('pageshow', ()=>{
   }
 
   // ★音質改善：電子音を消して丸い音へ + アタック強化 + Sustain Support
-  function playFreqs(freqs, dur){
+  window.playFreqs = function(freqs, dur){
     try{
       ensureTapAudio();
       stopAllVoices(); 
@@ -2836,8 +2883,8 @@ window.addEventListener('pageshow', ()=>{
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(2000, Number(f0) || 440));
         
-        // ストロークのズレ（ポロン）
-        const strumDelay = i * 0.015 + (Math.random() - 0.5) * 0.004; 
+        // ストロークのズレ（ポロン）: ウクレレ特有のストラム感を強調
+        const strumDelay = i * 0.025 + (Math.random() - 0.5) * 0.005; 
         const startTime = now + strumDelay;
 
         // --- 1. Pluck Noise (パチッ) ---
@@ -2847,12 +2894,12 @@ window.addEventListener('pageshow', ()=>{
 
         const noiseFilter = tapAudioCtx.createBiquadFilter();
         noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 3000;
-        noiseFilter.Q.value = 0.8;
+        noiseFilter.frequency.value = 2000;
+        noiseFilter.Q.value = 0.5;
 
         const noiseGain = tapAudioCtx.createGain();
-        noiseGain.gain.setValueAtTime(0.15 * baseGain, startTime);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
+        noiseGain.gain.setValueAtTime(0.2 * baseGain, startTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.015);
 
         noiseSrc.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
@@ -2862,46 +2909,48 @@ window.addEventListener('pageshow', ()=>{
         // --- 2. String Tone (ポロッ) ---
         const bodyFilter = tapAudioCtx.createBiquadFilter();
         bodyFilter.type = 'peaking';
-        bodyFilter.frequency.value = 400; // 胴鳴り
-        bodyFilter.Q.value = 1.5;
-        bodyFilter.gain.value = 5.0;
+        bodyFilter.frequency.value = 350; // ウクレレの胴鳴り
+        bodyFilter.Q.value = 1.2;
+        bodyFilter.gain.value = 6.0;
 
         const osc1 = tapAudioCtx.createOscillator();
         const osc2 = tapAudioCtx.createOscillator();
         const osc3 = tapAudioCtx.createOscillator();
         
-        osc1.type = 'triangle';
+        // ナイロン弦の暖かさを出すため基本波をサイン波に
+        osc1.type = 'sine';
         osc2.type = 'sine';
         osc3.type = 'triangle';
 
         // ピッチ変動（弦を弾いた直後はわずかに高い）
-        const pitchBend = f * 0.012; 
+        const pitchBend = f * 0.008; 
         osc1.frequency.setValueAtTime(f + pitchBend, startTime);
-        osc1.frequency.exponentialRampToValueAtTime(f, startTime + 0.05);
+        osc1.frequency.exponentialRampToValueAtTime(f, startTime + 0.08);
 
-        osc2.frequency.setValueAtTime((f * 2) + pitchBend * 2, startTime);
-        osc2.frequency.exponentialRampToValueAtTime(f * 2, startTime + 0.05);
+        osc2.frequency.setValueAtTime((f * 2) + pitchBend * 1.5, startTime);
+        osc2.frequency.exponentialRampToValueAtTime(f * 2, startTime + 0.08);
 
-        const f3 = f * 3.02; // 非整数倍音で弦の硬さを表現
-        osc3.frequency.setValueAtTime(f3 + pitchBend * 3, startTime);
+        // アタックを際立たせる成分
+        const f3 = f * 3.0; 
+        osc3.frequency.setValueAtTime(f3 + pitchBend * 2, startTime);
         osc3.frequency.exponentialRampToValueAtTime(f3, startTime + 0.05);
 
         const mix1 = tapAudioCtx.createGain();
         const mix2 = tapAudioCtx.createGain();
         const mix3 = tapAudioCtx.createGain();
 
-        // エンベロープ（減衰）
+        // エンベロープ（減衰）ナイロン弦特有の早い減衰
         mix1.gain.setValueAtTime(0, startTime);
-        mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.005);
-        mix1.gain.exponentialRampToValueAtTime(0.01, startTime + 1.8);
+        mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.008);
+        mix1.gain.exponentialRampToValueAtTime(0.01, startTime + 1.2);
 
         mix2.gain.setValueAtTime(0, startTime);
-        mix2.gain.linearRampToValueAtTime(0.3, startTime + 0.005);
-        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.7);
+        mix2.gain.linearRampToValueAtTime(0.25, startTime + 0.005);
+        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5);
 
         mix3.gain.setValueAtTime(0, startTime);
-        mix3.gain.linearRampToValueAtTime(0.1, startTime + 0.002);
-        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+        mix3.gain.linearRampToValueAtTime(0.15, startTime + 0.003);
+        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
 
         osc1.connect(mix1);
         osc2.connect(mix2);
@@ -2914,11 +2963,11 @@ window.addEventListener('pageshow', ()=>{
         mix2.connect(bodyFilter);
         mix3.connect(bodyFilter);
 
-        // トーンローパス（高域を削って耳を疲れさせない）
+        // トーンローパス（高域を削って耳を疲れさせず、丸い音にする）
         const lpFilter = tapAudioCtx.createBiquadFilter();
         lpFilter.type = 'lowpass';
-        lpFilter.frequency.setValueAtTime(3000, startTime);
-        lpFilter.frequency.exponentialRampToValueAtTime(700, startTime + 0.2);
+        lpFilter.frequency.setValueAtTime(2500, startTime);
+        lpFilter.frequency.exponentialRampToValueAtTime(800, startTime + 0.3);
         lpFilter.Q.value = 0.5;
 
         bodyFilter.connect(lpFilter);
@@ -2929,7 +2978,7 @@ window.addEventListener('pageshow', ()=>{
         osc2.start(startTime);
         osc3.start(startTime);
 
-        const stopTime = startTime + 2.5; 
+        const stopTime = startTime + 2.0; 
         osc1.stop(stopTime);
         osc2.stop(stopTime);
         osc3.stop(stopTime);
@@ -2941,7 +2990,7 @@ window.addEventListener('pageshow', ()=>{
         });
       });
     }catch(e){ console.error(e); }
-  }
+  };
 
   // コード定義 (High-G Tuning: G=392, C=261, E=329, A=440)
   // [A弦フレット, E弦フレット, C弦フレット, G弦フレット]

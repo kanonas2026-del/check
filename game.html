@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: game.html
+fullContent:
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -821,7 +825,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.3</div>
+<div id="verTag">v0.4</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -2792,10 +2796,13 @@ window.addEventListener('pageshow', ()=>{
     // release nicely to avoid destruction sound
     activeVoices.forEach(v => {
       try {
-        v.gain.gain.cancelScheduledValues(now);
-        v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // fade out
-        v.osc.stop(now + 0.15);
+        if(v.gain && v.gain.gain){
+            v.gain.gain.cancelScheduledValues(now);
+            v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
+            v.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05); // quick fade out
+        }
+        if(v.osc) v.osc.stop(now + 0.06);
+        if(v.osc2) v.osc2.stop(now + 0.06);
       } catch(e){}
     });
     activeVoices.length = 0;
@@ -2806,8 +2813,23 @@ window.addEventListener('pageshow', ()=>{
   window.addEventListener('mouseup', stopAllVoices, {passive:true});
   window.addEventListener('pointerup', stopAllVoices, {passive:true});
 
-  // ★音質改善2：電子音を消して丸い音へ + ストローク間隔短縮 + Sustain Support
-  // Bright Tropical Ukulele Tone
+
+  // --- NOISE GENERATOR (For "Pachi" click) ---
+  let _noiseBuffer = null;
+  function getNoiseBuffer(ctx){
+    if(_noiseBuffer) return _noiseBuffer;
+    const bufSize = ctx.sampleRate * 0.1; // 0.1s
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0; i<bufSize; i++){
+        data[i] = (Math.random() * 2 - 1) * 0.8;
+    }
+    _noiseBuffer = buf;
+    return buf;
+  }
+
+  // ★音質改善：ウクレレ風ナイロン弦サウンド
+  // 構成：NoiseBurst(Pachi) + Triangle(Poro) + Faint Saw(Buzz) + Body Filter
   function playFreqs(freqs, dur){
     try{
       ensureTapAudio();
@@ -2815,85 +2837,107 @@ window.addEventListener('pageshow', ()=>{
       
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
+      const noiseBuf = getNoiseBuffer(tapAudioCtx);
 
       // Volume & Tuning
-      const baseGain = 0.50 / N; 
-      const sustainLevel = baseGain * 0.4; 
-      const decayTime = 0.25; 
+      // 複数音ある場合は少し音量を下げるが、基本はハッキリ鳴らす
+      const baseGain = (0.55 / Math.sqrt(N)); 
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(1500, Number(f0) || 440));
         
-        // Strumming effect: slightly irregular fast strum (up/down feel simulation not needed, just fast strum)
-        // Add random micro-delay to simulate human imperfection
+        // Strumming effect: バラつき（+少しのランダム性）
         const humanize = (Math.random() - 0.5) * 0.005;
-        const strumDelay = i * 0.015 + humanize; 
+        const strumDelay = i * 0.018 + humanize; 
         const startTime = now + strumDelay;
 
-        // --- 1. Pluck Noise (The "Click" / Attack) ---
-        // Generates a tiny burst of noise to simulate finger hitting string
-        const noiseOsc = tapAudioCtx.createOscillator();
+        // --- 1. Noise Burst (Pachi) ---
+        // 指が弦に当たる瞬間の「パチッ」音
+        const noiseSrc = tapAudioCtx.createBufferSource();
+        noiseSrc.buffer = noiseBuf;
+        const noiseFilter = tapAudioCtx.createBiquadFilter();
         const noiseGain = tapAudioCtx.createGain();
-        noiseOsc.type = 'square'; // Square wave as a cheap noise source when short
-        // High frequency chirp
-        noiseOsc.frequency.setValueAtTime(800, startTime);
-        noiseOsc.frequency.exponentialRampToValueAtTime(100, startTime + 0.015);
-        
-        noiseGain.gain.setValueAtTime(0.04, startTime);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.01);
-        
-        noiseOsc.connect(noiseGain);
+
+        // Bandpass at 3kHz (Skin snap sound)
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 3200;
+        noiseFilter.Q.value = 0.8;
+
+        noiseGain.gain.setValueAtTime(0, startTime);
+        noiseGain.gain.linearRampToValueAtTime(0.04 * (0.8 + Math.random()*0.4), startTime + 0.002);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.012); // 12ms decay
+
+        noiseSrc.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
         noiseGain.connect(tapMaster);
-        noiseOsc.start(startTime);
-        noiseOsc.stop(startTime + 0.02);
+        noiseSrc.start(startTime);
+        noiseSrc.stop(startTime + 0.02);
 
 
-        // --- 2. String Tone (Sawtooth + Filtering) ---
-        const osc = tapAudioCtx.createOscillator();
-        const gain = tapAudioCtx.createGain();
+        // --- 2. String Tone (Fundamental + Overtone) ---
+        const osc = tapAudioCtx.createOscillator();   // Fundamental (Triangle)
+        const osc2 = tapAudioCtx.createOscillator();  // Overtone (Sawtooth - faint)
+        const gain = tapAudioCtx.createGain();        // Main Env
+        const gain2 = tapAudioCtx.createGain();       // Overtone Env
         
-        // Main Filter: Cuts the harsh buzz of sawtooth
-        const toneFilter = tapAudioCtx.createBiquadFilter();
+        const bodyFilter = tapAudioCtx.createBiquadFilter(); // Body Resonance
+        const toneFilter = tapAudioCtx.createBiquadFilter(); // High Damping
+
+        // Oscillator 1: Triangle (Rounder sound for Nylon strings)
+        osc.type = 'triangle';
         
-        // Body Resonance Filter: Simulates the wooden box (formant) around 600Hz
-        const bodyFilter = tapAudioCtx.createBiquadFilter();
+        // Pitch Envelope: Micro-bend (Start slightly sharp -> decay to pitch)
+        // Simulates tension release
+        osc.frequency.setValueAtTime(f * 1.008, startTime); 
+        osc.frequency.exponentialRampToValueAtTime(f, startTime + 0.06);
 
-        // 2a. Oscillator: Sawtooth is richer than Triangle (closer to strings)
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(f, startTime);
+        // Oscillator 2: Sawtooth (Adds "bite" or "buzz" only at attack)
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(f, startTime); // same freq
 
-        // 2b. Tone Filter (Lowpass)
-        toneFilter.type = 'lowpass';
-        toneFilter.Q.value = 0.5;
-        // Start bright (pluck) then dulls quickly
-        toneFilter.frequency.setValueAtTime(3500, startTime); 
-        toneFilter.frequency.exponentialRampToValueAtTime(1000, startTime + 0.2); 
-
-        // 2c. Body Filter (Peaking) - The "Tropical" wood sound
+        // Filter Chain
+        // Body: Boosts ~400Hz (Ukulele body size resonance)
         bodyFilter.type = 'peaking';
-        bodyFilter.frequency.value = 550; // Ukulele body resonance
+        bodyFilter.frequency.value = 380;
         bodyFilter.Q.value = 1.0;
-        bodyFilter.gain.value = 4; // Slight boost
+        bodyFilter.gain.value = 6; 
 
-        // 2d. Envelope
+        // Tone: Cuts harsh digital highs
+        toneFilter.type = 'lowpass';
+        toneFilter.frequency.setValueAtTime(3000, startTime);
+        toneFilter.frequency.exponentialRampToValueAtTime(1500, startTime + 0.2); // gets duller
+
+        // Envelopes
+        // Main Tone (Osc1): Attack 4ms -> Quick Decay ~200ms
         gain.gain.setValueAtTime(0, startTime);
-        // Sharp attack
-        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.006);
-        // Decay to sustain
-        gain.gain.exponentialRampToValueAtTime(sustainLevel, startTime + decayTime);
+        gain.gain.linearRampToValueAtTime(baseGain, startTime + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.22); // ~220ms total
 
-        // Connect: Osc -> ToneFilter -> BodyFilter -> Gain -> Master
-        osc.connect(toneFilter);
-        toneFilter.connect(bodyFilter);
-        bodyFilter.connect(gain);
+        // Overtone (Osc2): Instant Attack -> Very fast decay (15-20ms)
+        // Just enough to give the triangle wave some initial definition
+        gain2.gain.setValueAtTime(0, startTime);
+        gain2.gain.linearRampToValueAtTime(baseGain * 0.15, startTime + 0.002);
+        gain2.gain.exponentialRampToValueAtTime(0.001, startTime + 0.04);
+
+        // Connections
+        // Osc1 -> Body -> Tone -> Gain -> Master
+        osc.connect(bodyFilter);
+        bodyFilter.connect(toneFilter);
+        toneFilter.connect(gain);
         gain.connect(tapMaster);
 
+        // Osc2 -> Tone -> Gain2 -> Master (Bypasses Body slightly for crispness)
+        osc2.connect(toneFilter);
+        toneFilter.connect(gain2);
+        gain2.connect(tapMaster);
+
         osc.start(startTime);
+        osc2.start(startTime);
         
-        // Safety stop
-        osc.stop(startTime + 3.0);
+        osc.stop(startTime + 0.3);
+        osc2.stop(startTime + 0.1);
         
-        activeVoices.push({osc, gain, startTime});
+        activeVoices.push({osc, osc2, gain, startTime});
       });
     }catch(e){ console.error(e); }
   }

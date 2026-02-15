@@ -584,6 +584,7 @@ body.playing #menu-overlay{ display:none; }
 
 /* ===== V7 COMPACT: tap volume + TOP button fit in one screen ===== */
 #verTag{
+  display: none !important; /* v82: 完全に非表示（リクエスト対応） */
   position: absolute;
   right: 14px;
   top: 14px;
@@ -821,6 +822,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
+<div id="verTag">v0.3</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1284,6 +1286,7 @@ const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 0.35;
 let tapAudioCtx = null;
 let tapMaster = null;
+let tapCompressor = null; // コンプレッサー追加
 
 function loadTapVol(){
   try{
@@ -1298,11 +1301,26 @@ function ensureTapAudio(){
   try{
     if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
+    
+    // マスターゲインとコンプレッサーの構築
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
+      tapCompressor = tapAudioCtx.createDynamicsCompressor();
+      
+      // コンプレッサー設定（音割れ防止）
+      tapCompressor.threshold.setValueAtTime(-18, tapAudioCtx.currentTime);
+      tapCompressor.knee.setValueAtTime(30, tapAudioCtx.currentTime);
+      tapCompressor.ratio.setValueAtTime(12, tapAudioCtx.currentTime);
+      tapCompressor.attack.setValueAtTime(0.003, tapAudioCtx.currentTime);
+      tapCompressor.release.setValueAtTime(0.25, tapAudioCtx.currentTime);
+
       tapMaster.gain.value = tapVol;
-      tapMaster.connect(tapAudioCtx.destination);
-  applyTapVolumeToGain();
+      
+      // 接続: Master -> Compressor -> Destination
+      tapMaster.connect(tapCompressor);
+      tapCompressor.connect(tapAudioCtx.destination);
+      
+      applyTapVolumeToGain();
     } else {
       tapMaster.gain.value = tapVol;
     }
@@ -2802,7 +2820,7 @@ window.addEventListener('pageshow', ()=>{
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
         o.connect(g);
-        g.connect(tapMaster);
+        g.connect(tapMaster); // Use tapMaster which is connected to compressor
         o.start(now);
         o.stop(now + 0.1);
     }catch(e){}
@@ -2843,8 +2861,9 @@ window.addEventListener('pageshow', ()=>{
       try {
         v.gain.gain.cancelScheduledValues(now);
         v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); // 素早く減衰
-        v.osc.forEach(o => o.stop(now + 0.1));
+        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // fade out
+        if(Array.isArray(v.osc)) v.osc.forEach(o => o.stop(now + 0.15));
+        else v.osc.stop(now + 0.15);
       } catch(e){}
     });
     activeVoices.length = 0;
@@ -2858,6 +2877,7 @@ window.addEventListener('pageshow', ()=>{
   // ノイズバッファの生成（キャッシュ）
   function getUkeNoiseBuffer() {
       if (window.__ukeNoiseBuf) return window.__ukeNoiseBuf;
+      if (!tapAudioCtx) return null;
       const bufSize = tapAudioCtx.sampleRate * 0.05; // 50ms
       const buf = tapAudioCtx.createBuffer(1, bufSize, tapAudioCtx.sampleRate);
       const data = buf.getChannelData(0);
@@ -2869,6 +2889,7 @@ window.addEventListener('pageshow', ()=>{
   }
 
   // ★音質改善：電子音を消して丸い音へ + アタック強化 + Sustain Support
+  // Based on "Love Me Tender" audio analysis: Warm, plucky, short decay.
   window.playFreqs = function(freqs, dur){
     try{
       ensureTapAudio();
@@ -2877,115 +2898,116 @@ window.addEventListener('pageshow', ()=>{
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
-      // Volume & Tuning
-      const baseGain = 0.6 / Math.sqrt(N); 
+      // Volume Scaling to prevent clipping before compressor
+      // 弦の数が多いほどゲインを下げる
+      const baseGain = 0.4 / Math.sqrt(N); 
+      
+      // Warm Tone Filter (Simulate wood body resonance around 400Hz)
+      const bodyFilter = tapAudioCtx.createBiquadFilter();
+      bodyFilter.type = 'peaking';
+      bodyFilter.frequency.value = 400; // Ukulele body resonance
+      bodyFilter.Q.value = 1.0;
+      bodyFilter.gain.value = 3.0; // Boost warmth (slightly reduced to prevent distortion)
 
       freqs.forEach((f0, i) => {
         const f = Math.max(80, Math.min(2000, Number(f0) || 440));
         
-        // ストロークのズレ（ポロン）: ウクレレ特有のストラム感を強調
-        const strumDelay = i * 0.025 + (Math.random() - 0.5) * 0.005; 
+        // Strumming effect: slightly looser time feel for ballad style
+        const strumDelay = i * 0.025 + (Math.random() * 0.005); 
         const startTime = now + strumDelay;
 
-        // --- 1. Pluck Noise (パチッ) ---
+        // --- 1. Pluck Noise (Nail click) ---
         const noiseBuf = getUkeNoiseBuffer();
-        const noiseSrc = tapAudioCtx.createBufferSource();
-        noiseSrc.buffer = noiseBuf;
+        if(noiseBuf){
+            const noiseSrc = tapAudioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuf;
+            const noiseFilter = tapAudioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 3000; // Crisp high click
+            const noiseGain = tapAudioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.1 * baseGain, startTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
+            noiseSrc.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            // Connect to Master (Compressor)
+            noiseGain.connect(tapMaster);
+            noiseSrc.start(startTime);
+        }
 
-        const noiseFilter = tapAudioCtx.createBiquadFilter();
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 2000;
-        noiseFilter.Q.value = 0.5;
+        // --- 2. String Tone (Warm Nylon) ---
+        // Use Sine waves for fundamental to be "mellow" + Lowpassed Saw for "buzz"
+        const osc1 = tapAudioCtx.createOscillator(); // Fundamental
+        const osc2 = tapAudioCtx.createOscillator(); // Overtone (Octave)
+        const osc3 = tapAudioCtx.createOscillator(); // Texture (Sawtooth)
 
-        const noiseGain = tapAudioCtx.createGain();
-        noiseGain.gain.setValueAtTime(0.2 * baseGain, startTime);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.015);
-
-        noiseSrc.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(tapMaster);
-        noiseSrc.start(startTime);
-
-        // --- 2. String Tone (ポロッ) ---
-        const bodyFilter = tapAudioCtx.createBiquadFilter();
-        bodyFilter.type = 'peaking';
-        bodyFilter.frequency.value = 350; // ウクレレの胴鳴り
-        bodyFilter.Q.value = 1.2;
-        bodyFilter.gain.value = 6.0;
-
-        const osc1 = tapAudioCtx.createOscillator();
-        const osc2 = tapAudioCtx.createOscillator();
-        const osc3 = tapAudioCtx.createOscillator();
-        
-        // ナイロン弦の暖かさを出すため基本波をサイン波に
         osc1.type = 'sine';
-        osc2.type = 'sine';
-        osc3.type = 'triangle';
+        osc2.type = 'sine'; 
+        osc3.type = 'sawtooth';
 
-        // ピッチ変動（弦を弾いた直後はわずかに高い）
-        const pitchBend = f * 0.008; 
-        osc1.frequency.setValueAtTime(f + pitchBend, startTime);
-        osc1.frequency.exponentialRampToValueAtTime(f, startTime + 0.08);
+        // Pitch envelope (strings go slightly sharp on attack)
+        const bend = f * 0.005;
+        osc1.frequency.setValueAtTime(f + bend, startTime);
+        osc1.frequency.exponentialRampToValueAtTime(f, startTime + 0.1);
+        
+        osc2.frequency.setValueAtTime((f * 2) + bend, startTime);
+        osc2.frequency.exponentialRampToValueAtTime(f * 2, startTime + 0.1);
 
-        osc2.frequency.setValueAtTime((f * 2) + pitchBend * 1.5, startTime);
-        osc2.frequency.exponentialRampToValueAtTime(f * 2, startTime + 0.08);
-
-        // アタックを際立たせる成分
-        const f3 = f * 3.0; 
-        osc3.frequency.setValueAtTime(f3 + pitchBend * 2, startTime);
-        osc3.frequency.exponentialRampToValueAtTime(f3, startTime + 0.05);
+        osc3.frequency.setValueAtTime(f, startTime); // Texture follows fundamental
 
         const mix1 = tapAudioCtx.createGain();
         const mix2 = tapAudioCtx.createGain();
         const mix3 = tapAudioCtx.createGain();
 
-        // エンベロープ（減衰）ナイロン弦特有の早い減衰
+        // Envelope: Nylon strings have fast decay but soft attack
         mix1.gain.setValueAtTime(0, startTime);
-        mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.008);
-        mix1.gain.exponentialRampToValueAtTime(0.01, startTime + 1.2);
+        mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
+        mix1.gain.exponentialRampToValueAtTime(0.15, startTime + 0.8); // Main sustain
 
         mix2.gain.setValueAtTime(0, startTime);
-        mix2.gain.linearRampToValueAtTime(0.25, startTime + 0.005);
-        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5);
+        mix2.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4); // Harmonics die faster
 
         mix3.gain.setValueAtTime(0, startTime);
-        mix3.gain.linearRampToValueAtTime(0.15, startTime + 0.003);
-        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+        mix3.gain.linearRampToValueAtTime(0.08, startTime + 0.005);
+        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2); // Buzz is short
 
+        // Connect graph
         osc1.connect(mix1);
         osc2.connect(mix2);
         osc3.connect(mix3);
 
-        const masterToneGain = tapAudioCtx.createGain();
-        masterToneGain.gain.value = baseGain;
+        const stringMix = tapAudioCtx.createGain();
+        mix1.connect(stringMix);
+        mix2.connect(stringMix);
+        mix3.connect(stringMix);
 
-        mix1.connect(bodyFilter);
-        mix2.connect(bodyFilter);
-        mix3.connect(bodyFilter);
-
-        // トーンローパス（高域を削って耳を疲れさせず、丸い音にする）
+        // Lowpass Filter for Texture (Remove harsh saw buzz)
         const lpFilter = tapAudioCtx.createBiquadFilter();
         lpFilter.type = 'lowpass';
-        lpFilter.frequency.setValueAtTime(2500, startTime);
-        lpFilter.frequency.exponentialRampToValueAtTime(800, startTime + 0.3);
-        lpFilter.Q.value = 0.5;
+        lpFilter.frequency.setValueAtTime(2200, startTime); 
 
+        stringMix.connect(bodyFilter);
         bodyFilter.connect(lpFilter);
-        lpFilter.connect(masterToneGain);
-        masterToneGain.connect(tapMaster);
+        
+        const voiceGain = tapAudioCtx.createGain();
+        voiceGain.gain.value = baseGain;
+        
+        lpFilter.connect(voiceGain);
+        // Connect to Master (Compressor)
+        voiceGain.connect(tapMaster);
 
         osc1.start(startTime);
         osc2.start(startTime);
         osc3.start(startTime);
-
-        const stopTime = startTime + 2.0; 
+        
+        const stopTime = startTime + 2.5;
         osc1.stop(stopTime);
         osc2.stop(stopTime);
         osc3.stop(stopTime);
         
         activeVoices.push({
             osc: [osc1, osc2, osc3],
-            gain: masterToneGain,
+            gain: voiceGain,
             startTime: startTime
         });
       });

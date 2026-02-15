@@ -63,12 +63,22 @@
     }
     .menu-card h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
     
+    /* ★UI改善: グリッドレイアウトでボタンサイズを統一 */
+    .menu-main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
     .menu-btn {
       background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.90)); color: #4a3728;
       border: none; border-radius: 22px; padding: 12px 14px;
       cursor: pointer; display: flex; gap: 12px; align-items: center;
       box-shadow: 0 6px 0 rgba(122,177,204,0.26);
       transition: transform 0.08s; text-align: left;
+      width: 100%; /* Gridいっぱいに広げる */
+      box-sizing: border-box;
+      min-height: 80px; /* 高さ揃え */
     }
     .menu-btn:active { transform: translateY(2px); box-shadow: none; }
     .badge { flex: 0 0 38px; height: 38px; border-radius: 12px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
@@ -76,53 +86,79 @@
     .menu-btn.mode3 .badge{ background: #7ed957; }
     .menu-btn.mode4 .badge{ background: #5ce1e6; color: #133; }
     
-    .menu-text .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
-    .menu-text small { font-size: 11px; opacity: 0.8; }
+    .menu-text { display:flex; flex-direction:column; flex: 1; min-width:0; }
+    .menu-text .title { font-size: 16px; font-weight: 900; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .menu-text small { font-size: 11px; opacity: 0.8; line-height: 1.2; }
 
-    /* モード選択 */
+    /* きらきらぼし：2×2グリッドの一枠として配置 */
+    .song-block{ display:flex; flex-direction:column; gap:6px; grid-column:auto; }
+
+/* モード選択 */
     .mode-select { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); }
-    .mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-    .mode-pill {
-      border: 2px solid rgba(0,0,0,0.1); background: #fff; border-radius: 20px;
-      padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
+    
+    /* モード/音の設定行（コンパクト2カラム） */
+    .settings-row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; align-items:stretch; }
+    .settings-box{
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 18px;
+      padding: 10px 12px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.07);
     }
-    .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
+    /* 既存のサウンド切替枠の上部ボーダー/余白は箱内では不要 */
+    .settings-box .sound-select-wrap{ margin-top:0; padding-top:0; border-top:0; }
+    /* タップモードは音切替を非表示 → 右側だけに */
+    body.is-tap .settings-row{ grid-template-columns: 1fr; }
+    body.is-tap #sound-box{ display:none; }
+    body.is-tap #mode-box{ grid-column:1 / -1; }
 
+    @media (max-height: 420px){
+      .settings-box{ padding: 8px 10px; border-radius: 16px; }
+      .settings-row{ gap:8px; margin-top:8px; }
+    }
+.mode-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .mode-pill {
+      background: rgba(255,255,255,0.78);
+      border: 2px solid rgba(255,255,255,0.92);
+      border-radius: 999px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.10);
+      padding: 7px 14px;
+      font-weight: 1000;
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+      color: #555;
+    }
+    .mode-pill.active {
+      border-color: rgba(255,122,61,0.95);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.10), inset 0 0 0 2px rgba(255,122,61,0.12);
+      color: rgba(255,122,61,1);
+      background: rgba(255,255,255,0.92);
+    }
+    .mode-desc{
+      margin-top: 6px;
+      text-align: center;
+      font-weight: 900;
+      font-size: 11px;
+      opacity: 0.78;
+    }
 
-/* === MODE BUTTONS (match index) === */
-.mode-select .mode-pill{
-  background: rgba(255,255,255,0.78);
-  border: 2px solid rgba(255,255,255,0.92);
-  border-radius: 999px;
-  box-shadow: 0 10px 18px rgba(0,0,0,0.10);
-  padding: 7px 14px;
-  font-weight: 1000;
-  font-size: 11px;
-  cursor: pointer;
-  user-select: none;
-}
-.mode-select .mode-pill.active{
-  border-color: rgba(255,122,61,0.95);
-  box-shadow: 0 10px 18px rgba(0,0,0,0.10), inset 0 0 0 2px rgba(255,122,61,0.12);
-  color: rgba(255,122,61,1);
-  background: rgba(255,255,255,0.92);
-}
-.mode-desc{
-  margin-top: 6px;
-  text-align: center;
-  font-weight: 900;
-  font-size: 11px;
-  opacity: 0.78;
-}
-.song-title{ white-space: nowrap; }
+    /* ★UI改善: 音源切り替えボタン */
+    .sound-select-wrap {
+      margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.1);
+    }
+    .sound-label { font-size: 11px; font-weight: 900; opacity: 0.85; margin-bottom: 2px; }
 
-/* menu back button (secondary) - match index pill feel */
-.menu-card .action-btn.btn-secondary{
-  background: rgba(255,255,255,0.78);
-  border: 2px solid rgba(255,255,255,0.92);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.10);
-  color: rgba(20,20,20,0.78);
-}
+    .song-title{ white-space: nowrap; }
+
+    /* menu back button (secondary) - match index pill feel */
+    .menu-card .action-btn.btn-secondary{
+      background: rgba(255,255,255,0.78);
+      border: 2px solid rgba(255,255,255,0.92);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.10);
+      color: rgba(20,20,20,0.78);
+    }
 
 
     /* === iPhone横: メニューを1画面に収める（スクロール不要） === */
@@ -136,13 +172,13 @@
         padding-bottom: calc(10px + env(safe-area-inset-bottom));
       }
       .menu-card h1{ font-size: 16px; margin: 0 0 4px; }
-      .menu-btn{ padding: 8px; border-radius: 14px; gap: 10px; }
+      .menu-btn{ padding: 8px; border-radius: 14px; gap: 10px; min-height: 60px; }
       .badge{ flex: 0 0 30px; height: 30px; border-radius: 10px; font-size: 16px; }
       .menu-text .title{ font-size: 14px; margin-bottom: 1px; }
       .menu-text small{ font-size: 10px; }
 
       /* 上段: メニュー項目を2列で詰める */
-      .menu-main{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .menu-main{ gap: 6px; }
       .menu-main .menu-btn{ width: 100%; }
 
       /* 下段: モード/はやさを圧縮して必ず見える */
@@ -396,8 +432,6 @@
   #pageFlip.run::before{ animation: none; transform: translateX(0) rotateY(0); opacity: 1; }
 }
 
-
-
 /* ===== CLICK FIX (menu always clickable) ===== */
 body.menuOpen #gameCanvas{ pointer-events:none; }
 body.menuOpen #menu-overlay{ display:flex; z-index:10000; pointer-events:auto; }
@@ -412,70 +446,7 @@ body.playing #menu-overlay{ display:none; }
     /* menu preview: match "コード かんたん" single-note label style */
     .menu-text{ display:flex; flex-direction:column; flex: 1 1 auto; min-width:0; }
     .menu-preview{ margin-top:6px; width:100%; }
-    .scale-mini{
-      --fx: 72px;   /* finger center X */
-      --gap: 18px;  /* gap between label and finger */
-      position: relative;
-      width: 100%;
-      height: 46px;
-      border-radius: 16px;
-      background: rgba(90,60,45,0.30);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
-      overflow: hidden;
-    }
-    .scale-mini .nut{
-      position:absolute; left: 12px; top: 7px;
-      width: 10px; height: 32px;
-      border-radius: 6px;
-      background: rgba(255,255,255,0.92);
-      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
-    }
-    .scale-mini .line{
-      position:absolute; left: 22px; right: 10px;
-      height: 4px; border-radius: 4px;
-      opacity: .95;
-    }
-    .scale-mini .line.a{ top: 12px; background: rgba(255,90,90,0.95); }
-    .scale-mini .line.e{ top: 20px; background: rgba(255,230,90,0.95); }
-    .scale-mini .line.c{ top: 28px; background: rgba(120,255,120,0.95); }
-    .scale-mini .line.g{ top: 36px; background: rgba(90,220,255,0.95); }
-
-    .scale-mini .finger{
-      position:absolute;
-      left: var(--fx);
-      top: 28px; /* C string */
-      transform: translate(-50%, -50%);
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      background: rgba(160,160,160,0.95);
-      border: 4px solid rgba(255,255,255,0.98);
-      display:flex; align-items:center; justify-content:center;
-      font-weight: 900;
-      font-size: 18px;
-      color: #fff;
-      box-shadow: 0 2px 0 rgba(0,0,0,0.22);
-      pointer-events:none;
-    }
-    .scale-mini .label{
-      position:absolute;
-      left: calc(var(--fx) - var(--gap));
-      top: 28px; /* align to C string */
-      transform: translate(-100%, -50%);
-      padding: 6px 10px;
-      border-radius: 10px;
-      background: rgba(0,0,0,0.38);
-      color: #fff;
-      font-weight: 900;
-      font-size: 18px;
-      line-height: 1;
-      white-space: nowrap;
-      text-shadow: 0 2px 0 rgba(0,0,0,0.35);
-      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
-      pointer-events:none;
-    }
-
-
-
+    
 @media (orientation: landscape) and (max-height: 430px){
   .mode-desc{ margin-top: 3px; font-size: 10px; }
   .mode-select .mode-pill{ padding: 5px 10px; font-size: 10px; box-shadow: 0 8px 14px rgba(0,0,0,0.10); }
@@ -487,7 +458,7 @@ body.playing #menu-overlay{ display:none; }
 .song-block{ display:flex; flex-direction:column; gap:6px; }
 .song-block .song-speed-inline{
   display:flex; flex-direction:column; gap:4px;
-  margin-left: 50px; /* badge(38) + gap(12) */
+  margin-left: 0; /* 2×2配置のため左寄せ */
   margin-top: 6px;
 }
 .song-block .song-speed-inline .mode-pills{ justify-content: flex-start !important; }
@@ -516,7 +487,7 @@ body.playing #menu-overlay{ display:none; }
 
 /* iPhone横で詰まる時：インデントとピルを少し小さく */
 @media (orientation: landscape) and (max-height: 430px){
-  .song-block .song-speed-inline{ margin-left: 40px !important; }
+  .song-block .song-speed-inline{ margin-left: 0 !important; }
   .mode-pill{ padding: 6px 12px; font-size: 10px; box-shadow: 0 8px 14px rgba(0,0,0,0.10); }
 }
 
@@ -748,6 +719,37 @@ body.is-uke .vol-inline{ display:none !important; }
 
 /* v76: tapVolume drag stability (layout unchanged) */
 #tapVolume{ touch-action: pan-x; }
+
+/* === SAMPLER UI === */
+#sampler-overlay {
+  position: fixed; inset: 0; z-index: 10001;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.sampler-card {
+  width: min(500px, 92vw);
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sampler-title { font-size: 20px; font-weight: 900; color: #4a3728; margin: 0; }
+.sampler-text { font-size: 15px; opacity: 0.8; line-height: 1.5; font-weight: 700; margin: 4px 0 10px; }
+.sampler-meter {
+  height: 12px; width: 100%; background: #eee; border-radius: 6px; overflow: hidden;
+  position: relative; margin-bottom: 10px;
+}
+.sampler-bar {
+  height: 100%; width: 0%; background: var(--primary);
+  transition: width 0.1s linear;
+}
+.sampler-btn-row { display: flex; gap: 12px; margin-top: 6px; }
+.btn-outline { background: #fff; border: 2px solid #ddd; color: #555; }
 </style>
 
 <style>
@@ -822,53 +824,68 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.3</div>
+<div id="verTag">v0.5 Sample</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
-<button class="menu-btn mode1" onclick="prepGame('scale')">
-<div class="badge">🐤</div>
-<div class="menu-text">
-  <div class="title">ドレミファソラシド</div>
-  <small>だんだん速くなるよ</small>
-  </div>
-</button>
-<button class="menu-btn mode2" onclick="prepGame('easy')">
-<div class="badge">🐱</div>
-<div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
-</button>
-<button class="menu-btn mode3" onclick="prepGame('hard')">
-<div class="badge">🐼</div>
-<div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
-</button>
-<div class="song-block">
-  <button class="menu-btn mode4 song-start" onclick="prepGame('song')" aria-label="きらきらぼしをはじめる">
-    <div class="badge">🦁</div>
-    <div class="menu-text"><div class="title song-title">きらきらぼし</div><small>メロディ＋コード</small></div>
-  </button>
-  <div class="song-speed-inline" id="song-speed-wrap">
-    <div class="song-speed-title">♪ きらきらぼしの速さ <span class="song-only-note">(この曲だけ)</span></div>
-    <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start; flex-wrap:wrap; gap:6px;">
-      <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
-      <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
-      <div class="mode-pill" data-ss="FAST">はやい</div>
+  <button class="menu-btn mode1" onclick="prepGame('scale')">
+    <div class="badge">🐤</div>
+    <div class="menu-text">
+      <div class="title">ドレミファソラシド</div>
+      <small>だんだん速くなるよ</small>
     </div>
-    <div id="song-speed-note" class="song-speed-note">※この設定は「きらきらぼし」だけに効きます</div>
+  </button>
+  <button class="menu-btn mode2" onclick="prepGame('easy')">
+    <div class="badge">🐱</div>
+    <div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
+  </button>
+  <button class="menu-btn mode3" onclick="prepGame('hard')">
+    <div class="badge">🐼</div>
+    <div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
+  </button>
+  <div class="song-block">
+    <button class="menu-btn mode4 song-start" onclick="prepGame('song')" aria-label="きらきらぼしをはじめる">
+      <div class="badge">🦁</div>
+      <div class="menu-text"><div class="title song-title">きらきらぼし</div><small>メロディ＋コード</small></div>
+    </button>
+    <div class="song-speed-inline" id="song-speed-wrap">
+      <div class="song-speed-title">♪ きらきらぼしの速さ <span class="song-only-note">(この曲だけ)</span></div>
+      <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start; flex-wrap:wrap; gap:6px;">
+        <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
+        <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
+        <div class="mode-pill" data-ss="FAST">はやい</div>
+      </div>
+      <div id="song-speed-note" class="song-speed-note">※この設定は「きらきらぼし」だけに効きます</div>
+    </div>
   </div>
-</div>
 </div>
 </div>
 <div class="mode-select">
-<div class="mode-pills" id="play-mode-pills">
-  <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
-  <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
-</div>
-<div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
-<div class="tap-vol-wrap" id="tap-vol-wrap">
-  <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  <div class="settings-row">
+    <div class="settings-box" id="sound-box">
+      <div class="sound-select-wrap" id="sound-toggle-wrap" style="display:none;">
+          <div class="sound-label">♪ ウクレレのおと</div>
+          <div class="mode-pills" id="sound-src-pills">
+            <div class="mode-pill active" id="btn-sound-synth" onclick="toggleSoundSource('synth')">電子音</div>
+            <div class="mode-pill" id="btn-sound-sample" onclick="toggleSoundSource('sample')">録音した音</div>
+          </div>
+      </div>
+    </div>
+
+    <div class="settings-box" id="mode-box">
+      <div class="mode-pills" id="play-mode-pills">
+        <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+        <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
+      </div>
+      <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
+    </div>
+  </div>
+
+  <div class="tap-vol-wrap" id="tap-vol-wrap">
+    <div class="tap-vol-label">🔊 タップ音の大きさ</div>
+    <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  </div>
 </div>
 
-</div>
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
 <div class="bottom-inline">
@@ -913,6 +930,19 @@ body.is-uke .vol-inline{ display:none !important; }
 <button class="action-btn btn-secondary" onclick="goMenu()">メニュー</button>
 </div>
 </div>
+
+<div id="sampler-overlay">
+  <div class="sampler-card">
+    <h2 class="sampler-title" id="samplerTitle">ウクレレ録音</h2>
+    <div class="sampler-text" id="samplerMsg">あなたのウクレレの音を録音して<br>ゲームの音に使いますか？</div>
+    <div class="sampler-meter" id="samplerMeterBox" style="display:none;"><div class="sampler-bar" id="samplerBar"></div></div>
+    <div class="sampler-btn-row" id="samplerBtns">
+      <button class="action-btn btn-secondary" onclick="skipSampling()">スキップ</button>
+      <button class="action-btn btn-primary" onclick="startSamplerFlow()">録音する！</button>
+    </div>
+  </div>
+</div>
+
 <canvas id="gameCanvas"></canvas>
 </div>
 <script>
@@ -956,8 +986,6 @@ body.is-uke .vol-inline{ display:none !important; }
 
 
 // ===== MENU CLICK FIX =====
-// Some environments fail to trigger inline onclick reliably (especially with overlays/WebView).
-// We force a reliable event delegation and a menuOpen body class that disables canvas pointer events.
 (function(){
   const body = document.body;
   const menu = document.getElementById('menu-overlay');
@@ -1006,8 +1034,7 @@ body.is-uke .vol-inline{ display:none !important; }
 
 // ===== SONG SPEED PRESET (曲モード：最初にスピード固定) =====
 const SONG_SPEED_KEY = 'uk_song_speed_v1';
-// 曲モードは「弾ける間隔」を優先して少し遅めに（8分アルペジオ想定）
-const SONG_SPEED_PRESETS = { SLOW: 2.55, NORMAL: 5.10, FAST: 10.20 }; // Ver0.1: NORMAL=4/4, FAST=2/2, SLOW=4/4 x0.5 // v28: faster presets (no mid-song change) // v26: speed up (no mid-song change) // tuned: NORMALを速く（途中加速なし）
+const SONG_SPEED_PRESETS = { SLOW: 2.55, NORMAL: 5.10, FAST: 10.20 }; 
 function getSongSpeedId(){
   try{
     const v = localStorage.getItem(SONG_SPEED_KEY);
@@ -1038,35 +1065,31 @@ function bindSongSpeedUI(){
     setSongSpeedId(pill.dataset.ss);
   };
 
-  // capture phase: pills always win (iOS & nested button safety)
   wrap.addEventListener('pointerdown', pick, {passive:false, capture:true});
   wrap.addEventListener('touchstart',  pick, {passive:false, capture:true});
   wrap.addEventListener('mousedown',   pick, true);
   wrap.addEventListener('click',       pick, true);
 
-  // init
   setSongSpeedId(getSongSpeedId());
 }
 
 // ===== 基本設定 =====
-const BASE_SPEED_MULT = 1.15; // 全体のベース速度倍率（少しゆっくり）
-const SPEEDUP_MULT = 1.25;     // 5HITごと加速（1.7だと速すぎるため、1.25程度に修正）
-const PRACTICE_BOOST_CAP = 100; // practice(コード2モード)の5HIT加速の上限を撤廃（実質無限）
+const BASE_SPEED_MULT = 1.15; 
+const SPEEDUP_MULT = 1.25;     
+const PRACTICE_BOOST_CAP = 100; 
 
-const ENABLE_SPEED_UP = false; // speed is selected at start; no mid-song speed-up
+const ENABLE_SPEED_UP = false; 
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // ===== SHARED_STAGE_BLOCK v1 (GAME/TUNING 共通) =====
-// 目的: ネック/弦/フレットの「座標と見た目」を1か所で固定し、ズレ再発を防ぐ。
-// 注意: ここは原則いじらない（変更すると game/tuning 両方に影響）。
 const STAGE = Object.freeze({
   NUT_X: 150,
   NECK_HALF_H: 130,
   NECK_H: 260,
   FRET_COUNT: 12,
-  FRET_RIGHT_PAD: 20,        // (canvas.width - NUT_X - PAD)/FRET_COUNT
+  FRET_RIGHT_PAD: 20,       
   LANE_DY: 75,
   LABEL_X: 110,
   LABEL_R: 22,
@@ -1117,10 +1140,9 @@ function drawFretboardBase(ctx, canvas, stringColors){
 
   // neck
   ctx.fillStyle = STAGE.NECK_COLOR;
-  // main neck (from nut to right)
   ctx.fillRect(nutX, cy - STAGE.NECK_HALF_H, canvas.width - nutX, STAGE.NECK_H);
 
-  // nut block (clearly visible)
+  // nut block
   (function(){
     const nutW = STAGE.NUT_BLOCK_W;
     const over = STAGE.NUT_BLOCK_OVER;
@@ -1134,14 +1156,12 @@ function drawFretboardBase(ctx, canvas, stringColors){
     rrRect(ctx, x0, y0, nutW, h0, 6);
     ctx.fill();
     ctx.restore();
-    // outline
     ctx.strokeStyle = "rgba(0,0,0,0.25)";
     ctx.lineWidth = 2;
     rrRect(ctx, x0, y0, nutW, h0, 6);
     ctx.stroke();
   })();
 
-// frets (1..10)  ※ inlay描画がパスを潰さないよう、先にフレット線をstrokeしてからインレイを描く
   for (let i=1; i<=STAGE.FRET_COUNT; i++){
     const x = nutX + g.fretW * i;
     const isMark = (i===5 || i===10);
@@ -1154,7 +1174,6 @@ function drawFretboardBase(ctx, canvas, stringColors){
     ctx.lineTo(x, g.y + g.h);
     ctx.stroke();
 
-    // inlays: 5F=1dot, 10F=2dot（同じ●●）
     if(i===5){
       ctx.save();
       ctx.fillStyle = STAGE.INLAY_COLOR;
@@ -1181,57 +1200,42 @@ function drawFretboardBase(ctx, canvas, stringColors){
     }
   }
 
-  // teacher fret hints (MOVED TO TOP EDGE - OUTSIDE)
+  // teacher fret hints
   (function(){
     ctx.save();
-    
     ctx.font = STAGE.FRET_HINT_FONT;
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom"; // Anchor to bottom to sit on top of neck
-    
-    // NEW POSITION: ネックの上端(g.y)より少し上に表示
+    ctx.textBaseline = "bottom"; 
     const yTxt = g.y - 4;
-
-    ctx.fillStyle = "#fff"; // White text
-
+    ctx.fillStyle = "#fff"; 
     for (const n of STAGE.FRET_HINTS){
       if (n < 1 || n > STAGE.FRET_COUNT) continue;
       const x = nutX + g.fretW * n;
       const s = String(n);
-      
-      // Bubble background for visibility
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.3)";
       ctx.beginPath();
       ctx.arc(x, yTxt - 7, 12, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
-
       ctx.fillText(s, x, yTxt);
     }
     ctx.restore();
   })();
 
-// strings + left labels
   const labs = ['1A','2E','3C','4G'];
   for(let i=0;i<4;i++){
     const y = cy + (i-1.5) * STAGE.LANE_DY;
-
-    // left circle
     ctx.beginPath();
     ctx.fillStyle = stringColors[i];
     ctx.globalAlpha = 1.0;
     ctx.arc(STAGE.LABEL_X, y, STAGE.LABEL_R, 0, Math.PI*2);
     ctx.fill();
-
-    // label text
     ctx.fillStyle = "#fff";
     ctx.font = STAGE.LABEL_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(labs[i], STAGE.LABEL_X, y);
-
-    // straight string (tuning will overdraw as vibration if needed)
     ctx.strokeStyle = stringColors[i];
     ctx.lineWidth = STAGE.STRING_LINE_W;
     ctx.beginPath();
@@ -1239,18 +1243,11 @@ function drawFretboardBase(ctx, canvas, stringColors){
     ctx.lineTo(canvas.width, y);
     ctx.stroke();
   }
-
-  // restore defaults for other drawing
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
-
-  return g; // {cy,nutX,fretW}
+  return g; 
 }
-// ===== /SHARED_STAGE_BLOCK v1 =====
 
-
-
-// --- UI safe-area for browser bars (no install required) ---
 function updateUiVars(){
   const vv = window.visualViewport;
   if(vv){
@@ -1280,13 +1277,14 @@ window.addEventListener('orientationchange', ()=>setTimeout(updateUiVars, 250));
 
 let gameState = 'MENU';
 let playMode = 'WAIT';
+let useSampledSound = false; // Toggle state
 
 // ===== TAP SOUND (hit SE) =====
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 0.35;
 let tapAudioCtx = null;
 let tapMaster = null;
-let tapCompressor = null; // コンプレッサー追加
+let tapCompressor = null; 
 
 function loadTapVol(){
   try{
@@ -1297,17 +1295,36 @@ function loadTapVol(){
 function saveTapVol(){
   try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(e){}
 }
+
+function playSliderFeedback(){
+  // Pop sound for slider feedback
+  try{
+    ensureTapAudio();
+    const osc = tapAudioCtx.createOscillator();
+    const gain = tapAudioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(tapMaster);
+    
+    osc.frequency.setValueAtTime(880, tapAudioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, tapAudioCtx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(0.5, tapAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, tapAudioCtx.currentTime + 0.1);
+    
+    osc.start();
+    osc.stop(tapAudioCtx.currentTime + 0.15);
+  }catch(e){}
+}
+
 function ensureTapAudio(){
   try{
     if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
     if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
     
-    // マスターゲインとコンプレッサーの構築
     if(!tapMaster){
       tapMaster = tapAudioCtx.createGain();
       tapCompressor = tapAudioCtx.createDynamicsCompressor();
       
-      // コンプレッサー設定（音割れ防止）
       tapCompressor.threshold.setValueAtTime(-18, tapAudioCtx.currentTime);
       tapCompressor.knee.setValueAtTime(30, tapAudioCtx.currentTime);
       tapCompressor.ratio.setValueAtTime(12, tapAudioCtx.currentTime);
@@ -1316,7 +1333,6 @@ function ensureTapAudio(){
 
       tapMaster.gain.value = tapVol;
       
-      // 接続: Master -> Compressor -> Destination
       tapMaster.connect(tapCompressor);
       tapCompressor.connect(tapAudioCtx.destination);
       
@@ -1327,78 +1343,57 @@ function ensureTapAudio(){
   }catch(e){}
 }
 
-function enhanceRangeSlider(el){
+function enhanceRangeSlider(el, onSet){
   if(!el) return;
+  const toNum = (x, fallback)=>{ const n = Number(x); return Number.isFinite(n) ? n : fallback; };
+  const getStep = ()=>{ const s = String(el.step || '').trim(); if(!s || s === 'any') return null; const n = Number(s); return (Number.isFinite(n) && n > 0) ? n : null; };
+  const snap = (v)=>{ const st = getStep(); if(!st) return v; const min = toNum(el.min, 0); return Math.round((v - min)/st)*st + min; };
+  const clamp = (v)=>{ const min = toNum(el.min, 0); const max = toNum(el.max, 100); return Math.min(max, Math.max(min, v)); };
+  const clamp01 = (v)=> Math.min(1, Math.max(0, v));
 
-  const toNum = (x, fallback)=>{
-    const n = Number(x);
-    return Number.isFinite(n) ? n : fallback;
-  };
-
-  const getStep = ()=>{
-    // el.step defaults to "1" for range; may be "any"
-    const s = String(el.step || '').trim();
-    if(!s || s === 'any') return null;
-    const n = Number(s);
-    return (Number.isFinite(n) && n > 0) ? n : null;
-  };
-
-  const step = getStep();
-  const decimals = step ? (String(step).split('.')[1] || '').length : 0;
-
-  const quantize = (v)=>{
-    if(!step) return v;
-    return Math.round(v / step) * step;
+  const fireInput = ()=>{
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+    el.dispatchEvent(new Event('change', {bubbles:true}));
   };
 
   const setByClientX = (clientX)=>{
-    const r = el.getBoundingClientRect();
-    const x = Math.max(r.left, Math.min(r.right, clientX));
-    const ratio = (x - r.left) / Math.max(1, r.width);
-    const min = toNum(el.min, 0);
-    const max = toNum(el.max, 100);
-    let val = min + (max - min) * ratio;
-    val = quantize(val);
-    if(step) val = Number(val.toFixed(decimals));
-    val = Math.max(min, Math.min(max, val));
-    el.value = String(val);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
+    const rect = el.getBoundingClientRect();
+    const min = toNum(el.min, 0), max = toNum(el.max, 100);
+    const ratio = (clientX - rect.left) / Math.max(1, rect.width);
+    let v = min + clamp01(ratio) * (max - min);
+    v = clamp(snap(v));
+    el.value = String(v);
+    fireInput();
+    if(typeof onSet === 'function'){
+      try{ onSet(v); }catch(_e){}
+    }
   };
 
-  // Pointer Events
+  // Pointer & touch events (smooth on iPhone Safari landscape)
   let dragging = false;
-  el.addEventListener('pointerdown', (e)=>{
+  const start = (e)=>{
     dragging = true;
-    try{ el.setPointerCapture(e.pointerId); }catch(_){}
-    e.preventDefault();
-    setByClientX(e.clientX);
-  }, { passive:false });
-
-  el.addEventListener('pointermove', (e)=>{
-    if(!dragging) return;
-    e.preventDefault();
-    setByClientX(e.clientX);
-  }, { passive:false });
-
-  const end = (e)=>{
-    dragging = false;
-    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+    if(e && e.preventDefault) e.preventDefault();
+    const x = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    setByClientX(x);
   };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
+  const move = (e)=>{
+    if(!dragging) return;
+    if(e && e.preventDefault) e.preventDefault();
+    const x = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    setByClientX(x);
+  };
+  const end = ()=>{ dragging = false; };
 
-  // Touch fallback
-  el.addEventListener('touchstart', (e)=>{
-    if(!e.touches || !e.touches[0]) return;
-    e.preventDefault();
-    setByClientX(e.touches[0].clientX);
-  }, { passive:false });
+  el.addEventListener('pointerdown', start, {passive:false});
+  window.addEventListener('pointermove', move, {passive:false});
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 
-  el.addEventListener('touchmove', (e)=>{
-    if(!e.touches || !e.touches[0]) return;
-    e.preventDefault();
-    setByClientX(e.touches[0].clientX);
-  }, { passive:false });
+  el.addEventListener('touchstart', start, {passive:false});
+  window.addEventListener('touchmove', move, {passive:false});
+  window.addEventListener('touchend', end);
+  window.addEventListener('touchcancel', end);
 }
 
 function bindTapVolUI(){
@@ -1411,7 +1406,6 @@ function bindTapVolUI(){
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
     if(tapMaster) tapMaster.gain.value = tapVol;
     saveTapVol();
-    // user gesture => allow audio on iOS
     ensureTapAudio();
   };
   el.addEventListener('input', apply);
@@ -1426,7 +1420,7 @@ let micAnalyser = null;
 
 // ---- チューニング結果（判定閾値）を読む ----
 const THRESH_KEY = 'uk_game_thresholds_v1';
-const THRESH_MAX_AGE_H = 24; // 24時間
+const THRESH_MAX_AGE_H = 24; 
 function loadGameThresholds(){
   try{
     const raw = localStorage.getItem(THRESH_KEY);
@@ -1462,7 +1456,6 @@ function applyThresholdsFrom(noise, stored){
     rise = stored.pluckRiseRms * k;
     high = stored.pluckHighRms * k;
   }
-  // 最低ライン（端末別）
   if(IS_IOS){
     rise = Math.max(rise||0, 0.0016, noise*2.0);
     high = Math.max(high||0, 0.0020, noise*3.0);
@@ -1489,9 +1482,8 @@ let gameEndAt = 0;
 let score = 0;
 let groups = [];
 let stars = [];
-const STAR_CAP = 90; // パフォーマンス上限（軽量化） // パフォーマンス上限
+const STAR_CAP = 90; 
 function burstStars(n, x, y, waves=1, waveDelay=120){
-  // iPhone: keep FX light to avoid lag
   if(IS_IOS) n = Math.min(n, 8);
   const make = ()=>{
     const add = Math.min(n, STAR_CAP);
@@ -1504,7 +1496,6 @@ function burstStars(n, x, y, waves=1, waveDelay=120){
 
 
 function getNeckMidY(){
-  // between E and C strings (2 and 3) = neck middle
   try{ return (canvas.height/2) + (0.0)*STAGE.LANE_DY; }catch(e){ return (window.innerHeight/2); }
 }
 function getFxPointFromGroup(g){
@@ -1525,17 +1516,16 @@ let waitHold = false;
 let waitTargetGroup = null;
 let comboStreak = 0;
 let speedLevel = 0;
-let disableSpeedUpActive = false; // 旧ロジック用（温存）
+let disableSpeedUpActive = false; 
 let speedBoosted = false;
-let practiceBoostCount = 0; // practice(コード2モード)の5HIT加速段数      // 5連続 or 8音ノーミスで1.7倍にしたか
-let scaleSeqCount = 0;         // scaleで「doからdo2まで」ノーミスカウント
-let scaleSpeedBoosted = false; // scale専用
+let practiceBoostCount = 0; 
+let scaleSeqCount = 0;         
+let scaleSpeedBoosted = false; 
   updateComboUI();
   const big=document.getElementById('comboBig'); if(big) big.style.display='none';
 let currentScrollSpeed = 3.5;
-const SPEED_UP_EVERY = 5;    // 5連続で加速
-const SPEED_STEP = 0.5;   // ★変更：1段階の加速量（×0.5ずつ）
-//const SPEED_MAX_ADD = 2.25; // 上限（撤廃）
+const SPEED_UP_EVERY = 5;    
+const SPEED_STEP = 0.5;   
 
 let _fxTimer = 0;
 const CHEER_PHRASES = ['その調子！','いいぞ！','ナイス！','いい音！','指ばっちり！','リズム完璧！','ノってる！','キター！','最高！','つづけ！','いける！','落ち着いていこう！','今のきれい！'];
@@ -1565,16 +1555,9 @@ function showTimeBonus(msg){
 
 function updateComboUI(){ /* disabled */ }
 
-// --- Panda hint (FX layer only; does NOT affect gameplay) ---
-const PANDA_HINT_ENABLED = false; // v26: off by default (reduce lag) // false で完全無効
+const PANDA_HINT_ENABLED = false; 
 
-const _PANDA_LINES = [
-  "あわてなくて大丈夫",
-  "今のは気にしない",
-  "次いこう、次",
-  "リズムはそのまま",
-  "ゆっくりでOK"
-];
+const _PANDA_LINES = ["あわてなくて大丈夫","今のは気にしない","次いこう、次","リズムはそのまま","ゆっくりでOK"];
 
 function showPandaHint(msg){
   if(!PANDA_HINT_ENABLED) return;
@@ -1590,19 +1573,14 @@ function showFx(text, kind, opts = {}){
   const el = document.getElementById('fxMsg');
   if(!el) return;
   el.textContent = text;
-  // place FX in the upper-center of the screen (avoiding the left chord label and the neck)
   try{
-    // Center X
     const px = (canvas ? canvas.width/2 : window.innerWidth/2);
-    // Upper Y (above the neck)
     const py = (canvas ? canvas.height/2 : window.innerHeight/2) - 90;
-    
     el.style.left = px + 'px';
     el.style.top  = py + 'px';
     el.style.transform = 'translate(-50%,-50%)';
   }catch(e){}
   
-  // PANDA_HINT@MISS: show only AFTER miss is decided (FX layer)
   if(PANDA_HINT_ENABLED && kind === 'miss'){
     try{
       const line = _PANDA_LINES[Math.floor(Math.random()*_PANDA_LINES.length)];
@@ -1613,7 +1591,6 @@ el.classList.remove('hit','miss','speed','mega','show');
   el.style.display = 'block';
   if(kind) el.classList.add(kind);
   if(opts.mega) el.classList.add('mega');
-  // restart animation (軽量)
   requestAnimationFrame(()=>{ el.classList.add('show'); });
   clearTimeout(_fxTimer);
   _fxTimer = setTimeout(()=>{
@@ -1635,10 +1612,7 @@ function resetSpeedState(){
   }
 }
 function applySpeed(){
-  // const maxSpeed = baseScrollSpeed + SPEED_MAX_ADD; // 上限なし
-  // currentScrollSpeed = Math.min(baseScrollSpeed + speedLevel * SPEED_STEP, maxSpeed);
   currentScrollSpeed = baseScrollSpeed + (speedLevel * SPEED_STEP);
-
   if(gameState === 'PLAY' && !waitHold){
     scrollSpeed = currentScrollSpeed;
   }
@@ -1670,7 +1644,6 @@ const SOLO_LIB = {
   'do2': { name:'ド', targetIdx:0, fingers:[{s:1,f:3,txt:'薬'}]}
 };
 const CHORD_SHAPES_AECG = {
-  // A→E→C→G で統一（先生のコード表に準拠）
   'C':  { name:'C',  frets:{A:3,E:0,C:0,G:0}, fingers:{A:'薬',E:'',C:'',G:''} },
   'F':  { name:'F',  frets:{A:0,E:1,C:0,G:2}, fingers:{A:'',E:'人',C:'',G:'中'} },
   'G7': { name:'G7', frets:{A:2,E:1,C:2,G:0}, fingers:{A:'薬',E:'人',C:'中',G:''} },
@@ -1679,7 +1652,6 @@ const CHORD_SHAPES_AECG = {
 function chordToTextAEGC(ch){
   const s = CHORD_SHAPES_AECG[ch];
   if(!s) return '';
-  // 表示は A→E→C→G（ユーザー指定）／開放弦も「0」で必ず表示
   const fmt = (f, finger) => (f===0 ? '0' : `${f}${finger||''}`);
   const L = [
     `[${s.name}]`,
@@ -1691,23 +1663,17 @@ function chordToTextAEGC(ch){
   return L.join('\n');
 }
 
-// --- 曲(タブ譜)用：その8分で鳴らす弦だけ「指(薬/中/人)」+ 開放弦は「0」を同時に流す ---
-// ChordGroup は chord.fingers のみ描画するため、ここで「0(開放)」も fingers に含める。
 function chordObjForPick(chordName, pick){
-  // pick: {A:0, E:0, C:0, G:0} のように「その8分で鳴らす弦だけ」が入る
   const shape = CHORD_SHAPES_AECG[chordName];
   const sidx = {A:1, E:2, C:3, G:4};
   const fingers = [];
   if(!pick) pick = {};
-  // A→E→C→G の順に並べる（表示・流れが分かりやすい）
   for(const k of ['A','E','C','G']){
-    if(pick[k] === undefined) continue; // この8分で鳴らさない弦は出さない
+    if(pick[k] === undefined) continue; 
     const f = pick[k];
     if(f === 0){
-      // 開放弦も「0」を“薬などと一緒に”同じタイミングで流す
       fingers.push({s: sidx[k], f: 0, txt: '0'});
     }else{
-      // 押弦はコード表の指（人/中/薬）を優先。無ければフレット番号だけ出す。
       const ft = (shape && shape.fingers && shape.fingers[k]) ? shape.fingers[k] : '';
       fingers.push({s: sidx[k], f: f, txt: ft || String(f)});
     }
@@ -1720,36 +1686,25 @@ function chordObjForPick(chordName, pick){
 }
 
 
-// --- song用：アルペジオ(単音)の表示名（きらきら星はCメジャー想定） ---
 function _pcToSolfege(pc){
   const map = {0:"ド",2:"レ",4:"ミ",5:"ファ",7:"ソ",9:"ラ",11:"シ",
                1:"ド#",3:"レ#",6:"ファ#",8:"ソ#",10:"ラ#"};
   return map[pc%12] || "?";
 }
 function noteNameForFinger(fg){
-  // fg: {s:1..4, f:fret}
-  const basePCByS = {1:9, 2:4, 3:0, 4:7}; // A,E,C,G with C=0
+  const basePCByS = {1:9, 2:4, 3:0, 4:7}; 
   const base = basePCByS[fg.s] ?? 0;
   const pc = (base + (fg.f|0)) % 12;
   return _pcToSolfege(pc);
 }
 
-// きらきら星：先生タブ譜（8分×8）をそのまま「コード保持＋弾弦(Pick)」として流す
-// 表示は A→E→C→G（0=開放）で固定。Pick はその8分で鳴らす弦だけ表示します。
 const KIRAKIRA_TAB_BLOCKS = [
-  // 1) C → F → C
   { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
-  // 2) G7 → C → G7 → C
   { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
-  // 3) C → G7 → C → G7   ※G7のG弦0が欠けないように補完
   { label:"C→G7→C→G7", A:"--3-----2-----3-----2----", E:"--0-----1--1--0--0--1----", C:"--0-----2-----0-----2----", G:"--0--0--0-----0-----0----" },
-  // 4) G7 → C → G7 → C
   { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
-  // 5) C → F → C
   { label:"C→F→C",  A:"--3-----------0--0--3----", E:"--0-----------1-----0----", C:"--0--0--------0-----0----", G:"--0-----0--0--2-----0----" },
-  // 6) G7 → C → G7 → C
   { label:"G7→C→G7→C", A:"--2-----3-----2-----3----", E:"--1--1--0--0--1-----0----", C:"--2-----0-----2--2--0----", G:"--0-----0-----0-----0----" },
-  // 7) C (End)
   { label:"C",         A:"--3----------------------", E:"--0----------------------", C:"--0----------------------", G:"--0----------------------" },
 ];
 
@@ -1774,22 +1729,15 @@ function _tabNotesAt(block, col){
   return out;
 }
 function _detectChordFromNotes(notes){
-  // 複数弦が出る列（=フォームが見える）だけで推定。単弦列は直前コードを保持。
   const hasA = (notes.A!==undefined), hasE=(notes.E!==undefined), hasC=(notes.C!==undefined), hasG=(notes.G!==undefined);
   const count = (hasA?1:0)+(hasE?1:0)+(hasC?1:0)+(hasG?1:0);
   if(count < 3) return null;
-  // 既知の3コードだけ（今回の譜面範囲）
-  // C: A3 E0 C0 G0
   if((notes.A===3) && (notes.E===0) && (notes.C===0) && (notes.G===0)) return 'C';
-  // F: A0 E1 C0 G2
   if((notes.A===0) && (notes.E===1) && (notes.C===0) && (notes.G===2)) return 'F';
-  // G7: A2 E1 C2 (Gは0か省略)
   if((notes.A===2) && (notes.E===1) && (notes.C===2)) return 'G7';
   return null;
 }
 function _pickText(notes){
-  // A→E→C→G 順。0も表示（開放でも弾くなら0を出す）
-  // 「C」がコード名と紛らわしいので、弦は 1A/2E/3C/4G の表記にする
   const parts = [];
   if(notes.A!==undefined) parts.push(`1A${notes.A}`);
   if(notes.E!==undefined) parts.push(`2E${notes.E}`);
@@ -1800,11 +1748,9 @@ function _pickText(notes){
 
 function buildKirakiraFromTabBlocks(blocks){
   const out = [];
-  let currentChord = 'C'; // 先頭はCから始まる
+  let currentChord = 'C'; 
   for(const block of blocks){
     const cols = _tabEventCols(block);
-    // 先生譜面は 8分×8 を想定。今回のASCIIは「数字がある列」=発音タイミングで、
-    // 最後の8分が休符になることがある（colsが7個）。8個に満たない分は休符として埋めます。
     const steps = [];
     for(let i=0;i<8;i++){
       if(i < cols.length){
@@ -1816,7 +1762,6 @@ function buildKirakiraFromTabBlocks(blocks){
         steps.push({ chord: currentChord, pick: {} });
       }
     }
-    // データ化：1ステップ=1ノート（8分）
     for(const st of steps){
       out.push({ chord: chordObjForPick(st.chord, st.pick), lyrics: '' });
     }
@@ -1832,11 +1777,10 @@ const SONG_DATA = buildKirakiraFromTabBlocks(KIRAKIRA_TAB_BLOCKS);
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
 let songFinished=false; let songFinishedAt=0;
 let currentLevelChords = [];
-let spawnInterval = 2800; // ← 間隔（ms）: 全メニュー共通
-let lastStartParams = null; // リトライ用
+let spawnInterval = 2800; 
+let lastStartParams = null; 
 
 // --- UI操作 ---
-// ===== UI MODE / ENTRY KIND (v12) =====
 let entryKind = 'uke'; // 'tap' or 'uke'
 let uiMode = 'WAIT';   // 'NORMAL' or 'WAIT'
 
@@ -1847,22 +1791,29 @@ function isWaitMode(){
   return (playMode === 'WAIT' || playMode === 'TAP_WAIT');
 }
 
+function toggleSoundSource(type){
+  if(type === 'sample' && !window.hasRecordedSamples){
+    alert("まだ録音された音がありません。チューニング開始後に「録音する」を選ぶと作れます。");
+    return;
+  }
+  useSampledSound = (type === 'sample');
+  document.getElementById('btn-sound-synth').classList.toggle('active', !useSampledSound);
+  document.getElementById('btn-sound-sample').classList.toggle('active', useSampledSound);
+}
+
 function applyUiMode(mode){
   uiMode = (String(mode||'').toUpperCase() === 'NORMAL') ? 'NORMAL' : 'WAIT';
-  // map to internal playMode
   if(entryKind === 'tap'){
     playMode = (uiMode === 'NORMAL') ? 'TAP_NORMAL' : 'TAP_WAIT';
   }else{
-    playMode = uiMode; // 'NORMAL' or 'WAIT'
+    playMode = uiMode; 
   }
 
-  // UI: pills active (only data-mode pills)
   document.querySelectorAll('.mode-pill[data-mode]').forEach(b => {
     const m = (b.getAttribute('data-mode')||'').toUpperCase();
     b.classList.toggle('active', m === uiMode);
   });
 
-  // UI: explanation
   const desc = document.getElementById('mode-desc');
   if(desc){
     desc.textContent = (uiMode === 'NORMAL')
@@ -1870,24 +1821,26 @@ function applyUiMode(mode){
       : 'サポート付き：とまって まつよ（はじめてにおすすめ）';
   }
 
-  // UI: tap volume is only for tap entry
   const tapWrap = document.getElementById('tap-vol-wrap');
-  if(tapWrap){
-    tapWrap.style.display = (entryKind === 'tap') ? 'block' : 'none';
+  const soundWrap = document.getElementById('sound-toggle-wrap');
+  
+  if(entryKind === 'tap'){
+     if(tapWrap) tapWrap.style.display = 'block';
+     if(soundWrap) soundWrap.style.display = 'none';
+  } else {
+     if(tapWrap) tapWrap.style.display = 'none';
+     if(soundWrap) soundWrap.style.display = 'flex';
   }
 
-  // UI: menu title
   const mt = document.getElementById('menuTitle');
   if(mt){
     mt.textContent = (entryKind === 'tap') ? '👆 タップであそぶ' : '🪕 ウクレレであそぶ';
   }
+  
+  // body classes for CSS handling
+  document.body.classList.toggle('is-tap', entryKind === 'tap');
+  document.body.classList.toggle('is-uke', entryKind !== 'tap');
 
-
-  // UI: TOPへ戻るボタン（タップ入口のみ）
-  const topBack = document.getElementById('topBackBtn');
-  if(topBack){ topBack.style.display = (entryKind === 'tap') ? 'block' : 'none'; }
-
-  // UI: back button text
   const backBtn = document.getElementById('menuBackBtn');
   if(backBtn){
     backBtn.textContent = (entryKind === 'tap') ? '🏝️ TOPへもどる' : '🪕 ウクレレへもどる';
@@ -1898,8 +1851,6 @@ function setMode(el, mode){
   applyUiMode(mode);
 }
 
-// URLパラメータ mode=TAP/NORMAL/WAIT を反映
-// URLパラメータ mode=TAP/NORMAL/WAIT を入口として反映（v12）
 (function applyModeFromQuery(){
   try{
     const p = new URLSearchParams(location.search);
@@ -1907,7 +1858,7 @@ function setMode(el, mode){
 
     if(m === 'TAP'){
       entryKind = 'tap';
-      applyUiMode('WAIT'); // 初期はサポート付き
+      applyUiMode('WAIT'); 
       return;
     }
     if(m === 'NORMAL' || m === 'WAIT'){
@@ -1916,7 +1867,6 @@ function setMode(el, mode){
       return;
     }
 
-    // default: ウクレレ入口（サポート付き）
     entryKind = 'uke';
     applyUiMode('WAIT');
   }catch(e){
@@ -1929,10 +1879,7 @@ function goBackFromGameMenu(){
   const url = (entryKind === 'tap') ? 'index.html' : 'ukulele.html';
   goFlip(url);
 }
-;
 
-
-// ★修正: メニューへ戻る動作（TOPではなくゲームメニューに戻る）
 function goMenu(){
   try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   try{ document.body.classList.remove('playing'); document.body.classList.add('menuOpen'); }catch(e){}
@@ -1940,7 +1887,6 @@ function goMenu(){
   gameState = 'MENU';
   try{ document.body.classList.add('isMenu'); }catch(e){}
   
-  // UIリセット
   document.getElementById('menu-overlay').style.display = 'flex';
   document.getElementById('score-panel').style.display = 'none';
   document.getElementById('timer-panel').style.display = 'none';
@@ -1950,8 +1896,8 @@ function goMenu(){
   document.getElementById('back-btn').style.display = 'none';
   document.getElementById('chordHud').style.display = 'none';
   document.getElementById('lyrics-area').innerText = '';
+  document.getElementById('sampler-overlay').style.display = 'none';
   
-  // キャンバスクリア
   ctx.clearRect(0,0,canvas.width,canvas.height);
   resetSpeedState();
   const fx=document.getElementById('fxMsg'); if(fx){ fx.style.display='none'; fx.className=''; }
@@ -1973,25 +1919,23 @@ function resumeGame(){
 // --- ゲーム開始フロー ---
 async function prepGame(type){
   try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
-  try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
-  // タップモードならマイク不要
+  lastStartParams = type;
+
+  // タップモードなら即開始
   if(isTapMode()){ 
-      // ★NEW: 音量チェックと確実なAudioContext起動
       try{
         ensureTapAudio();
         const v = getTapVolume01();
-        // 音量が小さい、またはAudioContextが止まっている場合に警告
         if(v < 0.1 || (tapAudioCtx && tapAudioCtx.state === 'suspended')){
             if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
             showFx('🎵 音量をONにしてね\nマナーモードも解除してね', 'speed', { durationMs: 4000 });
         }
       }catch(e){}
-      
       startGameByType(type); 
       return; 
   }
 
-  // マイク準備
+  // マイク準備 & チューニングフロー
   document.getElementById('loading-overlay').style.display = 'flex';
   try {
     if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -2008,21 +1952,22 @@ async function prepGame(type){
       micAnalyser.fftSize = IS_IOS ? 4096 : 2048;
       src.connect(gain).connect(micAnalyser);
     }
+    
+    // Output Audio
+    ensureTapAudio();
 
-    // チューニング結果（あれば）
     const stored = loadGameThresholds();
-
-    // ノイズ計測（約1秒）
-    await new Promise(r => setTimeout(r, 200)); // 立ち上がり待ち
+    await new Promise(r => setTimeout(r, 200)); 
     NOISE_RMS = await measureNoiseRms(950, 95);
-
-    // 閾値：チューニング結果を基本に、今のノイズ床で補正
     applyThresholdsFrom(NOISE_RMS, stored);
 
     document.getElementById('loading-overlay').style.display = 'none';
-    startGameByType(type);
+
+    // ★チューニング/サンプリングのオーバーレイを表示
+    showTuningOverlay();
 
   } catch(e) {
+    console.error(e);
     alert('マイクが使えません。タップモードで開始します。');
     entryKind = 'tap'; applyUiMode('WAIT');
     document.getElementById('loading-overlay').style.display = 'none';
@@ -2030,8 +1975,438 @@ async function prepGame(type){
   }
 }
 
+// --- SAMPLER LOGIC ---
+// 目的：
+// - 「チューニング開始」後に「録音する？しない？」を聞く
+// - チューニングでOKになった音（1〜4弦）を、その場でサンプリング
+// - サンプリング後に「OK / やり直す / やっぱやめる」を、診断表示より先に聞く
+let samplerState = 'idle';
+let samplerDoRecord = false;
+let currentSampleStringIdx = 0; // 0=A, 1=E, 2=C, 3=G
+let tuningOk = [false, false, false, false];
+
+const TARGET_FREQS = [440.00, 329.63, 261.63, 392.00]; // A, E, C, G
+const TARGET_NAMES = ['1弦 (A)', '2弦 (E)', '3弦 (C)', '4弦 (G)'];
+
+window.customSamples = [null, null, null, null];
+window.hasRecordedSamples = false;
+
+// UI helpers
+function updateSamplerUI(title, msg, isHtml){
+  document.getElementById('samplerTitle').innerText = title;
+  if(isHtml){
+    document.getElementById('samplerMsg').innerHTML = msg;
+  }else{
+    document.getElementById('samplerMsg').innerText = msg;
+  }
+}
+function setSamplerBtns(html){
+  const el = document.getElementById('samplerBtns');
+  el.innerHTML = html;
+  el.style.display = 'flex';
+}
+function hideSamplerBtns(){ document.getElementById('samplerBtns').style.display = 'none'; }
+function showMeter(on){
+  document.getElementById('samplerMeterBox').style.display = on ? 'block' : 'none';
+}
+function renderProgress(){
+  return TARGET_NAMES.map((n,i)=> (tuningOk[i] ? `✅ ${n}` : `⬜ ${n}`)).join('<br>');
+}
+
+// Pitch detect (simple autocorrelation)
+function autoCorrelate(buf, sampleRate) {
+  let SIZE = buf.length;
+  let rms = 0;
+  for (let i=0;i<SIZE;i++) { let val = buf[i]; rms += val*val; }
+  rms = Math.sqrt(rms/SIZE);
+  if (rms<0.01) return -1;
+
+  let r1=0, r2=SIZE-1, thres=0.2;
+  for (let i=0; i<SIZE/2; i++) if (Math.abs(buf[i])<thres) { r1=i; break; }
+  for (let i=1; i<SIZE/2; i++) if (Math.abs(buf[SIZE-i])<thres) { r2=SIZE-i; break; }
+  buf = buf.slice(r1,r2);
+  SIZE = buf.length;
+
+  let c = new Array(SIZE).fill(0);
+  for (let i=0; i<SIZE; i++) {
+    for (let j=0; j<SIZE-i; j++) c[i] = c[i] + buf[j]*buf[j+i];
+  }
+  let d=0; while (c[d]>c[d+1]) d++;
+  let maxval=-1, maxpos=-1;
+  for (let i=d; i<SIZE; i++) {
+    if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+  }
+  let T0 = maxpos;
+  if(!T0 || T0 <= 0) return -1;
+  return sampleRate/T0;
+}
+
+function showTuningOverlay(){
+  const ov = document.getElementById('sampler-overlay');
+  ov.style.display = 'flex';
+  showMeter(false);
+  samplerState = 'idle';
+
+  updateSamplerUI(
+    "チューニング",
+    "ウクレレの準備はいいですか？<br>1弦から順番に音をチェックします。",
+    true
+  );
+
+  setSamplerBtns(`
+    <button class="action-btn btn-secondary" onclick="skipSampling()">スキップ（チューニングしない）</button>
+    <button class="action-btn btn-primary" onclick="startTuningFlow()">チューニング開始！</button>
+  `);
+}
+
+function skipSampling(){
+  samplerState = 'idle';
+  document.getElementById('sampler-overlay').style.display = 'none';
+  startGameByType(lastStartParams);
+}
+
+function startTuningFlow(){
+  // チューニング開始後に「録音する？」を聞く
+  samplerState = 'choose_record';
+  tuningOk = [false, false, false, false];
+  currentSampleStringIdx = 0;
+  showMeter(false);
+
+  updateSamplerUI(
+    "チューニング",
+    "このあと、各弦を弾いてOKを出します。<br><b>OKになった音を録音（サンプリング）しますか？</b>",
+    true
+  );
+
+  setSamplerBtns(`
+    <button class="action-btn btn-primary" onclick="beginTuning(true)">録音する</button>
+    <button class="action-btn btn-secondary" onclick="beginTuning(false)">録音しない</button>
+    <button class="action-btn btn-secondary" onclick="skipSampling()" style="font-size:12px; padding:10px;">やめる</button>
+  `);
+}
+
+// candidate recording (to capture attack) when samplerDoRecord=true
+let __cand = null; // {rec, chunks, done, stopTimer, startedAt, mime}
+const REC_MS = 2600;
+const MATCH_TIMEOUT_MS = 750;
+
+function chooseRecorderMime(){
+  try{
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported){
+      if(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
+      if(MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) return 'audio/ogg;codecs=opus';
+      if(MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+    }
+  }catch(e){}
+  return '';
+}
+
+function normalizeAndFadeBuffer(buf){
+  try{
+    if(!buf) return buf;
+    const chs = buf.numberOfChannels || 1;
+    let peak = 0;
+    for(let ch=0; ch<chs; ch++){
+      const data = buf.getChannelData(ch);
+      for(let i=0; i<data.length; i++){
+        const a = Math.abs(data[i]);
+        if(a > peak) peak = a;
+      }
+    }
+    const target = 0.88;
+    const g = (peak > 0.001) ? Math.min(1.0, target / peak) : 1.0;
+
+    const fadeIn = Math.floor(buf.sampleRate * 0.006);
+    const fadeOut = Math.floor(buf.sampleRate * 0.085);
+
+    for(let ch=0; ch<chs; ch++){
+      const data = buf.getChannelData(ch);
+
+      if(g !== 1.0){
+        for(let i=0;i<data.length;i++) data[i] *= g;
+      }
+
+      // fade in
+      for(let i=0;i<fadeIn && i<data.length;i++){
+        data[i] *= (i / Math.max(1, fadeIn));
+      }
+      // fade out
+      for(let i=0;i<fadeOut && i<data.length;i++){
+        const idx = data.length - 1 - i;
+        const k = (i / Math.max(1, fadeOut));
+        data[idx] *= (1 - k);
+      }
+    }
+  }catch(e){}
+  return buf;
+}
+
+function startCandidateRecording(){
+  return new Promise((resolve)=>{
+    try{
+      if(!window.MediaRecorder || !micStream){
+        resolve(null); return;
+      }
+      const mime = chooseRecorderMime();
+      let rec = null;
+      try{
+        rec = mime ? new MediaRecorder(micStream, { mimeType: mime }) : new MediaRecorder(micStream);
+      }catch(e){
+        rec = new MediaRecorder(micStream);
+      }
+      const chunks = [];
+      let doneResolve;
+      const done = new Promise(r=>doneResolve=r);
+
+      rec.ondataavailable = (e)=>{ if(e && e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = ()=>{ doneResolve({chunks, mime: (rec.mimeType || mime || '')}); };
+
+      rec.start();
+      const startedAt = performance.now ? performance.now() : Date.now();
+      const stopTimer = setTimeout(()=>{ try{ rec.stop(); }catch(e){} }, REC_MS);
+
+      resolve({rec, chunks, done, stopTimer, startedAt, mime: (rec.mimeType || mime || '')});
+    }catch(err){
+      resolve(null);
+    }
+  });
+}
+
+async function finalizeCandidateToSample(cand, idx){
+  if(!cand) return;
+  try{
+    const info = await cand.done;
+    clearTimeout(cand.stopTimer);
+
+    const blob = new Blob(info.chunks, { type: info.mime || 'audio/webm' });
+    const arrayBuffer = await blob.arrayBuffer();
+
+    const audioBuffer = await tapAudioCtx.decodeAudioData(arrayBuffer);
+    window.customSamples[idx] = normalizeAndFadeBuffer(audioBuffer);
+  }catch(e){
+    console.error(e);
+  }
+}
+
+async function discardCandidate(cand){
+  if(!cand) return;
+  try{
+    clearTimeout(cand.stopTimer);
+    if(cand.rec && cand.rec.state !== 'inactive'){
+      cand.rec.stop();
+    }
+  }catch(e){}
+}
+
+async function beginTuning(doRecord){
+  samplerDoRecord = !!doRecord;
+  try{ ensureTapAudio(); }catch(e){}
+  samplerState = 'wait_quiet';
+  currentSampleStringIdx = 0;
+  __cand = null;
+
+  // 今回はこのチューニングで録音したものだけを採用（やめたら破棄）
+  window.customSamples = [null, null, null, null];
+  window.hasRecordedSamples = false;
+
+  showMeter(true);
+  hideSamplerBtns();
+
+  updateSamplerUI(
+    "しずかにしてね...",
+    "まわりの おとを しらべています",
+    false
+  );
+
+  await samplerLoop();
+}
+
+function askForString(idx){
+  const recMsg = samplerDoRecord ? "（OKになった瞬間に、その音を録音します）" : "（OKだけ出します）";
+  updateSamplerUI(
+    `チューニング: ${TARGET_NAMES[idx]}`,
+    `${renderProgress()}<br><br><b>${TARGET_NAMES[idx]}</b> を ポーン と弾いてね！<br>${recMsg}`,
+    true
+  );
+}
+
+async function samplerLoop(){
+  // overlayが閉じたら停止
+  if(document.getElementById('sampler-overlay').style.display === 'none') return;
+
+  // safety
+  if(!micAnalyser){
+    samplerState = 'done';
+    setSamplerBtns(`<button class="action-btn btn-primary" onclick="skipSampling()">つづける</button>`);
+    return;
+  }
+
+  const buf = new Float32Array(micAnalyser.fftSize);
+  micAnalyser.getFloatTimeDomainData(buf);
+
+  // Meter
+  let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i]*buf[i];
+  let rms = Math.sqrt(sum/buf.length);
+  document.getElementById('samplerBar').style.width = Math.min(100, rms*500) + '%';
+
+  const nowMs = (performance.now ? performance.now() : Date.now());
+
+  if(samplerState === 'wait_quiet'){
+    // 静けさが少し続いたら次へ
+    if(!samplerLoop.__quietSince) samplerLoop.__quietSince = null;
+    if(rms < 0.05){
+      if(samplerLoop.__quietSince == null) samplerLoop.__quietSince = nowMs;
+      if(nowMs - samplerLoop.__quietSince > 450){
+        samplerLoop.__quietSince = null;
+        samplerState = 'listen';
+        askForString(currentSampleStringIdx);
+      }
+    }else{
+      samplerLoop.__quietSince = null;
+    }
+  }
+  else if(samplerState === 'listen'){
+    const target = TARGET_FREQS[currentSampleStringIdx];
+
+    // 音が鳴ったら（attack）先に録音を開始して攻撃音を取りこぼさない
+    if(samplerDoRecord && !__cand && rms > 0.06){
+      __cand = await startCandidateRecording();
+      if(__cand){
+        updateSamplerUI(`チューニング: ${TARGET_NAMES[currentSampleStringIdx]}`, `${renderProgress()}<br><br>録音中...（余韻まで）`, true);
+      }
+    }
+
+    const pitch = autoCorrelate(buf, audioCtx.sampleRate);
+    if(rms > 0.05 && pitch > 0){
+      const ratio = pitch / target;
+      if(ratio > 0.86 && ratio < 1.14){
+        // OK!
+        tuningOk[currentSampleStringIdx] = true;
+
+        if(samplerDoRecord && __cand){
+          samplerState = 'capturing';
+          updateSamplerUI("録音中...", "そのまま 音をのばしてね", false);
+
+          await finalizeCandidateToSample(__cand, currentSampleStringIdx);
+          __cand = null;
+        }else{
+          // 録音しない場合は少し待って次へ
+          __cand = null;
+        }
+
+        currentSampleStringIdx++;
+
+        if(currentSampleStringIdx >= 4){
+          if(samplerDoRecord){
+            samplerState = 'verify';
+            verifySamples();
+            return;
+          }else{
+            samplerState = 'done_tuning';
+            showTuningDone();
+            return;
+          }
+        }else{
+          samplerState = 'wait_quiet';
+        }
+      }
+    }
+
+    // 録音開始したが、合っていないまま一定時間経過 → 破棄してやり直し
+    if(__cand){
+      const elapsed = nowMs - __cand.startedAt;
+      if(elapsed > MATCH_TIMEOUT_MS && !tuningOk[currentSampleStringIdx]){
+        await discardCandidate(__cand);
+        __cand = null;
+        updateSamplerUI(`チューニング: ${TARGET_NAMES[currentSampleStringIdx]}`, `${renderProgress()}<br><br>ちょっと ちがうみたい… もういちど！`, true);
+        samplerState = 'wait_quiet';
+      }
+    }
+  }
+  else if(samplerState === 'capturing'){
+    // finalizeCandidateToSample が終わるまで待つ（ここには通常来ない）
+  }
+
+  if(samplerState !== 'verify' && samplerState !== 'done_tuning' && samplerState !== 'done'){
+    requestAnimationFrame(samplerLoop);
+  }
+}
+
+function verifySamples(){
+  updateSamplerUI("録音できたよ！", "録音した音を きいてみてね", false);
+  showMeter(false);
+
+  // Playback Arpeggio (4->3->2->1)
+  [3, 2, 1, 0].forEach((sIdx, i) => {
+    setTimeout(()=>{ playSampleBuffer(sIdx, 1.0); }, i * 520);
+  });
+
+  setTimeout(()=>{
+    setSamplerBtns(`
+      <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+        <button class="action-btn btn-primary" onclick="finishSampling(true)">OK（この音であそぶ）</button>
+        <button class="action-btn btn-secondary" onclick="startTuningFlow()">やり直す（もう一度録音）</button>
+        <button class="action-btn btn-secondary" onclick="finishSampling(false)" style="font-size:12px; padding:10px;">やっぱやめる（いつもの音）</button>
+      </div>
+    `);
+  }, 2500);
+}
+
+function playSampleBuffer(stringIdx, rate){
+  if(!window.customSamples[stringIdx]) return;
+  try{ ensureTapAudio(); }catch(e){}
+  try{ ensureHitBus(); }catch(e){}
+
+  const src = tapAudioCtx.createBufferSource();
+  src.buffer = window.customSamples[stringIdx];
+  src.playbackRate.value = rate;
+
+  const gain = tapAudioCtx.createGain();
+  gain.gain.value = 0.55;
+
+  // Fade Out (preview)
+  const now = tapAudioCtx.currentTime;
+  const dur = Math.min(src.buffer.duration / Math.max(0.1, src.playbackRate.value), 2.8);
+  const rel = Math.min(0.75, Math.max(0.35, dur * 0.28));
+  gain.gain.setValueAtTime(0.55, now);
+  gain.gain.setValueAtTime(0.55, Math.max(now, now + dur - rel));
+  gain.gain.linearRampToValueAtTime(0, now + dur);
+
+  src.connect(gain).connect(hitIn);
+  src.start();
+}
+
+function showTuningDone(){
+  showMeter(false);
+  updateSamplerUI("チューニングOK！", "そのまま はじめよう", false);
+
+  setSamplerBtns(`
+    <button class="action-btn btn-primary" onclick="finishSampling(false)">はじめる</button>
+    <button class="action-btn btn-secondary" onclick="startTuningFlow()">やり直す</button>
+  `);
+}
+
+function finishSampling(useRecorded){
+  const use = !!useRecorded;
+
+  if(use){
+    window.hasRecordedSamples = true;
+    try{ toggleSoundSource('sample'); }catch(e){}
+  }else{
+    // 「やっぱやめる / 録音しない」→録音データは破棄（次回また作成）
+    window.hasRecordedSamples = false;
+    window.customSamples = [null, null, null, null];
+    try{ toggleSoundSource('synth'); }catch(e){}
+  }
+
+  document.getElementById('sampler-overlay').style.display = 'none';
+  startGameByType(lastStartParams);
+}
+
+
 function startGameByType(type){
   lastStartParams = type;
+  try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
   if(type==='scale') initGame('scale', null, {speedBase:3.4});
   else if(type==='easy') initGame('practice', ['C','F','G7','Am'], {speedBase:3.2});
   else if(type==='hard') initGame('practice', ['C','F','G7','Am','G','A7','Dm','Em','D7'], {speedBase:3.35});
@@ -2053,7 +2428,7 @@ function initGame(mode, levelData, opts){
   document.getElementById('score-panel').style.display='block';
   document.getElementById('timer-panel').style.display='block';
   document.getElementById('stopBtn').style.display='block';
-  document.getElementById('back-btn').style.display='none'; // ゲーム中は邪魔なので消す
+  document.getElementById('back-btn').style.display='none'; 
 
   // 変数リセット
   score=0; groups=[]; stars=[];
@@ -2064,19 +2439,17 @@ function initGame(mode, levelData, opts){
   resetSpeedState();
   gameMode = mode;
   isSongMode = (mode==='song');
-  disableSpeedUpActive = !!(opts.disableSpeedUp); // songのみ固定、practice/scaleは途中UPあり
+  disableSpeedUpActive = !!(opts.disableSpeedUp); 
   currentLevelChords = levelData || [];
   practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
-  spawnInterval = 2800; // デフォルト
+  spawnInterval = 2800; 
   if(isSongMode){
-    // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
     const sid = getSongSpeedId();
-    spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; // Ver0.1: tempo mapping (SLOW x0.5, FAST x2) // v28: tighter arpeggio timing
+    spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; 
   }
 
   document.getElementById('score').innerText="0";
   document.getElementById('lyrics-area').innerText="";
-  // 曲モードは「曲が終わったら終了」なので時間制限なし
   if(isSongMode){
     gameEndAt = null;
     document.getElementById('timer-panel').style.display='none';
@@ -2100,7 +2473,7 @@ function gameLoop(time){
   if(!lastFrameT) lastFrameT=time;
   lastFrameT=time;
 
-  // タイマー（曲モードは時間制限なし）
+  // タイマー
   if(gameEndAt!=null && !waitHold){
     const rem = Math.max(0, gameEndAt - performance.now());
     document.getElementById('timer').innerText = Math.ceil(rem/1000);
@@ -2112,11 +2485,10 @@ function gameLoop(time){
 
   // スポーン
   if(!waitHold && (time - lastSpawn > spawnInterval)){
-    // 画面が詰まらないようにチェック
     let cnt=0, maxX=-9999;
     for(let g of groups) { if(g.active){ cnt++; if(g.x>maxX) maxX=g.x; } }
     
-    if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
+    if(cnt<3 && (maxX < canvas.width+120 - 760)){ 
       if(isSongMode){
         if(songIndex < SONG_DATA.length){
           const d = SONG_DATA[songIndex];
@@ -2124,7 +2496,6 @@ function gameLoop(time){
           songIndex++;
           if(songIndex >= SONG_DATA.length){ songFinished = true; songFinishedAt = performance.now(); }
         } else {
-          // no more notes to spawn
           if(!songFinished){ songFinished = true; songFinishedAt = performance.now(); }
         }
 
@@ -2151,29 +2522,16 @@ function gameLoop(time){
     if(d < bestDist && d < 620 + 100){ bestDist=d; target=g; }
   }
   if(target){
-    if(gameMode!=='scale'){
-      document.getElementById('chordHud').style.display='none';
-    } else {
-      document.getElementById('chordHud').style.display='none';
-    }
-    // show faint support (also in scale mode)
     target.isTarget=true;
-  } else {
-    document.getElementById('chordHud').style.display='none';
-  }
+  } 
 
   for(let i=groups.length-1; i>=0; i--){
     groups[i].update(); groups[i].draw();
     if(groups[i].x < -300) groups.splice(i,1);
   }
 
-  // --- NEW: Draw Current Chord Label (Fixed at Headstock) ---
-  // Priority: 1. Waiting target (missed), 2. Front-most active group on screen
   let hudGroup = waitTargetGroup;
   if(!hudGroup){
-    // Find closest active group that has started appearing (or is about to)
-    // We want the one closest to the Nut (x=150) but still active.
-    // Since we iterate right-to-left, we want the one with smallest x that is > -something
     let minX = Infinity;
     for(const g of groups){
       if(g.active && g.x < canvas.width + 100){
@@ -2181,32 +2539,23 @@ function gameLoop(time){
       }
     }
   }
-  
   if(hudGroup){
     drawBigHeadstockLabel(ctx, hudGroup);
   }
 
-
-  // 曲モード：最後まで流れ切ったら終了
   if(isSongMode){
     const done = (songFinished || songIndex >= SONG_DATA.length);
     if(done && groups.length===0){
       endGame();
       return;
     }
-    // 保険：最後まで生成し終えてから一定時間経っても残骸が0にならない場合は強制終了
     if(done && songFinishedAt && (performance.now()-songFinishedAt)>8000){
       endGame();
       return;
     }
   }
 
-  
-  // 自動MISS：判定位置を通過したら（タップしなくても）MISS扱い
-  // iPhoneなどでフレーム落ちすると「target判定の範囲外へ一気に飛ぶ」ことがあり、
-  // 最初のコードがMISS表示なしで通り過ぎることがあるため、全グループを走査してMISS判定します。
   if(!waitHold){
-    const win = 0; // v26: per-chord auto-miss line (1 fret left of pressed)
     let cand = null;
     let candAX = Infinity;
 
@@ -2216,36 +2565,28 @@ function gameLoop(time){
       if(g._autoMissed) continue;
       const ax = g.getAnchorX();
       if(ax < g.getAutoMissX()){
-        // もっと左に行っている（＝最も取りこぼしが確定している）ものを優先
         if(ax < candAX){ cand = g; candAX = ax; }
       }
     }
 
     if(cand){
       cand._autoMissed = true;
-
-      // 連続・速度リセット＆MISS演出（“おちついて”＋flash）
       comboStreak = 0;
       resetSpeedState();
       updateComboUI();
 
-      // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
       showFx(missMsg, 'miss', { durationMs: 2600 });
 
-      // iPhoneはDOM更新が重く感じることがあるので、🐼は控えめ（PCでは従来どおり）
       try{ if(!IS_IOS && typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
-
       try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
-if(isWaitMode()){
-        // 従来どおり：止めて弾き直し（同じ符号を正解位置で点滅）
+      if(isWaitMode()){
         waitHold = true;
         scrollSpeed = 0;
         waitTargetGroup = cand;
         cand.x = NUT_X;
-        cand._autoMissed = false; // 弾き直し用に解除
+        cand._autoMissed = false; 
       } else {
-        // NORMAL：流して次へ
         cand.active = false;
       }
     }
@@ -2261,7 +2602,6 @@ if(isWaitMode()){
 
   }catch(e){
     console.error(e);
-    // ここで止まると「7Fあたりで消えて何も起きない」になるので、ループは維持
     if(!window.__lastRuntimeErrAt || (performance.now()-window.__lastRuntimeErrAt)>2000){
       window.__lastRuntimeErrAt = performance.now();
       try{ showFx('⚠️ いったん続行します', {kind:'miss'}); }catch(_){ }
@@ -2289,11 +2629,9 @@ function endGame(){
   finishEl.innerText = "FINISH!!";
   document.getElementById('app').appendChild(finishEl);
 
-  // 少し遅れて表示と音
   setTimeout(()=>{
     finishEl.style.transform = "translate(-50%, -50%) scale(1)";
     finishEl.style.opacity = "1";
-    // ジャーンと鳴らす (Cコード)
     try{ 
         if(typeof playFreqs === 'function') {
             playFreqs([261.63, 329.63, 392.00, 523.25], 1.0); 
@@ -2301,7 +2639,6 @@ function endGame(){
     }catch(e){}
   }, 100);
 
-  // 2秒後にリザルト表示
   setTimeout(()=>{
     finishEl.style.opacity = "0";
     finishEl.style.transform = "translate(-50%, -50%) scale(1.5)";
@@ -2315,7 +2652,6 @@ function endGame(){
     document.getElementById('result-msg').innerText = msg;
     document.getElementById('result-overlay').style.display='flex';
     
-    // ファンファーレ的な音
     setTimeout(()=>{
        try{ 
            if(typeof playFreqs === 'function') {
@@ -2328,7 +2664,7 @@ function endGame(){
 
 // --- 入力判定 ---
 function processMicInput(){
-  if(isTapMode() || !micAnalyser) return;
+  if(entryKind==='tap' || !micAnalyser) return;
   const buf = new Float32Array(micAnalyser.fftSize);
   micAnalyser.getFloatTimeDomainData(buf);
   let rms=0; for(let i=0; i<buf.length; i++) rms+=buf[i]*buf[i];
@@ -2351,7 +2687,6 @@ function processMicInput(){
 
 function handleAction(){
   if(gameState!=='PLAY') return;
-  // ターゲット探索
   let target=null, best=Infinity;
   if(waitHold && waitTargetGroup && waitTargetGroup.active){
     target = waitTargetGroup; best = Math.abs(target.x - NUT_X);
@@ -2368,7 +2703,6 @@ function handleAction(){
     if(best < win){
       // HIT
       target.active=false;
-      // TAPモードはHIT時に音を鳴らす
       try{ playTapHitSound(target); }catch(e){}
 
       if(waitHold){
@@ -2377,61 +2711,50 @@ function handleAction(){
       score += (best<50 ? 15 : 10);
       document.getElementById('score').innerText=score;
       try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
-// combo / speed (DDR6ルール)
       comboStreak++;
       updateComboUI();
 
       const cheer = CHEER_PHRASES[Math.floor(Math.random()*CHEER_PHRASES.length)];
 
-      // ===== スピードアップ判定 =====
       if(gameMode==='scale'){
-        // scaleは「doからdo2まで(8音)をノーミス達成」でのみ1.7倍
         if(!scaleSpeedBoosted){
           if(target.noteKey === 'do'){
             scaleSeqCount = 1;
           } else if(scaleSeqCount > 0){
             scaleSeqCount++;
-          } // else: doから始まっていないので数えない
+          } 
 
           if(scaleSeqCount >= 8){
             scaleSpeedBoosted = true;
             if(!disableSpeedUpActive){ currentScrollSpeed = baseScrollSpeed * SPEEDUP_MULT; }
             if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
 
-            // flashScreen(); // 重いので無効化
             showFx(`💥 8音ノーミス！\nスピードUP!!`, 'speed', { mega:true, durationMs: 1200 });
             try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 } else {
-            // 通常HIT（scaleでも気分が上がる言葉だけ）
             try{const p=getFxPointFromGroup(target); showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 , x:p.x, y:p.y});}catch(e){ showFx(`✨PERFECT!!✨\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1760 });}
             try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 }
         } else {
-          // 既に加速中
           try{const p=getFxPointFromGroup(target); showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 , x:p.x, y:p.y});}catch(e){ showFx(`🔥NICE!!🔥\n${comboStreak}連続  ${cheer}`, 'hit', { mega:false, durationMs: 1640 });}
           try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 }
 
       } else {
-        // practice(コード2モード)は「5連続HITごとに累積加速」 / song(きらきら星)は速度固定
         const canSpeedUp = (gameMode === 'practice');
         const hitMilestone = (canSpeedUp && !disableSpeedUpActive && comboStreak > 0 && (comboStreak % 5 === 0));
         
         if(hitMilestone){
-          // ★ルール変更： +0.5スピードUP（上限なし）、+5秒延長
           practiceBoostCount++;
-          // currentScrollSpeed = baseScrollSpeed * Math.pow(SPEEDUP_MULT, practiceBoostCount); // 旧ロジック
-          currentScrollSpeed += SPEED_STEP; // 新ロジック：0.5ずつ加算
+          currentScrollSpeed += SPEED_STEP; 
 
           if(gameState==='PLAY' && !waitHold) scrollSpeed = currentScrollSpeed;
           
-          // Time Extension Rule
           if(gameEndAt != null) {
-            gameEndAt += 5000; // +5 seconds
+            gameEndAt += 5000; 
             showTimeBonus("+5秒!");
           }
           
-          // Visuals
           triggerRainbowFlash();
           showFx(`💥 ${comboStreak} COMBO!! 💥\nスピードUP!! (${currentScrollSpeed.toFixed(1)})`, 'speed', { mega:true, durationMs: 2000 });
           try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(20, p.x, p.y, 2); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
@@ -2443,23 +2766,19 @@ function handleAction(){
         }
       }
 } else {
-      // MISS（早すぎ/遅すぎ）
       comboStreak = 0;
       resetSpeedState();
       updateComboUI();
 
-      // flashScreen(); // 重いので無効化
       const missMsg = ['おちついて','だいじょうぶ！','もういっかい！','ゆっくりでOK','あわてない！'][Math.floor(Math.random()*5)];
       showFx(missMsg, 'miss', { durationMs: 2600 });
       try{ if(typeof showPandaHint==='function') showPandaHint(missMsg); }catch(e){}
       try{ const p=getFxPointFromGroup(target||waitTargetGroup); burstStars(14, p.x, p.y, 1); }catch(e){ burstStars(10, NUT_X+260, getNeckMidY(), 1); }
 if(isWaitMode()){
-        // 従来どおり：止めて弾き直し
         if(!waitHold){
           waitHold=true; scrollSpeed=0; waitTargetGroup=target; target.x=NUT_X;
         }
       } else {
-        // NORMAL：流して次へ
         target.active=false;
       }
     }
@@ -2473,7 +2792,6 @@ function drawBigHeadstockLabel(ctx, group){
   const nmRaw = group.chord.name || "";
   let nm = nmRaw;
   
-  // Decide what text to show (same logic as before)
   const isScale = (gameMode === 'scale');
   const isSong = !!isSongMode;
   if(isSong && !isScale){
@@ -2484,11 +2802,9 @@ function drawBigHeadstockLabel(ctx, group){
 
   if(!nm) return;
 
-  // ===== CHANGED: Move further left (x=36) and shrink font to 34px to avoid overlap with string labels (x=110) =====
-  const cx = 36; // 左端ギリギリに寄せ、右側の110pxエリアとの干渉を避ける
+  const cx = 36; 
   const cy = canvas.height / 2;
   
-  // Blink if waiting on this specific group
   const isWaiting = (waitHold && waitTargetGroup === group);
   const alpha = isWaiting ? (0.6 + 0.4*Math.sin(performance.now()/80)) : 1.0;
 
@@ -2497,19 +2813,17 @@ function drawBigHeadstockLabel(ctx, group){
   ctx.fillStyle = "#fff";
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 6;
-  // Font reduced to 34px
   ctx.font = "900 34px system-ui, -apple-system, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Draw background plate to separate from background/tuning pegs
   const tw = ctx.measureText(nm).width;
-  const bw = tw + 20; // less padding
-  const bh = 54;      // smaller box
+  const bw = tw + 20; 
+  const bh = 54;      
   
   ctx.save();
   ctx.globalAlpha = alpha * 0.6;
-  ctx.fillStyle = "#4a3728"; // Dark brown background
+  ctx.fillStyle = "#4a3728"; 
   ctx.beginPath();
   const r = 10;
   const bx = cx - bw/2, by = cy - bh/2;
@@ -2533,18 +2847,15 @@ class ChordGroup {
   constructor(chord, lyrics){
     this.chord=chord; this.lyrics=lyrics;
     this.x = canvas.width+120; this.active=true; this.ticked=false; this.isTarget=false;
-    // spawn-guard: prevent immediate auto-miss right after spawn
     this.born = performance.now();
     this.entered = false;
   }
   update(){
     this.x -= scrollSpeed;
-    // mark as 'entered' after it actually started moving on screen
-    if(!this.entered && this.x < (canvas.width + 60)) this.entered = true; // enter sooner to ensure auto-miss works from first chord
+    if(!this.entered && this.x < (canvas.width + 60)) this.entered = true; 
     if(!this.ticked && this.x<=NUT_X){ this.ticked=true; }
   }
   getAnchorX(){
-    // Visual anchor for timing: leftmost displayed circle X (accounts for open-string shifting rule)
     const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
     const fretsAll = this.chord.fingers.map(f=>f.f);
     const maxF = Math.max(...fretsAll);
@@ -2571,8 +2882,6 @@ class ChordGroup {
   }
 
   getAutoMissX(){
-    // Auto-MISS threshold: when the leftmost displayed circle passes "1 fret left of the pressed position"
-    // User request: 押弦から1F左に過ぎたらエラー
     const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
 
     const fretsAll = this.chord.fingers.map(f=>f.f);
@@ -2583,7 +2892,6 @@ class ChordGroup {
     const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
     const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
 
-    // Determine the leftmost displayed fret number (0 may be shifted to minPressed)
     let dispMinF = Infinity;
     for(const f of fretsAll){
       const df = (shiftOpenToLeftMostPressed && f===0) ? minPressed : f;
@@ -2591,10 +2899,8 @@ class ChordGroup {
     }
     if(!isFinite(dispMinF)) dispMinF = 0;
 
-    // Intended X when the group is at the hit position (baseX == NUT_X)
     const intendedLeftmostX = (dispMinF > 0) ? (NUT_X + (dispMinF*fw) - (fw/2)) : NUT_X;
 
-    // 1 fret to the left
     return intendedLeftmostX - fw;
   }
 
@@ -2603,52 +2909,37 @@ class ChordGroup {
     const cy = canvas.height/2;
     const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
 
-    // --- ルール：開放弦(0)の表示位置 ---
-    // ユーザー要望：
-    // - メインの押弦（人/中/薬）と同時に鳴る開放弦(0)は、ナット(フック)ではなく
-    //   「1フレット分フック寄り（＝1Fの位置）」に寄せて流す。
-    // - 判定/ガイドも同じ位置に合わせる（補助の薄い判定がバラバラにならないように）。
-    // ここでは「0だけ」位置をズラし、押弦(>=1)は正しいフレット位置のまま。
     const fretsAll = this.chord.fingers.map(f=>f.f);
     const maxF = Math.max(...fretsAll);
     const minF = Math.min(...fretsAll);
     const hasOpen = (minF === 0);
     const hasPressed = (maxF > 0);
-    // 0(開放)の表示位置ルール：
-    // 押弦が同時にある場合は「一番左(最小)の押弦フレット位置」に0を合わせる（表示は0のまま）
     const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
     const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
 
     const fretCenterX = (baseX, fret)=>{
       if(fret > 0) return baseX + (fret*fw) - (fw/2);
       if(shiftOpenToLeftMostPressed && fret === 0){
-        // 0を「最小押弦フレット中心」へ寄せる（判定/ガイドも同じルール）
         return baseX + (minPressed*fw) - (fw/2);
       }
       return baseX; // 開放のみの場合はナット
     };
 const fretToX = (fret)=> fretCenterX(this.x, fret);
-// ガイド（ターゲット時）
     if(this.isTarget && Math.abs(this.x-NUT_X)<620){
       const t = Math.max(0, 1 - Math.abs(this.x-NUT_X)/620);
       this.chord.fingers.forEach(f=>{
-        // ガイドは「判定ライン(NUT_X)上」で表示する
         const fx = fretCenterX(NUT_X, f.f);
         const fy = cy + (f.s-2.5)*75;
         drawCircle(fx, fy, f.txt, 32+t*10, 0.2+t*0.6, true);
       });
       this.isTarget=false;
     }
-    // 本体
     const blink = (waitHold && waitTargetGroup===this) ? (0.5+0.5*Math.sin(performance.now()/100)) : 1.0;
     this.chord.fingers.forEach(f=>{
       const fx = fretToX(f.f);
       const fy = cy + (f.s-2.5)*75;
       drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
     });
-    
-    // 表示：コード名・単音名のテキスト描画はここでは行わない（drawCurrentChordLabelで固定表示）
-    // （元のコード描画ロジックは削除・無効化）
   }
 }
 function drawCircle(x,y,txt,size,alpha,blur,scale=1){
@@ -2677,7 +2968,6 @@ function applyViewportSize(){
   const vv = window.visualViewport;
   const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
   const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  // expose CSS vh unit (iPhone Safari 100vh issue)
   document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
   canvas.width  = Math.floor(w);
   canvas.height = Math.floor(h);
@@ -2689,8 +2979,8 @@ if (window.visualViewport){
 window.addEventListener('resize', applyViewportSize);
 window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
 // タップ操作
-canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(isTapMode()) handleAction(); }, {passive:false});
-canvas.addEventListener('mousedown', ()=>{ if(isTapMode()) handleAction(); });
+canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(entryKind==='tap') handleAction(); }, {passive:false});
+canvas.addEventListener('mousedown', ()=>{ if(entryKind==='tap') handleAction(); });
 
 // UIBAR FIX PATCH (disabled on iOS)
 (function(){
@@ -2795,37 +3085,6 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){}
   };
 
-  // --- UI Sound Feedback (Fun Pop Sound) ---
-  let lastFeedbackTime = 0;
-  function playSliderFeedback(){
-    try{
-        if(!tapAudioCtx) return;
-        const now = tapAudioCtx.currentTime;
-        if(now - lastFeedbackTime < 0.06) return; // 間引き
-        lastFeedbackTime = now;
-
-        const vol = getTapVolume01();
-        if(vol < 0.01) return;
-
-        const o = tapAudioCtx.createOscillator();
-        const g = tapAudioCtx.createGain();
-        
-        o.type = 'sine';
-        const freq = 800 + (vol * 200); 
-        o.frequency.setValueAtTime(freq, now);
-        o.frequency.exponentialRampToValueAtTime(freq * 0.5, now + 0.08);
-
-        g.gain.setValueAtTime(0.0, now);
-        g.gain.linearRampToValueAtTime(0.3 * vol, now + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-        o.connect(g);
-        g.connect(tapMaster); // Use tapMaster which is connected to compressor
-        o.start(now);
-        o.stop(now + 0.1);
-    }catch(e){}
-  }
-
   // --- Legacy Preview Cleaner ---
   window.stopTapPreview = function(){ 
     // No-op
@@ -2856,16 +3115,14 @@ window.addEventListener('pageshow', ()=>{
   function stopAllVoices(){
     if(!tapAudioCtx) return;
     const now = tapAudioCtx.currentTime;
-    // release nicely to avoid destruction sound
     activeVoices.forEach(v => {
       try {
-        v.gain.gain.cancelScheduledValues(now);
-        v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        // ★修正: リリース時間を少し残しつつ、確実に無音まで下げる
-        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4); 
-        v.gain.gain.linearRampToValueAtTime(0, now + 0.5);
-        
-        // オシレーターもすぐ止めずに、リリース後に止める
+        if(v.gain.gain){
+          v.gain.gain.cancelScheduledValues(now);
+          v.gain.gain.setValueAtTime(v.gain.gain.value, now); 
+          v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4); 
+          v.gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        }
         if(Array.isArray(v.osc)) v.osc.forEach(o => o.stop(now + 0.6));
         else v.osc.stop(now + 0.6);
       } catch(e){}
@@ -2873,16 +3130,12 @@ window.addEventListener('pageshow', ()=>{
     activeVoices.length = 0;
   }
 
-  // Tap Release Handler
-  window.addEventListener('touchend', stopAllVoices, {passive:true});
-  window.addEventListener('mouseup', stopAllVoices, {passive:true});
-  window.addEventListener('pointerup', stopAllVoices, {passive:true});
+  // NOTE: 余韻を残すため、pointerup で強制停止しない（次の発音時に自然にフェードします）
 
-  // ノイズバッファの生成（キャッシュ）
   function getUkeNoiseBuffer() {
       if (window.__ukeNoiseBuf) return window.__ukeNoiseBuf;
       if (!tapAudioCtx) return null;
-      const bufSize = tapAudioCtx.sampleRate * 0.05; // 50ms
+      const bufSize = tapAudioCtx.sampleRate * 0.05; 
       const buf = tapAudioCtx.createBuffer(1, bufSize, tapAudioCtx.sampleRate);
       const data = buf.getChannelData(0);
       for(let j=0; j<bufSize; j++) {
@@ -2892,97 +3145,175 @@ window.addEventListener('pageshow', ()=>{
       return buf;
   }
 
-  // ★音質改善：電子音を消して丸い音へ + アタック強化 + Sustain Support
-  // Based on "Love Me Tender" audio analysis: Warm, plucky, short decay.
+  // --- 発音バス（余韻/箱鳴りを少し足す：ポップ音は通さない） ---
+  let hitIn = null, hitOut = null, hitDry = null, hitWet = null, hitConv = null, hitDelay = null, hitFb = null;
+
+  function buildSmallRoomIR(ctx, seconds=0.9){
+    const rate = ctx.sampleRate;
+    const len = Math.max(1, Math.floor(rate * seconds));
+    const ir = ctx.createBuffer(2, len, rate);
+    for(let ch=0; ch<2; ch++){
+      const data = ir.getChannelData(ch);
+      for(let i=0; i<len; i++){
+        const t = i / len;
+        const env = Math.pow(1 - t, 2.2) * Math.exp(-t * 4.0);
+        data[i] = (Math.random() * 2 - 1) * env * 0.32;
+      }
+    }
+    return ir;
+  }
+
+  function ensureHitBus(){
+    ensureTapAudio();
+    if(hitIn) return;
+    hitIn  = tapAudioCtx.createGain();
+    hitOut = tapAudioCtx.createGain();
+    hitDry = tapAudioCtx.createGain();
+    hitWet = tapAudioCtx.createGain();
+
+    hitDry.gain.value = 1.0;
+    hitWet.gain.value = 0.14;   // ほんのり
+    hitOut.gain.value = 1.0;
+
+    hitConv = tapAudioCtx.createConvolver();
+    hitConv.buffer = buildSmallRoomIR(tapAudioCtx, 0.9);
+
+    hitDelay = tapAudioCtx.createDelay(0.08);
+    hitDelay.delayTime.value = 0.024; // 24ms
+    hitFb = tapAudioCtx.createGain();
+    hitFb.gain.value = 0.22;
+
+    // wiring
+    hitIn.connect(hitDry).connect(hitOut);
+    hitIn.connect(hitDelay);
+    hitDelay.connect(hitFb); hitFb.connect(hitDelay); // feedback
+    hitDelay.connect(hitConv);
+    hitConv.connect(hitWet).connect(hitOut);
+
+    // masterへ（音量スライダーとコンプレッサは tapMaster 側にある）
+    hitOut.connect(tapMaster);
+  }
+
+  // ★音再生エンジン: サンプリング対応版
   window.playFreqs = function(freqs, dur){
     try{
       ensureTapAudio();
+      ensureHitBus();
       stopAllVoices(); 
       
       const now = tapAudioCtx.currentTime;
-      const N = Math.max(1, freqs.length);
+      
+      // サンプリングモードなら録音バッファを使う
+      if(useSampledSound && window.hasRecordedSamples){
+        freqs.forEach((item, i) => {
+          let f = 440, sIdx = 0;
+          if(typeof item === 'number') { f = item; sIdx = 0; }
+          else { f = item.freq; sIdx = item.stringIdx; }
 
-      // Volume Scaling to prevent clipping before compressor
-      // 弦の数が多いほどゲインを下げる
+          if(!window.customSamples[sIdx]) return; // データなければスキップ
+
+          const strumDelay = i * 0.03; 
+          const startTime = now + strumDelay;
+          
+          const src = tapAudioCtx.createBufferSource();
+          src.buffer = window.customSamples[sIdx];
+          
+          // ピッチシフト計算: playbackRate = target / base
+          const bases = [440.00, 329.63, 261.63, 392.00];
+          src.playbackRate.value = f / bases[sIdx];
+
+          const gain = tapAudioCtx.createGain();
+          // クリップ回避：弦数に応じて自動で下げる（録音素材はピークが高くなりがち）
+          const __N = Math.max(1, freqs.length);
+          const __per = 0.34 / Math.sqrt(__N);
+
+          // リリース制御: フェードアウト（余韻を残す）
+          const bufferDur = src.buffer.duration / src.playbackRate.value;
+          const playDur = Math.min(2.9, bufferDur);
+          const rel = Math.min(0.75, Math.max(0.35, playDur * 0.28));
+
+          gain.gain.setValueAtTime(__per, startTime);
+          gain.gain.setValueAtTime(__per, Math.max(startTime, startTime + playDur - rel));
+          gain.gain.linearRampToValueAtTime(0, startTime + playDur);
+
+          src.connect(gain);
+          gain.connect(hitIn);
+src.start(startTime);
+          activeVoices.push({ osc: [src], gain: gain, startTime: startTime });
+        });
+        return;
+      }
+
+      // --- 以下、既存のシンセサイザーロジック ---
+      const N = Math.max(1, freqs.length);
       const baseGain = 0.4 / Math.sqrt(N); 
       
-      // Warm Tone Filter (Simulate wood body resonance around 400Hz)
       const bodyFilter = tapAudioCtx.createBiquadFilter();
       bodyFilter.type = 'peaking';
-      bodyFilter.frequency.value = 400; // Ukulele body resonance
+      bodyFilter.frequency.value = 400; 
       bodyFilter.Q.value = 1.0;
-      bodyFilter.gain.value = 3.0; // Boost warmth (slightly reduced to prevent distortion)
+      bodyFilter.gain.value = 3.0; 
 
-      freqs.forEach((f0, i) => {
+      freqs.forEach((item, i) => {
+        let f0 = (typeof item === 'number') ? item : item.freq;
         const f = Math.max(80, Math.min(2000, Number(f0) || 440));
         
-        // Strumming effect: slightly looser time feel for ballad style
         const strumDelay = i * 0.025 + (Math.random() * 0.005); 
         const startTime = now + strumDelay;
 
-        // --- 1. Pluck Noise (Nail click) ---
         const noiseBuf = getUkeNoiseBuffer();
         if(noiseBuf){
             const noiseSrc = tapAudioCtx.createBufferSource();
             noiseSrc.buffer = noiseBuf;
             const noiseFilter = tapAudioCtx.createBiquadFilter();
             noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 3000; // Crisp high click
+            noiseFilter.frequency.value = 3000; 
             const noiseGain = tapAudioCtx.createGain();
             noiseGain.gain.setValueAtTime(0.1 * baseGain, startTime);
             noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
-            noiseGain.gain.linearRampToValueAtTime(0, startTime + 0.03); // ★確実な無音化
+            noiseGain.gain.linearRampToValueAtTime(0, startTime + 0.03); 
             noiseSrc.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
-            // Connect to Master (Compressor)
-            noiseGain.connect(tapMaster);
+            noiseGain.connect(hitIn);
             noiseSrc.start(startTime);
-            noiseSrc.stop(startTime + 0.1); // ★ソースも止める
+            noiseSrc.stop(startTime + 0.1); 
         }
 
-        // --- 2. String Tone (Warm Nylon) ---
-        // Use Sine waves for fundamental to be "mellow" + Lowpassed Saw for "buzz"
-        const osc1 = tapAudioCtx.createOscillator(); // Fundamental
-        const osc2 = tapAudioCtx.createOscillator(); // Overtone (Octave)
-        const osc3 = tapAudioCtx.createOscillator(); // Texture (Sawtooth)
+        const osc1 = tapAudioCtx.createOscillator(); 
+        const osc2 = tapAudioCtx.createOscillator(); 
+        const osc3 = tapAudioCtx.createOscillator(); 
 
         osc1.type = 'sine';
         osc2.type = 'sine'; 
         osc3.type = 'sawtooth';
 
-        // Pitch envelope (strings go slightly sharp on attack)
         const bend = f * 0.005;
         osc1.frequency.setValueAtTime(f + bend, startTime);
         osc1.frequency.exponentialRampToValueAtTime(f, startTime + 0.1);
-        
         osc2.frequency.setValueAtTime((f * 2) + bend, startTime);
         osc2.frequency.exponentialRampToValueAtTime(f * 2, startTime + 0.1);
-
-        osc3.frequency.setValueAtTime(f, startTime); // Texture follows fundamental
+        osc3.frequency.setValueAtTime(f, startTime); 
 
         const mix1 = tapAudioCtx.createGain();
         const mix2 = tapAudioCtx.createGain();
         const mix3 = tapAudioCtx.createGain();
 
-        // Envelope: Nylon strings have fast decay but soft attack
-        // ★修正: exponentialRampの前に0.001を入れて確実にエラーを防ぎ、最後まで減衰させる
         mix1.gain.setValueAtTime(0.001, startTime);
         mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
-        mix1.gain.exponentialRampToValueAtTime(0.15, startTime + 0.8); // Main sustain
-        mix1.gain.exponentialRampToValueAtTime(0.001, startTime + 2.0); // ★自然減衰して消える
-        mix1.gain.linearRampToValueAtTime(0, startTime + 2.1); // ★完全に無音へ
+        mix1.gain.exponentialRampToValueAtTime(0.15, startTime + 0.8); 
+        mix1.gain.exponentialRampToValueAtTime(0.001, startTime + 2.0); 
+        mix1.gain.linearRampToValueAtTime(0, startTime + 2.1); 
 
         mix2.gain.setValueAtTime(0.001, startTime);
         mix2.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
-        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4); // Harmonics die faster
-        mix2.gain.linearRampToValueAtTime(0, startTime + 0.5); // ★完全に無音へ
+        mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4); 
+        mix2.gain.linearRampToValueAtTime(0, startTime + 0.5); 
 
         mix3.gain.setValueAtTime(0.001, startTime);
         mix3.gain.linearRampToValueAtTime(0.08, startTime + 0.005);
-        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2); // Buzz is short
-        mix3.gain.linearRampToValueAtTime(0, startTime + 0.25); // ★完全に無音へ
+        mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2); 
+        mix3.gain.linearRampToValueAtTime(0, startTime + 0.25); 
 
-        // Connect graph
         osc1.connect(mix1);
         osc2.connect(mix2);
         osc3.connect(mix3);
@@ -2992,7 +3323,6 @@ window.addEventListener('pageshow', ()=>{
         mix2.connect(stringMix);
         mix3.connect(stringMix);
 
-        // Lowpass Filter for Texture (Remove harsh saw buzz)
         const lpFilter = tapAudioCtx.createBiquadFilter();
         lpFilter.type = 'lowpass';
         lpFilter.frequency.setValueAtTime(2200, startTime); 
@@ -3001,21 +3331,19 @@ window.addEventListener('pageshow', ()=>{
         bodyFilter.connect(lpFilter);
         
         const voiceGain = tapAudioCtx.createGain();
-        // ★修正: マスターフェードアウトでプツッと切れるクリップノイズを防止
         voiceGain.gain.setValueAtTime(baseGain, startTime);
         voiceGain.gain.setValueAtTime(baseGain, startTime + 1.8);
         voiceGain.gain.exponentialRampToValueAtTime(0.001, startTime + 2.2);
         voiceGain.gain.linearRampToValueAtTime(0, startTime + 2.3);
         
         lpFilter.connect(voiceGain);
-        // Connect to Master (Compressor)
-        voiceGain.connect(tapMaster);
+        voiceGain.connect(hitIn);
 
         osc1.start(startTime);
         osc2.start(startTime);
         osc3.start(startTime);
         
-        const stopTime = startTime + 2.4; // ★ゲインが完全に落ち切ってからオシレーターを停止
+        const stopTime = startTime + 2.4; 
         osc1.stop(stopTime);
         osc2.stop(stopTime);
         osc3.stop(stopTime);
@@ -3029,8 +3357,6 @@ window.addEventListener('pageshow', ()=>{
     }catch(e){ console.error(e); }
   };
 
-  // コード定義 (High-G Tuning: G=392, C=261, E=329, A=440)
-  // [A弦フレット, E弦フレット, C弦フレット, G弦フレット]
   const UKE_FULL_CHORDS = {
     'C':  [3,0,0,0], 
     'F':  [0,1,0,2], 
@@ -3044,39 +3370,37 @@ window.addEventListener('pageshow', ()=>{
   };
 
   function getFreqsFromTarget(target){
-    // 1. コード名から周波数（和音）
     try{
       const name = target && target.chord && target.chord.name != null ? String(target.chord.name).trim() : '';
       if(name && UKE_FULL_CHORDS[name]){
         const shapes = UKE_FULL_CHORDS[name];
-        // 実際のウクレレの開放弦ピッチ (A4, E4, C4, G4)
-        const bases = [440.00, 329.63, 261.63, 392.00]; // index: 0=A, 1=E, 2=C, 3=G
+        const bases = [440.00, 329.63, 261.63, 392.00]; 
         
-        // ストローク順（上から G->C->E->A の順に鳴らすとポロン感が出る）
         const strOrder = [
-           {base: bases[3], fret: shapes[3]}, // G string
-           {base: bases[2], fret: shapes[2]}, // C string
-           {base: bases[1], fret: shapes[1]}, // E string
-           {base: bases[0], fret: shapes[0]}  // A string
+           {base: bases[3], fret: shapes[3], sIdx: 3}, // G
+           {base: bases[2], fret: shapes[2], sIdx: 2}, // C
+           {base: bases[1], fret: shapes[1], sIdx: 1}, // E
+           {base: bases[0], fret: shapes[0], sIdx: 0}  // A
         ];
         
         const freqs = [];
         strOrder.forEach(p => {
-           freqs.push(p.base * Math.pow(2, p.fret/12));
+           freqs.push({
+             freq: p.base * Math.pow(2, p.fret/12),
+             stringIdx: p.sIdx
+           });
         });
         return freqs;
       }
     }catch(e){}
 
-    // 2. 特殊音名指定
     try{
       const nk = target && target.noteKey ? String(target.noteKey).toLowerCase().trim() : '';
       if(nk){
-        if(NOTE[nk]) return [NOTE[nk]];
+        if(NOTE[nk]) return [NOTE[nk]]; // Fallback for scale (no string info usually)
       }
     }catch(e){}
 
-    // 3. 指データから生成 (スケールモードなど)
     try{
       const fingers = target && target.chord && Array.isArray(target.chord.fingers) ? target.chord.fingers : null;
       if(fingers && fingers.length){
@@ -3085,20 +3409,23 @@ window.addEventListener('pageshow', ()=>{
           const sRaw = (f && (f.string ?? f.str ?? f.s)) != null ? String(f.string ?? f.str ?? f.s) : '';
           const fretRaw = (f && (f.fret ?? f.f)) != null ? f.fret ?? f.f : 0;
           const fret = Number(fretRaw);
-          const key = sRaw.trim().toUpperCase();
-          const base = STR_BASE[key] ?? STR_BASE[sRaw.trim()] ?? null;
-          // s=1(A), 2(E), 3(C), 4(G) マッピング
-          const numBase = {1:440.00, 2:329.63, 3:261.63, 4:392.00}[sRaw] || base;
+          // Map s=1(A)..4(G) to internal 0..3
+          const sIdxMap = {1:0, 2:1, 3:2, 4:3}; 
+          const sIdx = sIdxMap[sRaw];
+          const bases = {1:440.00, 2:329.63, 3:261.63, 4:392.00};
+          const numBase = bases[sRaw];
 
           if(numBase != null && Number.isFinite(fret)){
-            freqs.push(numBase * Math.pow(2, fret/12));
+            freqs.push({
+              freq: numBase * Math.pow(2, fret/12),
+              stringIdx: sIdx
+            });
           }
         }
         if(freqs.length) return freqs;
       }
     }catch(e){}
 
-    // 4. フォールバック
     try{
       const nn = target && (target.note || target.noteName || target.pitchName) ? (target.note || target.noteName || target.pitchName) : '';
       const f = noteNameToFreq(nn);
@@ -3109,12 +3436,9 @@ window.addEventListener('pageshow', ()=>{
   }
 
   window.playTapHitSound = function(target){
-    // ★修正: タップモード または (ウクレレモード かつ サポート付き(WAIT)) なら鳴らす
     try{ 
         if(typeof isTapMode === 'function' && !isTapMode()) {
-            // ウクレレモードの場合、WAITモード(サポート付き)なら許可する
             if(typeof isWaitMode === 'function' && isWaitMode()){
-                // OK, play sound
             } else {
                 return; 
             }
@@ -3130,7 +3454,6 @@ window.addEventListener('pageshow', ()=>{
       playFreqs(freqs, freqs.length >= 3 ? 0.22 : 0.18);
       return;
     }
-    // fallback default C chord
     playFreqs([392.00, 261.63, 329.63, 523.25], 0.2);
   };
 
@@ -3143,9 +3466,19 @@ window.addEventListener('pageshow', ()=>{
     setTapVolume01(v01);
     try{ window.applyTapVolumeToGain(); }catch(e){}
 
-    try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s); }catch(e){}
+    // スライダー操作の「ポップ音」は、iPhone Safari の制限で
+    // 擬似的に dispatch された input だと鳴らないことがあるため、
+    // 実際のドラッグ操作（pointer/touch）側で鳴らします。
+    let __lastPop = 0;
+    const __pop = ()=>{
+      const t = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      if(t - __lastPop < 55) return;
+      __lastPop = t;
+      try{ playSliderFeedback(); }catch(_e){}
+    };
 
-    // iOS: first interaction must "wake" WebAudio inside a real gesture
+    try{ if(typeof enhanceRangeSlider === 'function') enhanceRangeSlider(s, __pop); }catch(e){}
+
     const wake = ()=>{
       try{ ensureTapAudio(); }catch(e){}
       try{
@@ -3162,12 +3495,7 @@ window.addEventListener('pageshow', ()=>{
       try{ setTapVolume01(getTapVolume01()); }catch(e){}
       try{ window.applyTapVolumeToGain(); }catch(e){}
       wake();
-
-      // Feedback sound on input (wait for resume if needed)
-      if(e && e.type === 'input'){
-        try{
-          if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx && tapAudioCtx.state === 'suspended'){
-            tapAudioCtx.resume().then(()=>{ try{ playSliderFeedback(); }catch(_){ } }).catch(()=>{});
+).catch(()=>{});
           }else{
             playSliderFeedback();
           }
@@ -3179,8 +3507,6 @@ window.addEventListener('pageshow', ()=>{
     s.addEventListener('change', apply, {passive:true});
   }
 
-  // ★NEW: Unlock Audio on First Touch (Global)
-  // This solves the "initial silence" issue by forcing a resume on the very first touch anywhere.
   function unlockAudioGlobal(){
     try{
       if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();

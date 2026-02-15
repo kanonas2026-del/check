@@ -2861,9 +2861,12 @@ window.addEventListener('pageshow', ()=>{
       try {
         v.gain.gain.cancelScheduledValues(now);
         v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // fade out
-        if(Array.isArray(v.osc)) v.osc.forEach(o => o.stop(now + 0.15));
-        else v.osc.stop(now + 0.15);
+        // ★修正: リリース時間を 0.12 -> 0.4 に延ばし、余韻を少し残す
+        v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4); 
+        
+        // オシレーターもすぐ止めずに、リリース後に止める
+        if(Array.isArray(v.osc)) v.osc.forEach(o => o.stop(now + 0.6));
+        else v.osc.stop(now + 0.6);
       } catch(e){}
     });
     activeVoices.length = 0;
@@ -3094,7 +3097,18 @@ window.addEventListener('pageshow', ()=>{
   }
 
   window.playTapHitSound = function(target){
-    try{ if(typeof isTapMode === 'function' && !isTapMode()) return; }catch(e){}
+    // ★修正: タップモード または (ウクレレモード かつ サポート付き(WAIT)) なら鳴らす
+    try{ 
+        if(typeof isTapMode === 'function' && !isTapMode()) {
+            // ウクレレモードの場合、WAITモード(サポート付き)なら許可する
+            if(typeof isWaitMode === 'function' && isWaitMode()){
+                // OK, play sound
+            } else {
+                return; 
+            }
+        }
+    }catch(e){}
+    
     try{ setTapVolume01(getTapVolume01()); }catch(e){}
     try{ window.applyTapVolumeToGain(); }catch(e){}
     try{ ensureTapAudio(); }catch(e){}
@@ -3159,16 +3173,6 @@ window.addEventListener('pageshow', ()=>{
     try{
       if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
       if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-      
-      // 無音再生で確実にアンロック
-      if(tapAudioCtx) {
-          const osc = tapAudioCtx.createOscillator();
-          const gain = tapAudioCtx.createGain();
-          gain.gain.value = 0;
-          osc.connect(gain).connect(tapAudioCtx.destination);
-          osc.start();
-          osc.stop(tapAudioCtx.currentTime + 0.001);
-      }
     }catch(e){}
     document.removeEventListener('touchstart', unlockAudioGlobal);
     document.removeEventListener('click', unlockAudioGlobal);

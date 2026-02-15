@@ -2861,8 +2861,9 @@ window.addEventListener('pageshow', ()=>{
       try {
         v.gain.gain.cancelScheduledValues(now);
         v.gain.gain.setValueAtTime(v.gain.gain.value, now); // freeze value
-        // ★修正: リリース時間を 0.12 -> 0.4 に延ばし、余韻を少し残す
+        // ★修正: リリース時間を少し残しつつ、確実に無音まで下げる
         v.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4); 
+        v.gain.gain.linearRampToValueAtTime(0, now + 0.5);
         
         // オシレーターもすぐ止めずに、リリース後に止める
         if(Array.isArray(v.osc)) v.osc.forEach(o => o.stop(now + 0.6));
@@ -2930,11 +2931,13 @@ window.addEventListener('pageshow', ()=>{
             const noiseGain = tapAudioCtx.createGain();
             noiseGain.gain.setValueAtTime(0.1 * baseGain, startTime);
             noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
+            noiseGain.gain.linearRampToValueAtTime(0, startTime + 0.03); // ★確実な無音化
             noiseSrc.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
             // Connect to Master (Compressor)
             noiseGain.connect(tapMaster);
             noiseSrc.start(startTime);
+            noiseSrc.stop(startTime + 0.1); // ★ソースも止める
         }
 
         // --- 2. String Tone (Warm Nylon) ---
@@ -2962,17 +2965,22 @@ window.addEventListener('pageshow', ()=>{
         const mix3 = tapAudioCtx.createGain();
 
         // Envelope: Nylon strings have fast decay but soft attack
-        mix1.gain.setValueAtTime(0, startTime);
+        // ★修正: exponentialRampの前に0.001を入れて確実にエラーを防ぎ、最後まで減衰させる
+        mix1.gain.setValueAtTime(0.001, startTime);
         mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
         mix1.gain.exponentialRampToValueAtTime(0.15, startTime + 0.8); // Main sustain
+        mix1.gain.exponentialRampToValueAtTime(0.001, startTime + 2.0); // ★自然減衰して消える
+        mix1.gain.linearRampToValueAtTime(0, startTime + 2.1); // ★完全に無音へ
 
-        mix2.gain.setValueAtTime(0, startTime);
+        mix2.gain.setValueAtTime(0.001, startTime);
         mix2.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
         mix2.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4); // Harmonics die faster
+        mix2.gain.linearRampToValueAtTime(0, startTime + 0.5); // ★完全に無音へ
 
-        mix3.gain.setValueAtTime(0, startTime);
+        mix3.gain.setValueAtTime(0.001, startTime);
         mix3.gain.linearRampToValueAtTime(0.08, startTime + 0.005);
         mix3.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2); // Buzz is short
+        mix3.gain.linearRampToValueAtTime(0, startTime + 0.25); // ★完全に無音へ
 
         // Connect graph
         osc1.connect(mix1);
@@ -2993,7 +3001,11 @@ window.addEventListener('pageshow', ()=>{
         bodyFilter.connect(lpFilter);
         
         const voiceGain = tapAudioCtx.createGain();
-        voiceGain.gain.value = baseGain;
+        // ★修正: マスターフェードアウトでプツッと切れるクリップノイズを防止
+        voiceGain.gain.setValueAtTime(baseGain, startTime);
+        voiceGain.gain.setValueAtTime(baseGain, startTime + 1.8);
+        voiceGain.gain.exponentialRampToValueAtTime(0.001, startTime + 2.2);
+        voiceGain.gain.linearRampToValueAtTime(0, startTime + 2.3);
         
         lpFilter.connect(voiceGain);
         // Connect to Master (Compressor)
@@ -3003,7 +3015,7 @@ window.addEventListener('pageshow', ()=>{
         osc2.start(startTime);
         osc3.start(startTime);
         
-        const stopTime = startTime + 2.5;
+        const stopTime = startTime + 2.4; // ★ゲインが完全に落ち切ってからオシレーターを停止
         osc1.stop(stopTime);
         osc2.stop(stopTime);
         osc3.stop(stopTime);

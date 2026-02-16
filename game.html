@@ -1062,7 +1062,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.10</div>
+<div id="verTag">v0.11</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -3855,7 +3855,8 @@ window.addEventListener('pageshow', ()=>{
         g.gain.setValueAtTime(0.0001, now);
         g.gain.exponentialRampToValueAtTime(0.55, now + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
-        src.connect(g).connect(tapMasterGain);
+        src.connect(g);
+        g.connect(tapMaster);
         src.start(now);
         try{ src.stop(now + 1.2); }catch(e){}
         activeVoices.push({ osc: src, gain: g, startTime: now });

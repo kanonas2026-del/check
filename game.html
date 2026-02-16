@@ -52,6 +52,7 @@
       position: relative;
       background: var(--card); width: min(560px, 96vw);
       max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
+      max-height: calc(var(--vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px);
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
@@ -652,6 +653,7 @@ body.playing #menu-overlay{ display:none; }
     padding: 10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
     gap: 6px !important;
     max-height: calc(100dvh - 10px) !important;
+    max-height: calc(var(--vh) * 100 - 10px) !important;
   }
   #tap-vol-wrap{
     margin-top: 6px;
@@ -788,6 +790,7 @@ body.is-uke .vol-inline{ display:none !important; }
 /* Sampling overlay (no debug text) */
 .card-content.sample-card{
   max-height: calc(100dvh - 46px);
+  max-height: calc(var(--vh) * 100 - 46px);
   overflow: hidden;
   padding: 18px;
 }
@@ -804,7 +807,14 @@ body.is-uke .vol-inline{ display:none !important; }
   background: #f2f2f2;
   font-weight: 900;
   font-size: 13px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  cursor: pointer;
 }
+.sample-progress .sp-item.done::after{ content:" ✓"; }
+.sample-progress .sp-item.justdone{ animation: spPop 0.35s ease; }
+@keyframes spPop{ 0%{transform:scale(1);} 45%{transform:scale(1.08);} 100%{transform:scale(1);} }
 .sample-progress .sp-item.done{ background: #dff6e6; }
 .sample-progress .sp-item.active{ background: #ffe9c7; }
 .sample-hint{
@@ -824,6 +834,7 @@ body.is-uke .vol-inline{ display:none !important; }
     padding: 10px 10px calc(10px + env(safe-area-inset-bottom)) !important;
     gap: 6px !important;
     max-height: calc(100dvh - 12px) !important;
+    max-height: calc(var(--vh) * 100 - 12px) !important;
   }
   #menuTitle{ font-size: 18px; margin: 0 0 2px !important; }
   .menu-btn{ min-height: 74px; padding: 10px !important; }
@@ -904,6 +915,7 @@ body.is-uke .vol-inline{ display:none !important; }
   .menu-card{
     padding: 10px !important;
     max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 10px) !important;
+    max-height: calc(var(--vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 10px) !important;
   }
   .menu-list{ gap: 6px !important; }
   .menu-main{ gap: 6px !important; }
@@ -984,6 +996,64 @@ body.is-uke .vol-inline{ display:none !important; }
 #tapVol, input[type=range]{ touch-action: pan-x; }
 #menuBackBtn{ position: sticky; bottom: 0; }
 
+/* ===== v10: ultra-compact (very low landscape height) — keep 1 screen, no overlap ===== */
+@media (orientation: landscape) and (max-height: 360px){
+  #menu-overlay{
+    padding: calc(env(safe-area-inset-top) + 2px) 4px calc(env(safe-area-inset-bottom) + 2px) !important;
+  }
+  .menu-card{
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom)) !important;
+    gap: 4px !important;
+    border-radius: 22px !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 6px) !important;
+    max-height: calc(var(--vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 6px) !important;
+  }
+  #menuTitle{ font-size: 16px !important; margin-bottom: 2px !important; }
+  .menu-main{ gap: 6px !important; }
+  .menu-btn{
+    min-height: 60px !important;
+    padding: 7px 8px !important;
+    border-radius: 18px !important;
+  }
+  .menu-text .title{ font-size: 13px !important; }
+  .menu-text small{ font-size: 9px !important; }
+  .badge{
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+    font-size: 18px !important;
+  }
+  #song-speed-wrap{
+    padding: 4px 6px !important;
+    min-height: 0 !important;
+    border-radius: 18px !important;
+  }
+  #song-speed-wrap .song-speed-title{ font-size: 9px !important; margin-bottom: 2px !important; }
+  #song-speed-wrap .mode-pill{ padding: 5px 10px !important; font-size: 9px !important; }
+  .mode-select{
+    margin-top: 4px !important;
+    padding-top: 4px !important;
+  }
+  .mode-select .mode-pill{ padding: 5px 10px !important; font-size: 10px !important; }
+  .mode-desc{ margin-top: 3px !important; font-size: 10px !important; }
+  .bottom-inline{ margin-top: 4px !important; gap: 10px !important; }
+  .top-inline-btn{ padding: 6px 10px !important; font-size: 11px !important; border-radius: 14px !important; }
+  #tapVolume{ height: 18px !important; max-width: 170px !important; }
+  /* sampling overlay also must fit */
+  .card-content.sample-card{
+    padding: 10px !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
+    max-height: calc(var(--vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
+  }
+  .card-content.sample-card h2{ font-size: 16px !important; margin: 0 0 4px !important; }
+  .card-content.sample-card p{ font-size: 12px !important; margin: 4px 0 !important; }
+  .sample-hint{ font-size: 12px !important; margin-top: 2px !important; }
+  .sample-progress{ margin: 8px 0 4px !important; gap: 6px !important; }
+  .sample-progress .sp-item{ font-size: 11px !important; padding: 5px 8px !important; }
+  #sample-actions-record .action-btn,
+  #sample-actions-done .action-btn{ padding: 8px !important; font-size: 13px !important; margin-top: 6px !important; }
+}
+
 </style>
 
 </head>
@@ -992,7 +1062,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.9</div>
+<div id="verTag">v0.10</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1145,13 +1215,31 @@ body.is-uke .vol-inline{ display:none !important; }
     stop(e);
   }, opts);
 
-  document.addEventListener('gesturestart', stop, opts);
-  document.addEventListener('gesturechange', stop, opts);
-  document.addEventListener('gestureend', stop, opts);
+  // iOSのズーム暴発を防ぐ（メニュー/モーダルでも常に無効化）
+  const stopGesture = (e)=>{ try{ e.preventDefault(); }catch(_){ } };
+  document.addEventListener('gesturestart', stopGesture, opts);
+  document.addEventListener('gesturechange', stopGesture, opts);
+  document.addEventListener('gestureend', stopGesture, opts);
 
   document.addEventListener('wheel', (e)=>{
     if(gameState==='PLAY') stop(e);
   }, opts);
+})();
+
+
+// ===== iOS double-tap zoom guard (overlays only) =====
+(function(){
+  let last = 0;
+  document.addEventListener('touchend', (e)=>{
+    const t = e && e.target;
+    if(!t || !t.closest) return;
+    const inOverlay = t.closest('#menu-overlay') || t.closest('#sample-overlay');
+    if(!inOverlay) return;
+    if(t.matches && t.matches('input[type="range"]')) return;
+    const now = Date.now();
+    if(now - last < 300){ try{ e.preventDefault(); }catch(_){ } }
+    last = now;
+  }, {passive:false});
 })();
 
 
@@ -3349,6 +3437,8 @@ window.addEventListener('pageshow', ()=>{
 
     let running = false;
     let idx = 0;
+    let nextTimer = 0;
+    let reviewMode = false;
     let stream = null;
 
     // tapAudioCtx で録音→同じtapAudioCtxで再生できるようにする
@@ -3406,6 +3496,10 @@ window.addEventListener('pageshow', ()=>{
 
     const stopRAF = ()=>{
       if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
+    };
+
+    const clearNextTimer = ()=>{
+      if(nextTimer){ try{ clearTimeout(nextTimer); }catch(e){} nextTimer = 0; }
     };
 
     const stopStream = ()=>{
@@ -3551,6 +3645,8 @@ window.addEventListener('pageshow', ()=>{
     };
 
     const beginTake = async ()=>{
+      clearNextTimer();
+      reviewMode = false;
       const t = ORDER[idx];
       takeKey = t.key;
       stableCount = 0;
@@ -3639,6 +3735,8 @@ window.addEventListener('pageshow', ()=>{
 
     const finishTake = ()=>{
       try{
+        stopRAF();
+        clearNextTimer();
         const key = takeKey;
         if(!key || !recBuf) return;
 
@@ -3664,9 +3762,7 @@ window.addEventListener('pageshow', ()=>{
 
         // fade in/out to avoid clicks
         const fi = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.006));
-        for(let i=0;i<fi;i++){
-          ch[i] *= (i/fi);
-        }
+        for(let i=0;i<fi;i++){ ch[i] *= (i/fi); }
         const fo = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.045));
         for(let i=0;i<fo;i++){
           const p = (fo - i) / fo;
@@ -3674,14 +3770,35 @@ window.addEventListener('pageshow', ()=>{
         }
 
         candidates[key] = b;
-        setProgress(null);
 
-        // next
+        // visual feedback (avoid "すぐ次に行って分からない" 対策)
+        setProgress(key);
+        setMsg(`${ORDER[idx].label} OK！`);
         if(idx < ORDER.length - 1){
-          idx++;
-          beginTake();
+          setHint(`つぎは ${ORDER[idx+1].label} を弾いてね`);
         }else{
-          doneAll();
+          setHint('');
+        }
+        try{
+          const el = prog.querySelector(`.sp-item[data-s="${key}"]`);
+          if(el){
+            el.classList.add('justdone');
+            setTimeout(()=>{ try{ el.classList.remove('justdone'); }catch(_){ } }, 420);
+          }
+        }catch(_){}
+
+        // schedule next step (少しだけ見せてから移動)
+        if(idx < ORDER.length - 1){
+          nextTimer = setTimeout(()=>{
+            if(!running) return;
+            idx++;
+            beginTake();
+          }, 650);
+        }else{
+          nextTimer = setTimeout(()=>{
+            if(!running) return;
+            doneAll();
+          }, 450);
         }
       }catch(e){}
       finally{
@@ -3692,6 +3809,7 @@ window.addEventListener('pageshow', ()=>{
     };
 
     const playArpeggio = ()=>{
+
       try{
         ensureTapAudio();
         stopAllVoices();
@@ -3723,19 +3841,50 @@ window.addEventListener('pageshow', ()=>{
       }catch(e){}
     };
 
+    const playSingleString = (k)=>{
+      try{
+        ensureTapAudio();
+        stopAllVoices();
+        const b = candidates[k];
+        if(!b) return;
+        const now = tapAudioCtx.currentTime;
+        const src = tapAudioCtx.createBufferSource();
+        src.buffer = b;
+        src.playbackRate.value = 1;
+        const g = tapAudioCtx.createGain();
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.55, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+        src.connect(g).connect(tapMasterGain);
+        src.start(now);
+        try{ src.stop(now + 1.2); }catch(e){}
+        activeVoices.push({ osc: src, gain: g, startTime: now });
+      }catch(e){}
+    };
+
     const doneAll = ()=>{
       stopRAF();
+      clearNextTimer();
+      reviewMode = true;
       setProgress(null);
-      setMsg('ポロロン♪（録音した音で鳴らすよ）');
-      setHint('この音でよければ「この音でOK」');
-      playArpeggio();
+      setMsg('ポロロン♪（録音した音をきいてね）');
+      setHint('いま再生中…（終わったらボタンが出るよ）');
 
-      // buttons
+      // buttons: show after first playback so user can "hear then decide"
       actRec.style.display = 'none';
-      actDone.style.display = '';
+      actDone.style.display = 'none';
+
+      playArpeggio();
+      nextTimer = setTimeout(()=>{
+        if(!running) return;
+        actDone.style.display = '';
+        setHint('この音でよければ「この音でOK」 / 迷ったら「やり直す」');
+      }, 1200);
     };
 
     const resetFlow = ()=>{
+      clearNextTimer();
+      reviewMode = false;
       idx = 0;
       candidates = {A:null, E:null, C:null, G:null};
       setProgress(ORDER[0].key);
@@ -3768,6 +3917,8 @@ window.addEventListener('pageshow', ()=>{
 
     const endFlow = (stopMic=true)=>{
       running = false;
+      clearNextTimer();
+      reviewMode = false;
       cleanupNodes();
       if(stopMic) stopStream();
       closeOverlay();
@@ -3810,6 +3961,20 @@ window.addEventListener('pageshow', ()=>{
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
       endFlow(true);
     });
+
+    // review interactions: tap a string pill to hear that string; tap message to replay arpeggio
+    prog.addEventListener('click', (ev)=>{
+      const el = ev && ev.target && ev.target.closest ? ev.target.closest('.sp-item') : null;
+      if(!el) return;
+      if(!reviewMode) return;
+      const k = el.getAttribute('data-s');
+      if(!k) return;
+      if(!candidates[k]) return;
+      playSingleString(k);
+    });
+    msgEl.addEventListener('click', ()=>{ if(reviewMode) playArpeggio(); });
+    msgEl.addEventListener('touchend', ()=>{ if(reviewMode) playArpeggio(); }, {passive:true});
+
   };
 
   // コード定義 (High-G Tuning: G=392, C=261, E=329, A=440)

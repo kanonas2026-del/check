@@ -1080,7 +1080,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.20</div>
+<div id="verTag">v0.21</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1592,7 +1592,7 @@ let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
-let tapVol = 0.65;
+let tapVol = 0.85;
 let tapAudioCtx = null;
 let tapMaster = null;
 let tapCompressor = null; // コンプレッサー追加
@@ -1602,15 +1602,15 @@ function loadTapVol(){
     const raw = localStorage.getItem(TAP_VOL_KEY);
     // 初回（または旧既定値のまま）の場合は聞き取りやすい音量へ自動調整
     if(raw === null || raw === ''){
-      tapVol = 0.65;
+      tapVol = 0.85;
       try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       return;
     }
     const v = Number(raw);
     if(!Number.isNaN(v) && v>=0 && v<=1){
-      if(Math.abs(v - 0.35) < 1e-6){
-        // 旧バージョンの既定値(0.35)を自動で引き上げ
-        tapVol = 0.65;
+      if(Math.abs(v - 0.35) < 1e-6 || Math.abs(v - 0.65) < 1e-6){
+        // 旧バージョンの既定値(0.35/0.65)を自動で引き上げ
+        tapVol = 0.85;
         try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       }else{
         tapVol = v;
@@ -3409,7 +3409,7 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
-      const baseGain = 0.42 / Math.sqrt(N);
+      const baseGain = 0.78 / Math.sqrt(N);
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
 
@@ -3469,7 +3469,7 @@ window.addEventListener('pageshow', ()=>{
 
         const lp = tapAudioCtx.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(4200, startTime);
+        lp.frequency.setValueAtTime(6500, startTime);
 
         src.connect(hp);
         hp.connect(lp);
@@ -3560,7 +3560,7 @@ window.addEventListener('pageshow', ()=>{
           const r = (candMeta[k] && candMeta[k].rms) ? candMeta[k].rms : target;
           let mult = target / Math.max(1e-6, r);
           // clamp to avoid over-amplifying noise
-          mult = Math.max(0.60, Math.min(1.70, mult));
+          mult = Math.max(0.55, Math.min(2.40, mult));
           candGain[k] = mult;
         });
       }catch(e){}
@@ -3697,7 +3697,7 @@ window.addEventListener('pageshow', ()=>{
 
       bufTD = new Float32Array(analyser.fftSize);
 
-      preLen = Math.floor(tapAudioCtx.sampleRate * 0.25);
+      preLen = Math.floor(tapAudioCtx.sampleRate * 0.10);
       preRing = new Float32Array(preLen);
       preWrite = 0;
 
@@ -3748,7 +3748,7 @@ window.addEventListener('pageshow', ()=>{
       stableCount = 0;
       lastHz = 0;
       setProgress(takeKey);
-      setHint('できるだけ静かな場所で、少し強めに弾いてね');
+      setHint('できるだけ静かな場所で、ふつうの強さで弾いてね');
       setMsg(`${t.label} を弾いてね`);
 
       // 一応ノイズ床を反映（最初の1回だけ）
@@ -3756,7 +3756,7 @@ window.addEventListener('pageshow', ()=>{
         setMsg('静かにしてね（ノイズをはかるよ）');
         await sleep(250);
         noiseRms = await measureNoise();
-        minRms = Math.max(IS_IOS ? 0.0016 : 0.010, noiseRms * 2.2);
+        minRms = Math.max(IS_IOS ? 0.0012 : 0.0045, noiseRms * 1.7);
         setMsg(`${t.label} を弾いてね`);
       }
 
@@ -3766,15 +3766,27 @@ window.addEventListener('pageshow', ()=>{
         try{
           if(!running || !analyser) return;
           analyser.getFloatTimeDomainData(bufTD);
-          // rms
-          let s=0; for(let i=0;i<bufTD.length;i++){ const v=bufTD[i]; s += v*v; }
+          // rms + peak (too loud / clipping guard)
+          let s=0, peak=0;
+          for(let i=0;i<bufTD.length;i++){
+            const v=bufTD[i];
+            s += v*v;
+            const a=Math.abs(v);
+            if(a>peak) peak=a;
+          }
           const rms = Math.sqrt(s/bufTD.length);
 
-          if(rms < minRms){
+          // 強すぎ（クリップ/ペチン音）を避ける：大きすぎる場合はOKにしない
+          const tooLoud = (peak > 0.94) || (rms > Math.max(0.22, minRms * 18));
+          if(tooLoud){
+            stableCount = 0;
+            lastHz = 0;
+            setHint('強すぎるよ…少し小さめで弾いてね');
+          }else if(rms < minRms){
             stableCount = 0;
             lastHz = 0;
             // うるさくなりすぎないよう、毎回は文言を変えない
-            setHint('もう一度、強めに弾いてね');
+            setHint('もう一度、はっきり弾いてね');
           }else{
             const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate);
             if(hz > 0){
@@ -3792,7 +3804,7 @@ window.addEventListener('pageshow', ()=>{
                 setHint('ちょっとだけ合わせてね（近いよ）');
               }
 
-              if(stableCount >= 8 && !recActive){
+              if(stableCount >= 6 && !recActive){
                 triggerRecord();
               }
             }else{
@@ -3812,7 +3824,7 @@ window.addEventListener('pageshow', ()=>{
       recActive = true;
 
       // pre-roll + recordTime
-      const recordTime = 1.20;
+      const recordTime = 1.35;
       recNeed = preLen + Math.floor(tapAudioCtx.sampleRate * recordTime);
       recBuf = new Float32Array(recNeed);
 
@@ -3836,17 +3848,36 @@ window.addEventListener('pageshow', ()=>{
         const key = takeKey;
         if(!key || !recBuf) return;
 
+        // 強すぎ（マイク飽和/ペチン音）を検出したら録音しなおし
+        let peakAbs = 0, clipCount = 0;
+        for(let i=0;i<recBuf.length;i++){
+          const a = Math.abs(recBuf[i]);
+          if(a > peakAbs) peakAbs = a;
+          if(a > 0.985) clipCount++;
+        }
+        if(clipCount > 12 || peakAbs > 0.995){
+          setProgress(key);
+          setMsg('強すぎたよ…もう少し小さめで弾いてね');
+          setHint('録音しなおすよ');
+          recBuf = null;
+          recActive = false;
+          // same idx のままやり直し
+          nextTimer = setTimeout(()=>{ if(running) beginTake(); }, 750);
+          return;
+        }
+
         // trim leading silence
-        const thr = Math.max(0.02, minRms * 4.0);
+        const thr = Math.max(0.012, minRms * 2.8);
         let st = 0;
         for(let i=0; i<recBuf.length; i++){
           if(Math.abs(recBuf[i]) > thr){ st = Math.max(0, i - Math.floor(tapAudioCtx.sampleRate*0.01)); break; }
         }
 
-        // ★クリア化：アタック直後の「変な瞬間」を避ける（音色は変えずに開始点だけ少し後ろへ）
+        // ★クリア化：開始点を少しだけ調整（取り込み音は維持しつつ、ペチン/指ノイズの確率を下げる）
         const sr = tapAudioCtx.sampleRate;
-        const skip = Math.floor(sr * 0.08);
-        if((recBuf.length - st) > (skip + Math.floor(sr * 0.65))){ st += skip; }
+        const skipSec = (peakAbs > 0.70) ? 0.028 : 0.018; // 強めほど少しだけ後ろへ
+        const skip = Math.floor(sr * skipSec);
+        if((recBuf.length - st) > (skip + Math.floor(sr * 0.55))){ st += skip; }
 
         const maxLen = Math.min(recBuf.length - st, Math.floor(sr * 1.55));
         const data = recBuf.subarray(st, st + maxLen);
@@ -3867,13 +3898,13 @@ window.addEventListener('pageshow', ()=>{
         let y1 = 0, x1 = 0;
 
         // 1-pole lowpass to soften hiss/aliasing (≈6500Hz)
-        const lfc = 6500;
+        const lfc = 9000;
         const lrc = 1 / (2 * Math.PI * lfc);
         const la = dt / (lrc + dt);
         let ly = 0;
 
         // soft noise gate threshold (avoid boosting room noise)
-        const gate = Math.max(0.002, (noiseRms||0) * 2.6, (minRms||0) * 0.45);
+        const gate = Math.max(0.0015, (noiseRms||0) * 2.0, (minRms||0) * 0.30);
 
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
@@ -3895,7 +3926,7 @@ window.addEventListener('pageshow', ()=>{
         // peak normalize (keep headroom for chords)
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-        const g = (mx > 0.0005) ? (0.92 / mx) : 1.0;
+        const g = (mx > 0.0005) ? (0.95 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
         const b = tapAudioCtx.createBuffer(1, proc.length, sr);
@@ -3950,7 +3981,7 @@ candidates[key] = b;
           nextTimer = setTimeout(()=>{
             if(!running) return;
             doneAll();
-          }, 450);
+          }, 850);
         }
       }catch(e){}
       finally{
@@ -3973,17 +4004,17 @@ candidates[key] = b;
           if(!b) return;
           const src = tapAudioCtx.createBufferSource();
           src.buffer = b;
-          const gap = 0.48;
+          const gap = 0.78;
           src.playbackRate.setValueAtTime(1.0, now + i*gap);
 
           const g = tapAudioCtx.createGain();
           const t = now + i*gap;
           g.gain.setValueAtTime(0.0001, t);
           const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-          const peak = Math.min(0.98, 0.85 * mult);
+          const peak = Math.min(1.35, 1.20 * mult);
           g.gain.linearRampToValueAtTime(peak, t + 0.01);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 2.25);
-          g.gain.linearRampToValueAtTime(0, t + 2.40);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 2.55);
+          g.gain.linearRampToValueAtTime(0, t + 2.70);
 
           const hp = tapAudioCtx.createBiquadFilter();
           hp.type = 'highpass';
@@ -3998,7 +4029,7 @@ candidates[key] = b;
           g.connect(tapMaster);
 
           src.start(t);
-          src.stop(t + 2.55);
+          src.stop(t + 2.90);
 
           activeVoices.push({ osc: src, gain: g, startTime: t });
         });
@@ -4018,9 +4049,9 @@ candidates[key] = b;
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, now);
         const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-        const peak = Math.min(0.99, 1.05 * mult);
+        const peak = Math.min(1.45, 1.30 * mult);
         g.gain.exponentialRampToValueAtTime(peak, now + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 2.25);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 3.00);
         const hp = tapAudioCtx.createBiquadFilter();
         hp.type = 'highpass';
         hp.frequency.setValueAtTime(70, now);
@@ -4033,7 +4064,7 @@ candidates[key] = b;
         lp.connect(g);
         g.connect(tapMaster);
         src.start(now);
-        try{ src.stop(now + 2.45); }catch(e){}
+        try{ src.stop(now + 3.20); }catch(e){}
         activeVoices.push({ osc: src, gain: g, startTime: now });
       }catch(e){}
     };
@@ -4055,7 +4086,7 @@ candidates[key] = b;
         if(!running) return;
         actDone.style.display = '';
         setHint('この音でよければ「この音でOK」 / 迷ったら「やり直す」');
-      }, 2600);
+      }, 5600);
     };
 
     const resetFlow = ()=>{

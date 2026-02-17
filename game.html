@@ -88,7 +88,22 @@
       padding: 6px 12px; font-weight: 800; font-size:10px; cursor: pointer;
     }
     .mode-pill.active { border-color: var(--primary); background: rgba(255,122,61,0.1); color: var(--primary); }
-
+    /* モード行（レイアウト維持：ノーマル/サポートは中央、ウクレレのおとは左） */
+    .mode-row{
+      min-height: 34px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+    #ukeSoundPill{
+      grid-column: 1;
+      justify-self: center;
+      white-space: nowrap;
+    }
+    #play-mode-pills{
+      grid-column: 2;
+      justify-content: center;
+    }
 
 /* === MODE BUTTONS (match index) === */
 .mode-select .mode-pill{
@@ -1062,7 +1077,7 @@ body.is-uke .vol-inline{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.11</div>
+<div id="verTag">v0.13</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -1101,10 +1116,13 @@ body.is-uke .vol-inline{ display:none !important; }
 
 </div>
 <div class="mode-select">
-<div class="mode-pills" id="play-mode-pills">
-  <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
-  <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
-</div>
+  <div class="mode-row">
+    <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
+    <div class="mode-pills" id="play-mode-pills">
+      <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ノーマル</div>
+      <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート付き</div>
+    </div>
+  </div>
 <div id="mode-desc" class="mode-desc">サポート付き：とまって まつよ（はじめてにおすすめ）</div>
 <div class="tap-vol-wrap" id="tap-vol-wrap">
   <div class="tap-vol-label">🔊 タップ音の大きさ</div>
@@ -2185,6 +2203,40 @@ function applyUiMode(mode){
 function setMode(el, mode){
   applyUiMode(mode);
 }
+
+// サウンド選択（録音ウクレレ音 / アプリ音）
+window.applyUkeSoundUi = function(){
+  try{
+    const pill = document.getElementById('ukeSoundPill');
+    if(!pill) return;
+    const us = window.UKE_SAMPLE;
+    const on = !!(us && us.mode === 'SAMPLE' && us.ready);
+    pill.classList.toggle('active', on);
+    pill.setAttribute('aria-pressed', on ? 'true' : 'false');
+    pill.title = on ? '録音したウクレレの音' : 'アプリの音';
+  }catch(e){}
+};
+window.toggleUkeSound = function(){
+  try{ ensureTapAudio(); }catch(e){}
+  const us = window.UKE_SAMPLE;
+  if(!us){ return; }
+  const isOn = (us.mode === 'SAMPLE' && us.ready);
+  if(isOn){
+    us.mode = 'OSC';
+    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+    return;
+  }
+  // ONにしたい
+  if(us.ready){
+    us.mode = 'SAMPLE';
+    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+    return;
+  }
+  // まだ録音がない → 取り込みフローへ
+  const sb = document.getElementById('sampleBtn');
+  if(sb){ sb.click(); }
+  if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+};
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
 // URLパラメータ mode=TAP/NORMAL/WAIT を入口として反映（v12）
@@ -3923,6 +3975,7 @@ window.addEventListener('pageshow', ()=>{
       cleanupNodes();
       if(stopMic) stopStream();
       closeOverlay();
+      try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
     };
 
     // UI events
@@ -4146,6 +4199,7 @@ window.addEventListener('pageshow', ()=>{
     try{ hookSlider(); }catch(e){}
     try{ bindSongSpeedUI(); }catch(e){}
     try{ window.bindSamplingUI && window.bindSamplingUI(); }catch(e){}
+    try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
   };
   if(document.readyState === 'loading'){
     window.addEventListener('DOMContentLoaded', __initMenuUI);

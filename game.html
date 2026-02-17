@@ -1080,7 +1080,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div id="menu-overlay">
 <div class="menu-card">
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.18</div>
+<div id="verTag">v0.19</div>
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
 <div class="menu-main">
 <button class="menu-btn mode1" onclick="prepGame('scale')">
@@ -3271,7 +3271,7 @@ window.addEventListener('pageshow', ()=>{
             noiseFilter.type = 'highpass';
             noiseFilter.frequency.value = 3000; // Crisp high click
             const noiseGain = tapAudioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.1 * baseGain, startTime);
+            noiseGain.gain.setValueAtTime(0.03 * baseGain, startTime);
             noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
             noiseGain.gain.linearRampToValueAtTime(0, startTime + 0.03); // ★確実な無音化
             noiseSrc.connect(noiseFilter);
@@ -3376,6 +3376,7 @@ window.addEventListener('pageshow', ()=>{
     mode: 'OSC', // 'OSC' or 'SAMPLE'
     ready: false,
     buffers: { A:null, E:null, C:null, G:null },
+    gain: { A:1, E:1, C:1, G:1 },
     baseFreq: { A:440.00, E:329.63, C:261.63, G:392.00 }
   };
 
@@ -3394,6 +3395,9 @@ window.addEventListener('pageshow', ()=>{
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
       const baseGain = 0.22 / Math.sqrt(N);
+
+      const gMap = (S.gain || {A:1,E:1,C:1,G:1});
+
 
       const chooseString = (f)=>{
         let bestKey = 'A';
@@ -3433,20 +3437,27 @@ window.addEventListener('pageshow', ()=>{
         // フェード/余韻（短すぎない自然な減衰）
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, startTime);
-        g.gain.linearRampToValueAtTime(baseGain, startTime + 0.010);
+        const mult = (gMap && gMap[k]) ? gMap[k] : 1.0;
+        const peak = baseGain * mult;
+        g.gain.linearRampToValueAtTime(peak, startTime + 0.010);
 
         // dur は指定が来る場合だけ少し反映（通常は固定の余韻）
         const tail = Math.max(1.1, Math.min(2.2, (Number(dur)||0) * 3.0 || 1.6));
-        g.gain.setValueAtTime(baseGain, startTime + Math.max(0.35, tail - 0.9));
+        g.gain.setValueAtTime(peak, startTime + Math.max(0.35, tail - 0.9));
         g.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
         g.gain.linearRampToValueAtTime(0, startTime + tail + 0.10);
 
         // 軽いローパスで耳に痛い成分を抑える（実録の高域ノイズ対策）
+        const hp = tapAudioCtx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(70, startTime);
+
         const lp = tapAudioCtx.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(5000, startTime);
+        lp.frequency.setValueAtTime(4200, startTime);
 
-        src.connect(lp);
+        src.connect(hp);
+        hp.connect(lp);
         lp.connect(g);
         g.connect(tapMaster);
 
@@ -3518,6 +3529,28 @@ window.addEventListener('pageshow', ()=>{
 
     // staged buffers (before user accepts)
     let candidates = {A:null, E:null, C:null, G:null};
+
+    // per-string meta & gain (volume leveling / noise handling)
+    let candMeta = {A:null, E:null, C:null, G:null};
+    let candGain = {A:1, E:1, C:1, G:1};
+
+    const recalcLevels = ()=>{
+      try{
+        const keys = ['A','E','C','G'];
+        const rmsList = keys.map(k=>candMeta[k] && candMeta[k].rms).filter(v=>Number.isFinite(v));
+        if(rmsList.length < 4) return;
+        const s = rmsList.slice().sort((a,b)=>a-b);
+        const target = (s[1] + s[2]) * 0.5; // median(4)
+        keys.forEach(k=>{
+          const r = (candMeta[k] && candMeta[k].rms) ? candMeta[k].rms : target;
+          let mult = target / Math.max(1e-6, r);
+          // clamp to avoid over-amplifying noise
+          mult = Math.max(0.75, Math.min(1.35, mult));
+          candGain[k] = mult;
+        });
+      }catch(e){}
+    };
+
 
     const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
 
@@ -3798,17 +3831,49 @@ window.addEventListener('pageshow', ()=>{
         const maxLen = Math.min(recBuf.length - st, Math.floor(tapAudioCtx.sampleRate * 1.45));
         const data = recBuf.subarray(st, st + maxLen);
 
-        // normalize
+        // normalize + simple denoise (DC remove + highpass + soft noise gate)
+        const sr = tapAudioCtx.sampleRate;
+        const proc = new Float32Array(data.length);
+
+        // DC offset remove
+        let mean = 0;
+        for(let i=0;i<data.length;i++){ mean += data[i]; }
+        mean = mean / Math.max(1, data.length);
+
+        // 1-pole highpass to remove low rumble (≈70Hz)
+        const fc = 70;
+        const dt = 1 / sr;
+        const rc = 1 / (2 * Math.PI * fc);
+        const a = rc / (rc + dt);
+        let y1 = 0, x1 = 0;
+
+        // soft noise gate threshold (avoid boosting room noise)
+        const gate = Math.max(0.002, (noiseRms||0) * 2.6, (minRms||0) * 0.45);
+
+        for(let i=0;i<data.length;i++){
+          let x = (data[i] - mean);
+          let y = a * (y1 + x - x1);
+          x1 = x; y1 = y;
+
+          const ay = Math.abs(y);
+          if(ay < gate){
+            const m = ay / gate; // 0..1
+            y *= (m*m);          // soften near-zero noise
+          }
+          proc[i] = y;
+        }
+
+        // peak normalize (keep headroom for chords)
         let mx = 0;
-        for(let i=0;i<data.length;i++){ const a = Math.abs(data[i]); if(a>mx) mx=a; }
+        for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
         const g = (mx > 0.0005) ? (0.92 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
-        const b = tapAudioCtx.createBuffer(1, data.length, tapAudioCtx.sampleRate);
+        const b = tapAudioCtx.createBuffer(1, proc.length, sr);
         const ch = b.getChannelData(0);
-        for(let i=0;i<data.length;i++){ ch[i] = data[i] * g; }
+        for(let i=0;i<proc.length;i++){ ch[i] = proc[i] * g; }
 
-        // fade in/out to avoid clicks
+// fade in/out to avoid clicks
         const fi = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.006));
         for(let i=0;i<fi;i++){ ch[i] *= (i/fi); }
         const fo = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.045));
@@ -3817,7 +3882,17 @@ window.addEventListener('pageshow', ()=>{
           ch[ch.length-1-i] *= p;
         }
 
-        candidates[key] = b;
+        // compute rms for leveling
+        try{
+          let rr=0, pk=0;
+          for(let i=0;i<ch.length;i++){ const v=ch[i]; rr += v*v; const av=Math.abs(v); if(av>pk) pk=av; }
+          const rms = Math.sqrt(rr / Math.max(1, ch.length));
+          candMeta[key] = { rms, peak: pk };
+        }catch(e){}
+candidates[key] = b;
+
+        recalcLevels();
+
 
         // visual feedback (avoid "すぐ次に行って分からない" 対策)
         setProgress(key);
@@ -3869,20 +3944,32 @@ window.addEventListener('pageshow', ()=>{
           if(!b) return;
           const src = tapAudioCtx.createBufferSource();
           src.buffer = b;
-          src.playbackRate.setValueAtTime(1.0, now + i*0.18);
+          const gap = 0.32;
+          src.playbackRate.setValueAtTime(1.0, now + i*gap);
 
           const g = tapAudioCtx.createGain();
-          const t = now + i*0.18;
+          const t = now + i*gap;
           g.gain.setValueAtTime(0.0001, t);
-          g.gain.linearRampToValueAtTime(0.22, t + 0.01);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 1.35);
-          g.gain.linearRampToValueAtTime(0, t + 1.45);
+          const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
+          const peak = Math.min(0.95, 0.55 * mult);
+          g.gain.linearRampToValueAtTime(peak, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 1.75);
+          g.gain.linearRampToValueAtTime(0, t + 1.90);
 
-          src.connect(g);
+          const hp = tapAudioCtx.createBiquadFilter();
+          hp.type = 'highpass';
+          hp.frequency.setValueAtTime(70, t);
+          const lp = tapAudioCtx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.setValueAtTime(5600, t);
+
+          src.connect(hp);
+          hp.connect(lp);
+          lp.connect(g);
           g.connect(tapMaster);
 
           src.start(t);
-          src.stop(t + 1.6);
+          src.stop(t + 2.05);
 
           activeVoices.push({ osc: src, gain: g, startTime: t });
         });
@@ -3901,12 +3988,23 @@ window.addEventListener('pageshow', ()=>{
         src.playbackRate.value = 1;
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, now);
-        g.gain.exponentialRampToValueAtTime(0.55, now + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
-        src.connect(g);
+        const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
+        const peak = Math.min(0.98, 0.95 * mult);
+        g.gain.exponentialRampToValueAtTime(peak, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.55);
+        const hp = tapAudioCtx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(70, now);
+        const lp = tapAudioCtx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(5600, now);
+
+        src.connect(hp);
+        hp.connect(lp);
+        lp.connect(g);
         g.connect(tapMaster);
         src.start(now);
-        try{ src.stop(now + 1.2); }catch(e){}
+        try{ src.stop(now + 1.70); }catch(e){}
         activeVoices.push({ osc: src, gain: g, startTime: now });
       }catch(e){}
     };
@@ -3928,7 +4026,7 @@ window.addEventListener('pageshow', ()=>{
         if(!running) return;
         actDone.style.display = '';
         setHint('この音でよければ「この音でOK」 / 迷ったら「やり直す」');
-      }, 1200);
+      }, 2600);
     };
 
     const resetFlow = ()=>{
@@ -4007,6 +4105,7 @@ window.addEventListener('pageshow', ()=>{
     bOk.addEventListener('click', ()=>{
       // accept
       window.UKE_SAMPLE.buffers = { A:candidates.A, E:candidates.E, C:candidates.C, G:candidates.G };
+      window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
       window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
       endFlow(true);

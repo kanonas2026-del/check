@@ -957,16 +957,19 @@ body.is-uke .vol-inline{ display:none !important; }
       z-index: 10000;
     }
     
-    .modal-content {
+   .modal-content {
       background: #fff;
-      width: 85%; max-width: 360px;
+      width: 90%; max-width: 360px;
+      max-height: 85vh; /* 画面の高さの85%までに制限（これではみ出さない！） */
+      overflow-y: auto; /* 収まらない場合はスクロールできるようにする */
+      box-sizing: border-box;
       border: 4px solid #111;
       border-radius: 24px;
-      box-shadow: 8px 12px 0 #111;
-      padding: 24px 16px;
+      box-shadow: 6px 8px 0 #111; /* スマホ向けに影を少し調整 */
+      padding: 20px 16px 16px; 
       text-align: center;
       position: relative;
-      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* ポワッと現れるアニメ */
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     @keyframes popIn {
@@ -976,16 +979,19 @@ body.is-uke .vol-inline{ display:none !important; }
 
     /* 閉じるボタン（右上の赤いバツ印） */
     .modal-close {
-      position: absolute; top: -16px; right: -16px;
+      position: absolute; 
+      top: 8px; right: 8px; /* 画面外に逃げないように、枠の「内側」に配置 */
       background: #ff3d3d; color: #fff;
       border: 3px solid #111; border-radius: 50%;
-      width: 44px; height: 44px;
-      font-size: 24px; font-weight: 900;
+      width: 36px; height: 36px; /* タップしやすい少し小さめサイズに */
+      font-size: 20px; font-weight: 900;
       cursor: pointer;
-      box-shadow: 4px 4px 0 #111;
+      box-shadow: 3px 3px 0 #111;
       transition: transform 0.1s, box-shadow 0.1s;
+      display: flex; justify-content: center; align-items: center;
+      padding: 0; line-height: 1;
     }
-    .modal-close:active { transform: translate(2px, 4px); box-shadow: 0px 0px 0 #111; }
+    .modal-close:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0 #111; }
 
     /* 音の選択ボックス */
     .sound-select-box {
@@ -4519,6 +4525,37 @@ candidates[key] = b;
   apply();
 })();
 // 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
+// ▼▼ モーダル内の各ボタンを押したときの反応（テスト用） ▼▼
+    
+    // ①「お手本をきく」ボタン
+    const playSampleBtn = document.querySelector('.play-sample');
+    if(playSampleBtn) {
+      playSampleBtn.addEventListener('click', () => {
+        // どっちのラジオボタン（電子音かウクレレか）が選ばれているかチェック
+        const selectedSound = document.querySelector('input[name="sound-type"]:checked').parentElement.textContent.trim();
+        alert('【テスト】' + selectedSound + ' でお手本を再生する処理をここに作ります！');
+      });
+    }
+
+    // ②「れんしゅうスタート！」ボタン
+    const startGameBtn = document.querySelector('.start-game');
+    if(startGameBtn) {
+      startGameBtn.addEventListener('click', () => {
+        alert('【テスト】ゲーム画面へ切り替わります！');
+        // とりあえずポップアップを閉じる
+        document.getElementById('task-modal').style.display = 'none';
+      });
+    }
+
+    // ③「じぶんのウクレレを とうろく」ボタン
+    const recordUkeBtn = document.querySelector('.record-uke');
+    if(recordUkeBtn) {
+      recordUkeBtn.addEventListener('click', () => {
+        alert('【テスト】録音（ウクレレ登録）画面を開きます！');
+      });
+    }
+
+
     const importBtn = document.getElementById('import-json-btn');
     if(importBtn) {
       importBtn.addEventListener('click', () => {

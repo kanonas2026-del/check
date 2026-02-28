@@ -947,77 +947,66 @@ body.is-uke .vol-inline{ display:none !important; }
 }
 
 /* =========================================
-       課題曲ポップアップ（モーダル）のスタイル
+       課題曲ポップアップ（1画面完全フィット版）
        ========================================= */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6); /* 背景を少し暗くする */
-      display: none; /* 最初は隠しておく */
-      justify-content: center; align-items: center;
-      z-index: 10000;
+      background: rgba(0,0,0,0.7); display: none;
+      justify-content: center; align-items: center; z-index: 10000;
+      /* スクロール禁止令はそのまま維持！ */
     }
-    
-   .modal-content {
+
+    .modal-content {
       background: #fff;
-      width: 90%; max-width: 360px;
-      max-height: 85vh; /* 画面の高さの85%までに制限（これではみ出さない！） */
-      overflow-y: auto; /* 収まらない場合はスクロールできるようにする */
+      width: 90%; max-width: 420px;
+      height: 92vh; /* 画面の高さの92%に固定 */
+      max-height: 380px; /* PC等で大きくなりすぎないように */
       box-sizing: border-box;
-      border: 4px solid #111;
-      border-radius: 24px;
-      box-shadow: 6px 8px 0 #111; /* スマホ向けに影を少し調整 */
-      padding: 20px 16px 16px; 
-      text-align: center;
-      position: relative;
-      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    @keyframes popIn {
-      0% { transform: scale(0.5); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    /* 閉じるボタン（右上の赤いバツ印） */
-    .modal-close {
-      position: absolute; 
-      top: 8px; right: 8px; /* 画面外に逃げないように、枠の「内側」に配置 */
-      background: #ff3d3d; color: #fff;
-      border: 3px solid #111; border-radius: 50%;
-      width: 36px; height: 36px; /* タップしやすい少し小さめサイズに */
-      font-size: 20px; font-weight: 900;
-      cursor: pointer;
-      box-shadow: 3px 3px 0 #111;
-      transition: transform 0.1s, box-shadow 0.1s;
-      display: flex; justify-content: center; align-items: center;
-      padding: 0; line-height: 1;
-    }
-    .modal-close:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0 #111; }
-
-    /* 音の選択ボックス */
-    .sound-select-box {
-      background: #ffde59; /* ポップな黄色 */
       border: 3px solid #111; border-radius: 16px;
-      padding: 12px; margin: 16px 0;
-      text-align: left;
+      box-shadow: 4px 6px 0 #111;
+      padding: 2vh 2vw; /* 余白も画面の高さに合わせて縮む */
+      text-align: center; position: relative;
+      /* ▼重要：中身を縦に均等に並べて、絶対にはみ出させない */
+      display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
     }
-    
-    .sound-select-box p { margin: 0 0 8px 0; font-weight: 900; font-size: 14px; text-align: center;}
-    .sound-select-box label { font-weight: 900; font-size: 15px; display: inline-block; margin: 4px 8px; cursor: pointer; }
 
-    /* モーダル内のボタン */
-    .action-btn {
-      display: block; width: 100%;
-      background: #5ce1e6; color: #111;
-      border: 3px solid #111; border-radius: 18px;
-      padding: 14px; font-size: 16px; font-weight: 900;
-      box-shadow: 4px 6px 0 #111; cursor: pointer;
-      margin-bottom: 12px; transition: transform 0.1s, box-shadow 0.1s;
+    /* 閉じるボタン（絶対に被らないよう内側の右上に固定） */
+    .modal-close {
+      position: absolute; top: 4px; right: 4px;
+      background: #ff3d3d; color: #fff; border: 3px solid #111; border-radius: 50%;
+      width: 32px; height: 32px; font-size: 18px; font-weight: 900;
+      cursor: pointer; box-shadow: 2px 2px 0 #111;
+      display: flex; justify-content: center; align-items: center; padding: 0; z-index: 10;
     }
-    .action-btn.play-sample { background: #ffaa00; } /* お手本ボタンはオレンジ */
-    .action-btn.start-game { background: #ff3d3d; color: #fff; font-size: 20px; margin-bottom: 0; }
-    .action-btn.record-uke { background: #fff; font-size: 12px; padding: 8px; width: 90%; margin: 8px auto 0; box-shadow: 2px 4px 0 #111; }
-    
-    .action-btn:active { transform: translate(4px, 6px); box-shadow: 0px 0px 0 #111; }
+    .modal-close:active { transform: translate(2px, 2px); box-shadow: none; }
+
+    /* 文字サイズも画面の高さ(vh)に合わせて自動で縮むように設定 */
+    .modal-content h2 { margin: 0; color: #111; font-size: clamp(14px, 4.5vh, 22px); line-height: 1.1; }
+    #task-song-name { font-weight: 900; margin: 0; font-size: clamp(12px, 4vh, 18px); }
+
+    .sound-select-box {
+      background: #ffde59; border: 3px solid #111; border-radius: 12px;
+      width: 95%; padding: 1vh; box-sizing: border-box;
+      display: flex; flex-direction: column; justify-content: center; gap: 0.5vh;
+    }
+    .sound-select-box p { margin: 0; font-weight: 900; font-size: clamp(10px, 3vh, 14px); }
+    .sound-radios { display: flex; justify-content: center; gap: 10px; margin-bottom: 0.5vh; }
+    .sound-select-box label { font-weight: 900; font-size: clamp(11px, 3.5vh, 15px); cursor: pointer; margin:0;}
+
+    .action-btn {
+      width: 95%; background: #5ce1e6; color: #111;
+      border: 3px solid #111; border-radius: 12px;
+      padding: clamp(6px, 2vh, 14px);
+      font-size: clamp(13px, 4vh, 18px); font-weight: 900;
+      box-shadow: 2px 4px 0 #111; cursor: pointer; transition: transform 0.1s; margin: 0;
+    }
+    .action-btn.play-sample { background: #ffaa00; }
+    .action-btn.start-game { background: #ff3d3d; color: #fff; font-size: clamp(14px, 4.5vh, 20px); }
+    .action-btn.record-uke {
+      background: #fff; font-size: clamp(10px, 2.5vh, 13px);
+      padding: clamp(4px, 1vh, 8px); width: 85%; margin: 0 auto; box-shadow: 2px 2px 0 #111;
+    }
+    .action-btn:active { transform: translate(2px, 3px); box-shadow: 0px 0px 0 #111; }
 
 </style>
 
@@ -4525,36 +4514,32 @@ candidates[key] = b;
   apply();
 })();
 // 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
-// ▼▼ モーダル内の各ボタンを押したときの反応（テスト用） ▼▼
-    
-    // ①「お手本をきく」ボタン
-    const playSampleBtn = document.querySelector('.play-sample');
-    if(playSampleBtn) {
-      playSampleBtn.addEventListener('click', () => {
-        // どっちのラジオボタン（電子音かウクレレか）が選ばれているかチェック
-        const selectedSound = document.querySelector('input[name="sound-type"]:checked').parentElement.textContent.trim();
-        alert('【テスト】' + selectedSound + ' でお手本を再生する処理をここに作ります！');
-      });
-    }
-
-    // ②「れんしゅうスタート！」ボタン
-    const startGameBtn = document.querySelector('.start-game');
-    if(startGameBtn) {
-      startGameBtn.addEventListener('click', () => {
+// ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
+    document.addEventListener('click', function(e) {
+      
+      // 📥「先生のオリジナル譜面」を開く
+      if (e.target.closest('#import-json-btn')) {
+        document.getElementById('task-modal').style.display = 'flex';
+      }
+      
+      // ①「お手本をきく」ボタン
+      if (e.target.closest('.play-sample')) {
+        const checked = document.querySelector('input[name="sound-type"]:checked');
+        const soundName = checked ? checked.parentNode.textContent.trim() : 'でんし音';
+        alert('【テスト】' + soundName + ' でお手本を再生！');
+      }
+      
+      // ②「れんしゅうスタート！」ボタン
+      if (e.target.closest('.start-game')) {
         alert('【テスト】ゲーム画面へ切り替わります！');
-        // とりあえずポップアップを閉じる
         document.getElementById('task-modal').style.display = 'none';
-      });
-    }
-
-    // ③「じぶんのウクレレを とうろく」ボタン
-    const recordUkeBtn = document.querySelector('.record-uke');
-    if(recordUkeBtn) {
-      recordUkeBtn.addEventListener('click', () => {
+      }
+      
+      // ③「とうろく」ボタン
+      if (e.target.closest('.record-uke')) {
         alert('【テスト】録音（ウクレレ登録）画面を開きます！');
-      });
-    }
-
+      }
+    });
 
     const importBtn = document.getElementById('import-json-btn');
     if(importBtn) {
@@ -4568,12 +4553,12 @@ candidates[key] = b;
   <div class="modal-content">
     <button class="modal-close" onclick="document.getElementById('task-modal').style.display='none'">×</button>
     
-    <h2 style="margin: 0 0 8px; color: #111; font-size: 22px;">🎵 せんせいの かだい曲</h2>
-    <p id="task-song-name" style="font-weight: 900; font-size: 18px; margin: 0;">「ドレミのれんしゅう」</p>
+    <h2 style="color: #111;">🎵 せんせいの かだい曲</h2>
+    <p id="task-song-name">「ドレミのれんしゅう」</p>
     
     <div class="sound-select-box">
       <p>きく時の オトをえらぶ</p>
-      <div style="text-align: center;">
+      <div class="sound-radios">
         <label><input type="radio" name="sound-type" checked> 🤖 でんし音</label>
         <label><input type="radio" name="sound-type"> 🎸 ウクレレ1号</label>
       </div>

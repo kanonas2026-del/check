@@ -20,8 +20,10 @@
     overflow: hidden;
     position: fixed;
     font-family: "Mochiy Pop One", "Zen Maru Gothic", sans-serif;
-    /* 鮮やかなトロピカルグラデーション */
-    background: linear-gradient(180deg, #4facfe 0%, #00f2fe 50%, #ffd194 100%);
+    /* ポップなドット柄背景に変更 */
+    background-color: #ffde59;
+    background-image: radial-gradient(#ffaa00 15%, transparent 15%);
+    background-size: 30px 30px;
     user-select: none;
   }
 
@@ -58,16 +60,14 @@
   .game-title {
     font-size: clamp(32px, 7vw, 64px);
     margin: 0;
-    /* 文字色を濃いオレンジ、フチを白く太くして読みやすく */
-    color: #FF6B00; 
-    -webkit-text-stroke: 6px #ffffff;
+    color: #ff3d3d; /* ビビッドな赤 */
+    -webkit-text-stroke: 4px #111; /* 太い黒フチ */
     paint-order: stroke fill;
-    /* テキストシャドウで立体感 */
-    text-shadow: 4px 4px 0 rgba(0,0,0,0.1);
-    transform: rotate(-2deg);
-    animation: titleFloat 3s ease-in-out infinite;
+    text-shadow: 8px 8px 0px #111; /* くっきりした黒い影 */
+    transform: rotate(-3deg);
+    animation: titleFloat 2s ease-in-out infinite alternate;
   }
-  .sub-title {
+ .sub-title {
     display: block;
     margin-top: -2px;
     margin-bottom: 10px;
@@ -80,7 +80,6 @@
     font-weight: 900;
     box-shadow: 0 4px 0 rgba(0,0,0,0.1);
   }
-
   @keyframes titleFloat {
     0%, 100% { transform: rotate(-2deg) translateY(0); }
     50% { transform: rotate(2deg) translateY(-8px); }

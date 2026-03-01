@@ -9,6 +9,79 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ウクレレ">
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+
+<script>
+/* v0.36: portrait detection hardened for iOS Files preview (layout viewport scale < 1) */
+(function(){
+  try{
+    function _computePortraitQuick(){
+      var vv = window.visualViewport;
+      var w = (vv && vv.width) ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 0);
+      var h = (vv && vv.height) ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0);
+      var portrait = (h > w);
+
+      // If we're being scaled down (common in iOS embedded file preview / when viewport meta is ignored),
+      // force portrait-lock so the menu layout is not cached in a stretched state.
+      try{
+        if(vv && typeof vv.scale === 'number' && vv.scale > 0 && vv.scale < 0.95){
+          portrait = true;
+        }
+      }catch(e){}
+
+      // Strong orientation APIs when available
+      try{
+        if(typeof window.orientation === 'number'){
+          var o = window.orientation;
+          if(o === 0 || o === 180) portrait = true;
+          if(o === 90 || o === -90) portrait = false;
+        }
+      }catch(e){}
+      try{
+        if(screen && screen.orientation && typeof screen.orientation.type === 'string'){
+          if(screen.orientation.type.indexOf('portrait') >= 0) portrait = true;
+          if(screen.orientation.type.indexOf('landscape') >= 0) portrait = false;
+        }
+      }catch(e){}
+
+      // matchMedia: use as signal if it returns a boolean
+      try{
+        if(window.matchMedia){
+          var mq = window.matchMedia('(orientation: portrait)');
+          if(typeof mq.matches === 'boolean') portrait = mq.matches;
+        }
+      }catch(e){}
+
+      // Embedded viewers sometimes report a landscape viewport while the physical screen is portrait.
+      // If screen says portrait but viewport is landscape, treat as portrait lock (prevents broken preview + cached stretch).
+      try{
+        if(screen && screen.width && screen.height){
+          var screenPortrait = (screen.height > screen.width);
+          if(screenPortrait && (w > h)) portrait = true;
+        }
+      }catch(e){}
+
+      // Some embedded viewers keep a "landscape" layout viewport even when the device is portrait.
+      // outerWidth/outerHeight can still reflect the real device orientation.
+      try{
+        var ow = window.outerWidth || 0;
+        var oh = window.outerHeight || 0;
+        if(oh > ow) portrait = true;
+      }catch(e){}
+
+      // Too narrow => treat as portrait lock
+      if(w && w < 650) portrait = true;
+
+      return portrait;
+    }
+
+    if(_computePortraitQuick()){
+      document.documentElement.classList.add('needLandscape');
+    }else{
+      document.documentElement.classList.remove('needLandscape');
+    }
+  }catch(e){}
+})();
+</script>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
 <title>ウクレレ・ゲーム</title>
@@ -1023,7 +1096,18 @@ body.is-uke .vol-inline{ display:none !important; }
     padding: 18px;
     box-sizing: border-box;
   }
+  html.needLandscape #landscapeLock,
   body.needLandscape #landscapeLock{ display:flex; }
+  /* avoid "stretched buttons" being cached while in portrait: don't lay out the menu at all */
+  html.needLandscape #menu-overlay,
+  body.needLandscape #menu-overlay{ display:none !important; }
+
+  /* CSS-only portrait lock (for environments where JS may be disabled, e.g., iOS Files preview) */
+  @media (max-aspect-ratio: 1/1){
+    #landscapeLock{ display:flex; }
+    #menu-overlay{ display:none !important; }
+  }
+
   .landscapeCard{
     width: min(560px, 92vw);
     border-radius: 22px;
@@ -1146,8 +1230,14 @@ body.menuOpen #back-btn{ display:none !important; }
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 8px !important;
-  align-content: start;
+  /* iPhone縦→横 / Safariの高さ変動でも、ボタン段が伸びないように固定 */
+  align-content: start !important;
+  align-items: start !important;
+  grid-auto-rows: max-content !important;
 }
+
+/* extra safety: prevent any item from stretching in row height */
+.menu-main.menu-grid-3x2 > .menu-btn{ align-self: start !important; }
 
 /* import JSON button color (same size) */
 .menu-btn.mode6{
@@ -1294,7 +1384,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.31</div>
+<div id="verTag">v0.37</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -2495,77 +2585,26 @@ window.applyUkeSoundUi = function(){
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
-// ウクレレのおと（録音音 / アプリ音）切替：状態はlocalStorageに保存
-const UKE_SOUND_MODE_KEY = 'uk_uke_sound_mode_v1';
-function saveUkeSoundMode(mode){
-  try{ localStorage.setItem(UKE_SOUND_MODE_KEY, String(mode||'').toUpperCase()); }catch(e){}
-}
-function loadUkeSoundMode(){
-  try{ return String(localStorage.getItem(UKE_SOUND_MODE_KEY)||'').toUpperCase(); }catch(e){ return ''; }
-}
-window.applySavedUkeSoundMode = function(){
-  try{
-    const us = window.UKE_SAMPLE;
-    if(!us) return;
-    const m = loadUkeSoundMode();
-    if(m === 'SAMPLE' || m === 'OSC') us.mode = m;
-    if(!us.ready) us.mode = 'OSC';
-  }catch(e){}
-  try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
-};
-
 window.toggleUkeSound = function(){
   try{ ensureTapAudio(); }catch(e){}
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
-
   const isOn = (us.mode === 'SAMPLE' && us.ready);
-
   if(isOn){
     us.mode = 'OSC';
-    saveUkeSoundMode('OSC');
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
-  // ONにしたい（録音済みなら切替）
+  // ONにしたい
   if(us.ready){
     us.mode = 'SAMPLE';
-    saveUkeSoundMode('SAMPLE');
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
   // まだ録音がない → 取り込みフローへ
-  try{
-    // bindSamplingUI 内で公開される（クリック連鎖を避けて確実に開く）
-    if(typeof window.openSamplingFlow === 'function'){
-      window.openSamplingFlow();
-    }else{
-      const sb = document.getElementById('sampleBtn');
-      if(sb){ sb.click(); }
-    }
-  }catch(e){}
-
+  const sb = document.getElementById('sampleBtn');
+  if(sb){ sb.click(); }
   if(window.applyUkeSoundUi) window.applyUkeSoundUi();
-};
-
-// iOS/Safari対策：ボタン内にあるため、明示的にイベントを拾う
-window.bindUkeSoundPillDirect = function(){
-  try{
-    const pill = document.getElementById('ukeSoundPill');
-    if(!pill || pill.__ukeBound) return;
-    pill.__ukeBound = true;
-    const handler = (ev)=>{
-      try{ ensureTapAudio(); }catch(e){}
-      try{ ev && ev.preventDefault && ev.preventDefault(); }catch(e){}
-      try{ ev && ev.stopPropagation && ev.stopPropagation(); }catch(e){}
-      try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-      return false;
-    };
-    pill.addEventListener('click', handler);
-    pill.addEventListener('touchend', handler, {passive:false});
-  }catch(e){}
 };
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
@@ -3334,21 +3373,78 @@ function drawFretboard(){
 }
 
 
-function applyViewportSize(){
+function __getViewportWH(){
+  const iw = (window.innerWidth || document.documentElement.clientWidth || 0);
+  const ih = (window.innerHeight || document.documentElement.clientHeight || 0);
   const vv = window.visualViewport;
-  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
-  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  // expose CSS vh unit (iPhone Safari 100vh issue)
+  if(vv && vv.width && vv.height){
+    // iOS Safari: 縦→横で innerHeight が一瞬/長時間大きい値のまま残ることがあるため、
+    // 見えている範囲(visualViewport)と layout viewport の“小さい方”を採用して「下が伸びる」を防ぐ
+    return {
+      w: Math.round(Math.min(iw, vv.width)),
+      h: Math.round(Math.min(ih, vv.height))
+    };
+  }
+  return { w: Math.round(iw), h: Math.round(ih) };
+}
+
+function forceMenuRelayout(){
+  const card = document.querySelector('#menu-overlay .menu-card');
+  if(!card) return;
+  // iOS Safari: grid の行高が回転前のまま残ることがある → display トグルで確実に再計算
+  const prev = card.style.display;
+  card.style.display = 'none';
+  // force reflow
+  void card.offsetHeight;
+  card.style.display = prev || '';
+}
+
+function applyViewportSize(){
+  const wh = __getViewportWH();
+  const w = wh.w;
+  const h = wh.h;
+
+  // expose CSS vh unit (Safari address bar / rotation issue)
   document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+
+  // canvas size
   canvas.width  = Math.floor(w);
   canvas.height = Math.floor(h);
+
+  // menu relayout (prevents stretched buttons after portrait->landscape without reload)
+  try{ forceMenuRelayout(); }catch(_){}
 }
-applyViewportSize();
+function scheduleViewportSize(){
+  applyViewportSize();
+  try{ requestAnimationFrame(applyViewportSize); }catch(_){}
+  setTimeout(applyViewportSize, 120);
+  setTimeout(applyViewportSize, 360);
+  setTimeout(()=>{ try{ forceMenuRelayout(); }catch(_){} }, 520);
+}
+// 初期表示 + iOSのUIバー変動対策で複数回更新
+scheduleViewportSize();
+
 if (window.visualViewport){
-  window.visualViewport.addEventListener('resize', applyViewportSize);
+  window.visualViewport.addEventListener('resize', scheduleViewportSize);
+  // アドレスバー表示/非表示などで scroll だけ発火する場合がある
+  window.visualViewport.addEventListener('scroll', scheduleViewportSize);
 }
-window.addEventListener('resize', applyViewportSize);
-window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
+window.addEventListener('resize', scheduleViewportSize);
+window.addEventListener('orientationchange', scheduleViewportSize);
+window.addEventListener('pageshow', scheduleViewportSize);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) scheduleViewportSize(); });
+
+// 初回ジェスチャー後に高さが確定する端末があるため、最初の操作で再計測
+let __vhGestureDone = false;
+function __kickVhOnFirstGesture(){
+  if(__vhGestureDone) return;
+  __vhGestureDone = true;
+  scheduleViewportSize();
+  try{ window.removeEventListener('touchstart', __kickVhOnFirstGesture, true); }catch(_){}
+  try{ window.removeEventListener('mousedown',  __kickVhOnFirstGesture, true); }catch(_){}
+}
+window.addEventListener('touchstart', __kickVhOnFirstGesture, {passive:true, capture:true});
+window.addEventListener('mousedown',  __kickVhOnFirstGesture, true);
 // タップ操作
 canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } }, {passive:false});
 canvas.addEventListener('mousedown', ()=>{ if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } });
@@ -3767,29 +3863,13 @@ window.addEventListener('pageshow', ()=>{
         g.gain.setValueAtTime(0.0001, startTime);
         const mult = (gMap && gMap[k]) ? gMap[k] : 1.0;
         const peak = baseGain * mult;
-        // フェード/余韻（短めで濁りにくい／0.1秒程度で自然にフェードアウト）
-        const attack = 0.008;
-        const decay  = 0.050;
-        const sustain= 0.78;
-        const release= 0.12;
+        g.gain.linearRampToValueAtTime(peak, startTime + 0.010);
 
-        // dur(秒)が来る場合は少し反映。なければデフォルト短め。
-        let tail = (Number.isFinite(Number(dur)) && Number(dur) > 0)
-          ? Math.max(0.45, Math.min(1.25, Number(dur) * 1.20))
-          : 0.85;
-
-        // サンプル長（ピッチシフト後）より長くしすぎない
-        const bufDur = (buf.duration / rate);
-        tail = Math.min(tail, Math.max(0.40, bufDur + 0.02));
-
-        const tA = startTime + attack;
-        const tD = tA + decay;
-        const tR = startTime + Math.max((tD - startTime) + 0.05, tail - release);
-
-        g.gain.linearRampToValueAtTime(peak, tA);
-        g.gain.linearRampToValueAtTime(peak * sustain, tD);
-        g.gain.setValueAtTime(peak * sustain, tR);
-        g.gain.linearRampToValueAtTime(0.0, tR + release);
+        // dur は指定が来る場合だけ少し反映（通常は固定の余韻）
+        const tail = Math.max(2.2, Math.min(3.4, (Number(dur)||0) * 3.0 || 2.6));
+        g.gain.setValueAtTime(peak, startTime + Math.max(0.45, tail - 1.2));
+        g.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
+        g.gain.linearRampToValueAtTime(0, startTime + tail + 0.14);
 
         // 軽いローパスで耳に痛い成分を抑える（実録の高域ノイズ対策）
         const hp = tapAudioCtx.createBiquadFilter();
@@ -4275,43 +4355,27 @@ window.addEventListener('pageshow', ()=>{
         const g = (mx > 0.0005) ? (0.95 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
-        let b = tapAudioCtx.createBuffer(1, proc.length, sr);
-        let ch = b.getChannelData(0);
+        const b = tapAudioCtx.createBuffer(1, proc.length, sr);
+        const ch = b.getChannelData(0);
         for(let i=0;i<proc.length;i++){ ch[i] = proc[i] * g; }
 
-        // fade in/out + mild shaping (click防止 + 自然な余韻)
-        const fi = Math.min(ch.length, Math.floor(sr * 0.008));
-        for(let i=0;i<fi;i++){ ch[i] *= (i/Math.max(1,fi)); }
-        const fo = Math.min(ch.length, Math.floor(sr * 0.120));
+// fade in/out to avoid clicks
+        const fi = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.012));
+        for(let i=0;i<fi;i++){ ch[i] *= (i/fi); }
+        const fo = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.060));
         for(let i=0;i<fo;i++){
-          const p = (fo - i) / Math.max(1,fo);
+          const p = (fo - i) / fo;
           ch[ch.length-1-i] *= p;
         }
 
-        // trailing trim（部屋ノイズ/濁り対策。最低限のリリースは残す）
-        try{
-          const endThr = Math.max(0.0032, gate * 0.85);
-          let last = 0;
-          for(let i=ch.length-1;i>=0;i--){
-            if(Math.abs(ch[i]) > endThr){ last = i; break; }
-          }
-          const keep = Math.min(ch.length, last + Math.floor(sr * 0.18)); // +180ms
-          if(keep > Math.floor(sr * 0.35) && keep < ch.length - Math.floor(sr * 0.05)){
-            const b2 = tapAudioCtx.createBuffer(1, keep, sr);
-            b2.copyToChannel(ch.subarray(0, keep), 0, 0);
-            b = b2;
-            ch = b.getChannelData(0);
-          }
-        }catch(e){}
-
-        // compute rms for leveling（after trim）
+        // compute rms for leveling
         try{
           let rr=0, pk=0;
           for(let i=0;i<ch.length;i++){ const v=ch[i]; rr += v*v; const av=Math.abs(v); if(av>pk) pk=av; }
           const rms = Math.sqrt(rr / Math.max(1, ch.length));
           candMeta[key] = { rms, peak: pk };
         }catch(e){}
-        candidates[key] = b;
+candidates[key] = b;
 
         recalcLevels();
 
@@ -4495,38 +4559,16 @@ window.addEventListener('pageshow', ()=>{
     };
 
     // UI events
-    // 外部（ウクレレのおと等）からも確実に開けるように公開
-    window.openSamplingFlow = startFlow;
-
-    const _isUkeSoundTap = (ev)=>{
-      try{
-        const t = ev && ev.target;
-        if(!t || !t.closest) return false;
-        return !!t.closest('#ukeSoundPill');
-      }catch(e){ return false; }
-    };
-
-    btn.addEventListener('click', (ev)=>{
+    btn.addEventListener('click', ()=>{
       // user gesture => audio unlock
       try{ ensureTapAudio(); }catch(e){}
-      // 重要：#ukeSoundPill は録音開始ではなく ON/OFF の切替
-      if(_isUkeSoundTap(ev)){
-        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-        try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-        return;
-      }
       startFlow();
     });
     // iOS Safari: click が飛ばないケース対策（重複しても running ガードで1回だけ動く）
-    btn.addEventListener('touchend', (ev)=>{
+    btn.addEventListener('touchend', ()=>{
       try{ ensureTapAudio(); }catch(e){}
-      if(_isUkeSoundTap(ev)){
-        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-        try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-        return;
-      }
       startFlow();
-    }, {passive:false});
+    }, {passive:true});
 
     bCancel.addEventListener('click', ()=>{ endFlow(true); });
 
@@ -4543,7 +4585,6 @@ window.addEventListener('pageshow', ()=>{
       window.UKE_SAMPLE.mode = 'OSC';
       window.UKE_SAMPLE.ready = false;
       window.UKE_SAMPLE.buffers = {A:null,E:null,C:null,G:null};
-      try{ saveUkeSoundMode && saveUkeSoundMode('OSC'); }catch(e){}
       endFlow(true);
     });
 
@@ -4553,7 +4594,6 @@ window.addEventListener('pageshow', ()=>{
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
       window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
-      try{ saveUkeSoundMode && saveUkeSoundMode(window.UKE_SAMPLE.mode); }catch(e){}
       endFlow(true);
     });
 
@@ -4769,8 +4809,6 @@ window.addEventListener('pageshow', ()=>{
     try{ hookSlider(); }catch(e){}
     try{ bindSongSpeedUI(); }catch(e){}
     try{ window.bindSamplingUI && window.bindSamplingUI(); }catch(e){}
-    try{ window.bindUkeSoundPillDirect && window.bindUkeSoundPillDirect(); }catch(e){}
-    try{ window.applySavedUkeSoundMode && window.applySavedUkeSoundMode(); }catch(e){}
     try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
   };
   if(document.readyState === 'loading'){
@@ -4819,24 +4857,110 @@ window.addEventListener('pageshow', ()=>{
 
 <script>
 (function(){
+  function _portraitByViewport(){
+    // Robust portrait detection for iOS Safari / embedded webviews (Files preview, etc.)
+    // Goal: if the screen is effectively portrait OR too narrow to play, force the landscape lock overlay,
+    // and avoid laying out the menu (prevents "stretched buttons" being cached).
+    var vv = window.visualViewport;
+    var w = (vv && vv.width) ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 0);
+    var h = (vv && vv.height) ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0);
+
+    // iOS embedded previews sometimes ignore viewport meta and render a wide layout viewport,
+    // then scale it down. In that case visualViewport.scale becomes < 1.
+    try{
+      if(vv && typeof vv.scale === 'number' && vv.scale > 0 && vv.scale < 0.95){
+        return true;
+      }
+    }catch(e){}
+    var sw = 0, sh = 0;
+    try{ if(window.screen && typeof screen.width === 'number' && typeof screen.height === 'number'){ sw = screen.width; sh = screen.height; } }catch(e){}
+    var screenPortrait = (sh && sw) ? (sh > sw) : null;
+
+    // 1) Explicit orientation APIs (when available)
+    try{
+      if(typeof window.orientation === 'number'){
+        var o = window.orientation;
+        if(o === 0 || o === 180) return true;
+        if(o === 90 || o === -90) return false;
+      }
+    }catch(e){}
+    try{
+      if(screen && screen.orientation && typeof screen.orientation.type === 'string'){
+        if(screen.orientation.type.indexOf('portrait') >= 0) return true;
+        if(screen.orientation.type.indexOf('landscape') >= 0) return false;
+      }
+    }catch(e){}
+
+    // 2) If physical screen says portrait but the viewport reports landscape (common in embedded previews), lock to portrait.
+    if(screenPortrait === true && (w > h)) return true;
+
+    // 2.5) outer size can still reflect device orientation even when layout viewport is "stuck".
+    try{
+      var ow = window.outerWidth || 0;
+      var oh = window.outerHeight || 0;
+      if(oh > ow) return true;
+    }catch(e){}
+
+    // 3) Viewport ratio (most reliable across Safari UI-chrome changes)
+    var byRatio = (h > w);
+
+    // 3) matchMedia is sometimes wrong in embedded viewers: treat only "true" as strong signal
+    var mmPortrait = null;
+    try{
+      if(window.matchMedia){
+        var mq = window.matchMedia('(orientation: portrait)');
+        if(typeof mq.matches === 'boolean') mmPortrait = mq.matches;
+      }
+    }catch(e){}
+
+    // 4) Too narrow to safely show the 3x2 menu => treat as portrait lock (prevents broken preview)
+    var tooNarrow = (w && w < 650);
+
+    return (mmPortrait === true) || byRatio || tooNarrow;
+  }
+
+  var _prevPortrait = null;
   function apply(){
-    var portrait = window.innerHeight > window.innerWidth;
+    var portrait = _portraitByViewport();
+    document.documentElement.classList.toggle('needLandscape', portrait);
     document.body.classList.toggle('needLandscape', portrait);
+
     var lock = document.getElementById('landscapeLock');
     if(lock){
       lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
     }
+
+    // When leaving portrait, force a clean relayout (prevents cached stretched heights)
+    if(_prevPortrait === true && portrait === false){
+      try{
+        if(typeof scheduleViewportSize === 'function') scheduleViewportSize();
+      }catch(e){}
+    }
+    _prevPortrait = portrait;
   }
-  window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
-  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
+
+  function applySoon(){
+    apply();
+    setTimeout(apply, 80);
+    setTimeout(apply, 220);
+  }
+
+  window.addEventListener('resize', applySoon);
+  window.addEventListener('orientationchange', applySoon);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', applySoon);
+    window.visualViewport.addEventListener('scroll', applySoon);
+  }
+  document.addEventListener('visibilitychange', function(){ setTimeout(applySoon, 60); });
+
   // try to lock orientation when supported (PWA/Android)
   try{
     if(screen.orientation && screen.orientation.lock){
       screen.orientation.lock('landscape').catch(function(){});
     }
   }catch(e){}
-  apply();
+
+  applySoon();
 })();
 // 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
 // ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼

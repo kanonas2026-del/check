@@ -4233,7 +4233,7 @@ window.addEventListener('pageshow', ()=>{
           const rms = Math.sqrt(s/bufTD.length);
 
           // ★v33: 1弦(A)は小さめでもOKが出るように閾値を少し下げる
-          const rmsFloor = minRms * ((takeKey === 'A') ? 0.72 : 1.0);
+          const rmsFloor = minRms * ((takeKey === 'A') ? 0.50 : 1.0);
 
           // 強すぎ（クリップ/ペチン音）を避ける：大きすぎる場合はOKにしない
           const tooLoud = (peak > 0.94) || (rms > Math.max(0.22, minRms * 18));
@@ -4250,8 +4250,8 @@ window.addEventListener('pageshow', ()=>{
             const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate, rmsFloor);
             if(hz > 0){
               const cents = 1200 * Math.log2(Math.max(1e-6, hz / t.freq));
-              const okPitch = Math.abs(cents) < ((takeKey === 'A') ? 65 : 55);
-              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < ((takeKey === 'A') ? 24 : 18));
+              const okPitch = Math.abs(cents) < ((takeKey === 'A') ? 90 : 55);
+              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < ((takeKey === 'A') ? 38 : 18));
 
               if(okPitch && okStable){
                 stableCount++;
@@ -4263,7 +4263,7 @@ window.addEventListener('pageshow', ()=>{
                 setHint('ちょっとだけ合わせてね（近いよ）');
               }
 
-              const need = (takeKey === 'A') ? 5 : 6;
+              const need = (takeKey === 'A') ? 4 : 6;
               if(stableCount >= need && !recActive){
                 triggerRecord();
               }
@@ -4378,8 +4378,9 @@ window.addEventListener('pageshow', ()=>{
         let ly = 0;
 
         // soft noise gate threshold (avoid boosting room noise)
-        const gate = Math.max(0.0009, (noiseRms||0) * 1.8, (minRms||0) * 0.22);
+        const gate = Math.max(0.0011, (noiseRms||0) * 2.4, (minRms||0) * 0.30);
 
+        let kg = 1.0;
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
           let y = a * (y1 + x - x1);
@@ -4391,10 +4392,21 @@ window.addEventListener('pageshow', ()=>{
 
           const ay = Math.abs(y);
           if(ay < gate){
-            // ★v33: 余韻を殺さないように“弱めのエキスパンダ”にする（完全には消さない）
-            const m = ay / gate; // 0..1
-            const keep = 0.30 + 0.70 * Math.sqrt(Math.max(0, Math.min(1, m))); // 0.30..1.0
-            y *= keep;
+            // ★v34: 余韻は残しつつ、部屋ノイズは“自然に”落とす
+            // 先頭(アタック)は加工しすぎない
+            if(i < Math.floor(sr * 0.15)){
+              // keep as-is
+            }else{
+              const m = Math.max(0, Math.min(1, ay / gate)); // 0..1
+              // 低レベル域は強めに落として“録音っぽいザラつき”を減らす
+              const desired = 0.10 + 0.90 * (m*m);
+              // なめらかに追従（ポンピング抑制）
+              kg = kg + ((desired < kg) ? 0.035 : 0.008) * (desired - kg);
+              y *= kg;
+            }
+          }else{
+            // 回復はゆっくり（急に戻ると不自然）
+            kg = kg + 0.006 * (1.0 - kg);
           }
           proc[i] = y;
         }
@@ -4402,7 +4414,7 @@ window.addEventListener('pageshow', ()=>{
         // peak normalize (keep headroom for chords)
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-        const g = (mx > 0.0005) ? (0.78 / mx) : 1.0;
+        const g = (mx > 0.0005) ? (0.74 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
         let b = tapAudioCtx.createBuffer(1, proc.length, sr);
@@ -4426,13 +4438,21 @@ window.addEventListener('pageshow', ()=>{
           for(let i=ch.length-1;i>=0;i--){
             if(Math.abs(ch[i]) > endThr){ last = i; break; }
           }
-          const keep = Math.min(ch.length, last + Math.floor(sr * 0.30)); // +300ms
+          const keep = Math.min(ch.length, last + Math.floor(sr * 0.22)); // +220ms（余韻は残しつつノイズを抑える）
           if(keep > Math.floor(sr * 0.35) && keep < ch.length - Math.floor(sr * 0.05)){
             const b2 = tapAudioCtx.createBuffer(1, keep, sr);
             b2.copyToChannel(ch.subarray(0, keep), 0, 0);
             b = b2;
             ch = b.getChannelData(0);
-          }
+          
+            // trim後の末尾をもう一度なめらかにフェード（変な後ノイズを残さない）
+            const fo2 = Math.min(ch.length, Math.floor(sr * 0.24));
+            for(let i=0;i<fo2;i++){
+              const p = (fo2 - i) / Math.max(1, fo2);
+              const q = p * p;
+              ch[ch.length-1-i] *= q;
+            }
+}
         }catch(e){}
 
         // compute rms for leveling（after trim）
@@ -4521,9 +4541,9 @@ window.addEventListener('pageshow', ()=>{
         // ★v33: “ウクレレっぽい胴鳴り”を少しだけ足す（濁らない程度）
         const bodyF = tapAudioCtx.createBiquadFilter();
         bodyF.type = 'peaking';
-        bodyF.frequency.setValueAtTime(520, startTime);
-        bodyF.Q.setValueAtTime(1.1, startTime);
-        bodyF.gain.setValueAtTime(1.6, startTime);
+        bodyF.frequency.setValueAtTime(520, t);
+        bodyF.Q.setValueAtTime(1.1, t);
+        bodyF.gain.setValueAtTime(1.6, t);
 
         hp.connect(bodyF);
         bodyF.connect(lp);
@@ -4567,9 +4587,9 @@ window.addEventListener('pageshow', ()=>{
         // ★v33: “ウクレレっぽい胴鳴り”を少しだけ足す（濁らない程度）
         const bodyF = tapAudioCtx.createBiquadFilter();
         bodyF.type = 'peaking';
-        bodyF.frequency.setValueAtTime(520, startTime);
-        bodyF.Q.setValueAtTime(1.1, startTime);
-        bodyF.gain.setValueAtTime(1.6, startTime);
+        bodyF.frequency.setValueAtTime(520, now);
+        bodyF.Q.setValueAtTime(1.1, now);
+        bodyF.gain.setValueAtTime(1.6, now);
 
         hp.connect(bodyF);
         bodyF.connect(lp);

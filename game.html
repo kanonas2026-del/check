@@ -1294,7 +1294,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.29</div>
+<div id="verTag">v0.30</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1387,7 +1387,7 @@ body.menuOpen #back-btn{ display:none !important; }
     </div>
     <div class="vol-inline global-vol-inline" onclick="event.stopPropagation();">
       <div class="vol-label">🔊 タップ音</div>
-      <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
+      <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.85">
     </div>
   </div>
   <div id="mode-desc" class="mode-desc">サポート：とまって まつよ（はじめてにおすすめ）</div>
@@ -3299,8 +3299,8 @@ if (window.visualViewport){
 window.addEventListener('resize', applyViewportSize);
 window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
 // タップ操作
-canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(isTapMode()) handleAction(); }, {passive:false});
-canvas.addEventListener('mousedown', ()=>{ if(isTapMode()) handleAction(); });
+canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } }, {passive:false});
+canvas.addEventListener('mousedown', ()=>{ if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } });
 
 // UIBAR FIX PATCH (disabled on iOS)
 (function(){
@@ -4575,7 +4575,8 @@ candidates[key] = b;
     if(!s) return;
 
     try{ loadTapVol(); }catch(e){}
-    const v01 = getTapVolume01();
+    // prefer stored tapVol (localStorage) to avoid accidental silence
+    const v01 = (typeof tapVol !== 'undefined' && Number.isFinite(tapVol)) ? Math.max(0, Math.min(1, tapVol)) : getTapVolume01();
     setTapVolume01(v01);
     try{ window.applyTapVolumeToGain(); }catch(e){}
 
@@ -4616,16 +4617,44 @@ candidates[key] = b;
   }
 
   // ★NEW: Unlock Audio on First Touch (Global)
-  // This solves the "initial silence" issue by forcing a resume on the very first touch anywhere.
+  // iOS対策：最初のジェスチャーで AudioContext を生成/再開し、無音バッファを1回だけ流して確実にアンロックする
   function unlockAudioGlobal(){
     try{
-      if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
-      if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      // Tap SE context (create + resume)
+      try{ ensureTapAudio(); }catch(_){}
+
+      try{
+        if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
+          if(tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
+
+          // Hard unlock: play a 1-sample silent buffer once
+          try{
+            const b = tapAudioCtx.createBuffer(1, 1, tapAudioCtx.sampleRate);
+            const src = tapAudioCtx.createBufferSource();
+            src.buffer = b;
+            const g = tapAudioCtx.createGain();
+            g.gain.value = 0.0;
+            src.connect(g);
+            // Prefer master chain if available
+            if(typeof tapMaster !== 'undefined' && tapMaster) g.connect(tapMaster);
+            else g.connect(tapAudioCtx.destination);
+            src.start();
+            src.stop(tapAudioCtx.currentTime + 0.01);
+          }catch(__){}
+        }
+      }catch(__){}
+
+      // Mic context (if already created)
+      try{
+        if(typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      }catch(__){}
     }catch(e){}
     document.removeEventListener('touchstart', unlockAudioGlobal);
+    document.removeEventListener('pointerdown', unlockAudioGlobal);
     document.removeEventListener('click', unlockAudioGlobal);
   }
   document.addEventListener('touchstart', unlockAudioGlobal, {once:true, passive:true});
+  document.addEventListener('pointerdown', unlockAudioGlobal, {once:true, passive:true});
   document.addEventListener('click', unlockAudioGlobal, {once:true, passive:true});
 
 

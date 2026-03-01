@@ -1241,12 +1241,37 @@ body.menuOpen #back-btn{ display:none !important; }
 #globalModeWrap{ margin-top: 6px !important; }
 #globalModeWrap .global-mode-row{
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "top pills vol";
   align-items: center;
   gap: 12px;
 }
 #globalModeWrap .global-mode-row .top-inline-btn{ margin: 0; }
 #globalModeWrap .global-mode-row #play-mode-pills{ justify-content: center; }
+
+#globalModeWrap .global-mode-row .top-inline-btn{ grid-area: top; }
+#globalModeWrap .global-mode-row #play-mode-pills{ grid-area: pills; }
+#globalModeWrap .global-mode-row .global-vol-inline{ grid-area: vol; justify-content: flex-end; }
+
+#globalModeWrap .global-mode-row .global-vol-inline #tapVolume{
+  max-width: 190px;
+}
+
+@media (max-width: 520px){
+  #globalModeWrap .global-mode-row{
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "top pills"
+      "vol vol";
+    row-gap: 8px;
+  }
+  #globalModeWrap .global-mode-row .global-vol-inline{ justify-self: stretch; }
+  #globalModeWrap .global-mode-row .global-vol-inline #tapVolume{
+    max-width: none;
+    width: 100%;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 430px){
   #mode-desc{ display:none !important; }
   #globalModeWrap{ margin-top: 4px !important; }
@@ -1267,7 +1292,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.27</div>
+<div id="verTag">v0.28</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1358,6 +1383,10 @@ body.menuOpen #back-btn{ display:none !important; }
       <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ふつう</div>
       <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート</div>
     </div>
+    <div class="vol-inline global-vol-inline" onclick="event.stopPropagation();">
+      <div class="vol-label">🔊 タップ音</div>
+      <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
+    </div>
   </div>
   <div id="mode-desc" class="mode-desc">サポート：とまって まつよ（はじめてにおすすめ）</div>
 </div>
@@ -1366,13 +1395,6 @@ body.menuOpen #back-btn{ display:none !important; }
 
 <!-- legacy menu back button (kept for JS; hidden by existing CSS) -->
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
-
-<div class="bottom-inline">
-  <div class="vol-inline">
-    <div class="vol-label">🔊 タップ音</div>
-    <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
-  </div>
-</div>
 
 </div>
 </div>

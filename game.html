@@ -9,6 +9,79 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ウクレレ">
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+
+<script>
+/* v0.36: portrait detection hardened for iOS Files preview (layout viewport scale < 1) */
+(function(){
+  try{
+    function _computePortraitQuick(){
+      var vv = window.visualViewport;
+      var w = (vv && vv.width) ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 0);
+      var h = (vv && vv.height) ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0);
+      var portrait = (h > w);
+
+      // If we're being scaled down (common in iOS embedded file preview / when viewport meta is ignored),
+      // force portrait-lock so the menu layout is not cached in a stretched state.
+      try{
+        if(vv && typeof vv.scale === 'number' && vv.scale > 0 && vv.scale < 0.95){
+          portrait = true;
+        }
+      }catch(e){}
+
+      // Strong orientation APIs when available
+      try{
+        if(typeof window.orientation === 'number'){
+          var o = window.orientation;
+          if(o === 0 || o === 180) portrait = true;
+          if(o === 90 || o === -90) portrait = false;
+        }
+      }catch(e){}
+      try{
+        if(screen && screen.orientation && typeof screen.orientation.type === 'string'){
+          if(screen.orientation.type.indexOf('portrait') >= 0) portrait = true;
+          if(screen.orientation.type.indexOf('landscape') >= 0) portrait = false;
+        }
+      }catch(e){}
+
+      // matchMedia: use as signal if it returns a boolean
+      try{
+        if(window.matchMedia){
+          var mq = window.matchMedia('(orientation: portrait)');
+          if(typeof mq.matches === 'boolean') portrait = mq.matches;
+        }
+      }catch(e){}
+
+      // Embedded viewers sometimes report a landscape viewport while the physical screen is portrait.
+      // If screen says portrait but viewport is landscape, treat as portrait lock (prevents broken preview + cached stretch).
+      try{
+        if(screen && screen.width && screen.height){
+          var screenPortrait = (screen.height > screen.width);
+          if(screenPortrait && (w > h)) portrait = true;
+        }
+      }catch(e){}
+
+      // Some embedded viewers keep a "landscape" layout viewport even when the device is portrait.
+      // outerWidth/outerHeight can still reflect the real device orientation.
+      try{
+        var ow = window.outerWidth || 0;
+        var oh = window.outerHeight || 0;
+        if(oh > ow) portrait = true;
+      }catch(e){}
+
+      // Too narrow => treat as portrait lock
+      if(w && w < 650) portrait = true;
+
+      return portrait;
+    }
+
+    if(_computePortraitQuick()){
+      document.documentElement.classList.add('needLandscape');
+    }else{
+      document.documentElement.classList.remove('needLandscape');
+    }
+  }catch(e){}
+})();
+</script>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
 <title>ウクレレ・ゲーム</title>
@@ -841,6 +914,47 @@ body.is-uke .vol-inline{ display:none !important; }
   line-height: 1.25;
 }
 
+/* v38: ウクキャプ（サンプリング）UIを大きく＆OKを強調（他UIは触らない） */
+#sample-overlay .sample-card h2{
+  font-size: 26px;
+  margin: 4px 0 10px;
+}
+#sample-overlay #sample-msg{
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.25;
+  margin: 6px 0 8px;
+}
+#sample-overlay #sample-msg.is-ok{
+  font-size: 22px;
+  background: #dff6e6;
+  border: 2px solid rgba(0,0,0,0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+#sample-overlay .sample-progress{
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+#sample-overlay .sample-progress .sp-item{
+  font-size: 16px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid rgba(0,0,0,0.10);
+}
+#sample-overlay .sample-progress .sp-item.done{
+  border-color: rgba(0,0,0,0.16);
+}
+#sample-overlay .sample-progress .sp-item.done::after{
+  content: " OK";
+  font-weight: 1000;
+}
+#sample-overlay .sample-hint{
+  font-size: 14px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
 /* iPhone横：必ず1画面 */
 @media (orientation: landscape) and (max-height: 430px){
   #menu-overlay{
@@ -1023,7 +1137,18 @@ body.is-uke .vol-inline{ display:none !important; }
     padding: 18px;
     box-sizing: border-box;
   }
+  html.needLandscape #landscapeLock,
   body.needLandscape #landscapeLock{ display:flex; }
+  /* avoid "stretched buttons" being cached while in portrait: don't lay out the menu at all */
+  html.needLandscape #menu-overlay,
+  body.needLandscape #menu-overlay{ display:none !important; }
+
+  /* CSS-only portrait lock (for environments where JS may be disabled, e.g., iOS Files preview) */
+  @media (max-aspect-ratio: 1/1){
+    #landscapeLock{ display:flex; }
+    #menu-overlay{ display:none !important; }
+  }
+
   .landscapeCard{
     width: min(560px, 92vw);
     border-radius: 22px;
@@ -1146,8 +1271,14 @@ body.menuOpen #back-btn{ display:none !important; }
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 8px !important;
-  align-content: start;
+  /* iPhone縦→横 / Safariの高さ変動でも、ボタン段が伸びないように固定 */
+  align-content: start !important;
+  align-items: start !important;
+  grid-auto-rows: max-content !important;
 }
+
+/* extra safety: prevent any item from stretching in row height */
+.menu-main.menu-grid-3x2 > .menu-btn{ align-self: start !important; }
 
 /* import JSON button color (same size) */
 .menu-btn.mode6{
@@ -1294,7 +1425,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.31</div>
+<div id="verTag">v0.38</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1356,9 +1487,9 @@ body.menuOpen #back-btn{ display:none !important; }
       </div>
 
       <!-- ウクレレのおと: ボタン右側余白に収納（右スペース） -->
-      <div class="menu-extra">
+      <div class="menu-extra" onclick="event.stopPropagation();">
         <div class="mode-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
-          <div class="mode-pill sound-pill" id="ukeSoundPill" aria-pressed="false">ウクレレのおと</div>
+          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
         </div>
 
         <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
@@ -1855,9 +1986,6 @@ let tapVol = 0.85;
 let tapAudioCtx = null;
 let tapMaster = null;
 let tapCompressor = null; // コンプレッサー追加
-// 実録サンプル用：専用コンプ（タップ音と別にして濁り/割れを抑える）
-let sampleMaster = null;
-let sampleCompressor = null;
 
 function loadTapVol(){
   try{
@@ -1910,25 +2038,6 @@ function ensureTapAudio(){
     } else {
       tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
     }
-  
-    // 実録サンプル用の出力チェーン（タップ音と別のコンプで“割れ/濁り”を抑える）
-    try{
-      if(!sampleCompressor){
-        sampleCompressor = tapAudioCtx.createDynamicsCompressor();
-        // なるべく音色を変えずにピークだけ抑える（軽め）
-        sampleCompressor.threshold.setValueAtTime(-16, tapAudioCtx.currentTime);
-        sampleCompressor.knee.setValueAtTime(18, tapAudioCtx.currentTime);
-        sampleCompressor.ratio.setValueAtTime(4, tapAudioCtx.currentTime);
-        sampleCompressor.attack.setValueAtTime(0.004, tapAudioCtx.currentTime);
-        sampleCompressor.release.setValueAtTime(0.12, tapAudioCtx.currentTime);
-      }
-      if(!sampleMaster){
-        sampleMaster = tapAudioCtx.createGain();
-        sampleCompressor.connect(sampleMaster);
-        sampleMaster.connect(tapAudioCtx.destination);
-      }
-    }catch(e){}
-    try{ window.applyTapVolumeToGain && window.applyTapVolumeToGain(); }catch(e){}
   }catch(e){}
 }
 
@@ -2517,106 +2626,27 @@ window.applyUkeSoundUi = function(){
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
-// ウクレレのおと（録音音 / アプリ音）切替：状態はlocalStorageに保存
-const UKE_SOUND_MODE_KEY = 'uk_uke_sound_mode_v1';
-function saveUkeSoundMode(mode){
-  try{ localStorage.setItem(UKE_SOUND_MODE_KEY, String(mode||'').toUpperCase()); }catch(e){}
-}
-function loadUkeSoundMode(){
-  try{ return String(localStorage.getItem(UKE_SOUND_MODE_KEY)||'').toUpperCase(); }catch(e){ return ''; }
-}
-window.applySavedUkeSoundMode = function(){
-  try{
-    const us = window.UKE_SAMPLE;
-    if(!us) return;
-    const m = loadUkeSoundMode();
-    if(m === 'SAMPLE' || m === 'OSC') us.mode = m;
-    if(!us.ready) us.mode = 'OSC';
-  }catch(e){}
-  try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
-};
-
 window.toggleUkeSound = function(){
   try{ ensureTapAudio(); }catch(e){}
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
-
   const isOn = (us.mode === 'SAMPLE' && us.ready);
-
   if(isOn){
     us.mode = 'OSC';
-    saveUkeSoundMode('OSC');
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
-  // ONにしたい（録音済みなら切替）
+  // ONにしたい
   if(us.ready){
     us.mode = 'SAMPLE';
-    saveUkeSoundMode('SAMPLE');
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
   // まだ録音がない → 取り込みフローへ
-  try{
-    // bindSamplingUI 内で公開される（クリック連鎖を避けて確実に開く）
-    if(typeof window.openSamplingFlow === 'function'){
-      window.openSamplingFlow();
-    }else{
-      const sb = document.getElementById('sampleBtn');
-      if(sb){ sb.click(); }
-    }
-  }catch(e){}
-
+  const sb = document.getElementById('sampleBtn');
+  if(sb){ sb.click(); }
   if(window.applyUkeSoundUi) window.applyUkeSoundUi();
 };
-
-// iOS/Safari対策：ボタン内にあるため、明示的にイベントを拾う
-window.bindUkeSoundPillDirect = function(){
-  try{
-    const pill = document.getElementById('ukeSoundPill');
-    if(!pill || pill.__ukeBound) return;
-    pill.__ukeBound = true;
-
-    const fire = (ev)=>{
-      try{ ensureTapAudio(); }catch(e){}
-      try{ ev && ev.preventDefault && ev.preventDefault(); }catch(e){}
-      try{ ev && ev.stopPropagation && ev.stopPropagation(); }catch(e){}
-      try{ ev && ev.stopImmediatePropagation && ev.stopImmediatePropagation(); }catch(e){}
-      // 二重発火ガード（click/touch/pointer の多重を防ぐ）
-      const now = Date.now();
-      if(window.__ukeSoundLastTap && (now - window.__ukeSoundLastTap) < 180) return false;
-      window.__ukeSoundLastTap = now;
-
-      try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-      return false;
-    };
-
-    // 直接タップできる環境
-    pill.addEventListener('click', fire);
-    pill.addEventListener('touchend', fire, {passive:false});
-    pill.addEventListener('pointerup', fire, {passive:false});
-
-    // Safari/ボタン内要素の取りこぼし対策：キャプチャ段階で拾う（stopPropagationに負けない）
-    if(!window.__ukeSoundCaptureBound){
-      window.__ukeSoundCaptureBound = true;
-      const cap = (ev)=>{
-        try{
-          const t = ev && ev.target;
-          if(!t || !t.closest) return;
-          const hit = t.closest('#ukeSoundPill');
-          if(!hit) return;
-          return fire(ev);
-        }catch(e){}
-      };
-      document.addEventListener('pointerdown', cap, true);
-      document.addEventListener('click', cap, true);
-      document.addEventListener('touchstart', cap, {capture:true, passive:false});
-    }
-  }catch(e){}
-};
-
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
 // URLパラメータ mode=TAP/NORMAL/WAIT を入口として反映（v12）
@@ -3384,21 +3414,78 @@ function drawFretboard(){
 }
 
 
-function applyViewportSize(){
+function __getViewportWH(){
+  const iw = (window.innerWidth || document.documentElement.clientWidth || 0);
+  const ih = (window.innerHeight || document.documentElement.clientHeight || 0);
   const vv = window.visualViewport;
-  const w = vv ? vv.width  : (document.documentElement.clientWidth  || window.innerWidth);
-  const h = vv ? vv.height : (document.documentElement.clientHeight || window.innerHeight);
-  // expose CSS vh unit (iPhone Safari 100vh issue)
+  if(vv && vv.width && vv.height){
+    // iOS Safari: 縦→横で innerHeight が一瞬/長時間大きい値のまま残ることがあるため、
+    // 見えている範囲(visualViewport)と layout viewport の“小さい方”を採用して「下が伸びる」を防ぐ
+    return {
+      w: Math.round(Math.min(iw, vv.width)),
+      h: Math.round(Math.min(ih, vv.height))
+    };
+  }
+  return { w: Math.round(iw), h: Math.round(ih) };
+}
+
+function forceMenuRelayout(){
+  const card = document.querySelector('#menu-overlay .menu-card');
+  if(!card) return;
+  // iOS Safari: grid の行高が回転前のまま残ることがある → display トグルで確実に再計算
+  const prev = card.style.display;
+  card.style.display = 'none';
+  // force reflow
+  void card.offsetHeight;
+  card.style.display = prev || '';
+}
+
+function applyViewportSize(){
+  const wh = __getViewportWH();
+  const w = wh.w;
+  const h = wh.h;
+
+  // expose CSS vh unit (Safari address bar / rotation issue)
   document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
+
+  // canvas size
   canvas.width  = Math.floor(w);
   canvas.height = Math.floor(h);
+
+  // menu relayout (prevents stretched buttons after portrait->landscape without reload)
+  try{ forceMenuRelayout(); }catch(_){}
 }
-applyViewportSize();
+function scheduleViewportSize(){
+  applyViewportSize();
+  try{ requestAnimationFrame(applyViewportSize); }catch(_){}
+  setTimeout(applyViewportSize, 120);
+  setTimeout(applyViewportSize, 360);
+  setTimeout(()=>{ try{ forceMenuRelayout(); }catch(_){} }, 520);
+}
+// 初期表示 + iOSのUIバー変動対策で複数回更新
+scheduleViewportSize();
+
 if (window.visualViewport){
-  window.visualViewport.addEventListener('resize', applyViewportSize);
+  window.visualViewport.addEventListener('resize', scheduleViewportSize);
+  // アドレスバー表示/非表示などで scroll だけ発火する場合がある
+  window.visualViewport.addEventListener('scroll', scheduleViewportSize);
 }
-window.addEventListener('resize', applyViewportSize);
-window.addEventListener('orientationchange', () => setTimeout(applyViewportSize, 250));
+window.addEventListener('resize', scheduleViewportSize);
+window.addEventListener('orientationchange', scheduleViewportSize);
+window.addEventListener('pageshow', scheduleViewportSize);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) scheduleViewportSize(); });
+
+// 初回ジェスチャー後に高さが確定する端末があるため、最初の操作で再計測
+let __vhGestureDone = false;
+function __kickVhOnFirstGesture(){
+  if(__vhGestureDone) return;
+  __vhGestureDone = true;
+  scheduleViewportSize();
+  try{ window.removeEventListener('touchstart', __kickVhOnFirstGesture, true); }catch(_){}
+  try{ window.removeEventListener('mousedown',  __kickVhOnFirstGesture, true); }catch(_){}
+}
+window.addEventListener('touchstart', __kickVhOnFirstGesture, {passive:true, capture:true});
+window.addEventListener('mousedown',  __kickVhOnFirstGesture, true);
 // タップ操作
 canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } }, {passive:false});
 canvas.addEventListener('mousedown', ()=>{ if(isTapMode()){ try{ ensureTapAudio(); }catch(_){ } handleAction(); } });
@@ -3499,19 +3586,12 @@ window.addEventListener('pageshow', ()=>{
   window.applyTapVolumeToGain = function(){
     try{
       const v = getTapVolume01();
-      const g = Math.pow(v, 2.2);
-      if(typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
-        if(typeof tapMaster !== 'undefined' && tapMaster){
-          tapMaster.gain.setTargetAtTime(Math.min(2.0, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.015);
-        }
-        // 実録サンプル側は少しだけ控えめ（割れを避ける）
-        if(typeof sampleMaster !== 'undefined' && sampleMaster){
-          sampleMaster.gain.setTargetAtTime(Math.min(2.0, g * OUTPUT_BOOST * 0.92), tapAudioCtx.currentTime, 0.015);
-        }
+      const g = Math.pow(v, 2.2); 
+      if(typeof tapMaster !== 'undefined' && tapMaster && typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
+        tapMaster.gain.setTargetAtTime(Math.min(2.0, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.015);
       }
     }catch(e){}
   };
-
 
   // --- UI Sound Feedback (Fun Pop Sound) ---
   let lastFeedbackTime = 0;
@@ -3569,51 +3649,7 @@ window.addEventListener('pageshow', ()=>{
   }
 
   // --- SUSTAIN MANAGEMENT (v80) ---
-  const activeVoices = []; // {osc, gain, startTime, endTime}
-  const MAX_ACTIVE_VOICES = 18;
-
-  function pruneVoices(){
-    if(!tapAudioCtx) return;
-    const now = tapAudioCtx.currentTime;
-    for(let i=activeVoices.length-1;i>=0;i--){
-      const v = activeVoices[i];
-      const et = (v && Number.isFinite(v.endTime)) ? v.endTime : (v && Number.isFinite(v.startTime) ? (v.startTime + 5.0) : now);
-      if(et < now - 0.05){
-        activeVoices.splice(i, 1);
-      }
-    }
-  }
-
-  function softReleaseVoice(v, relSec){
-    if(!tapAudioCtx || !v || !v.gain) return;
-    const now = tapAudioCtx.currentTime;
-    const rel = Number.isFinite(relSec) ? relSec : 0.18;
-    try{
-      const g = v.gain.gain;
-      g.cancelScheduledValues(now);
-      const cur = Number.isFinite(g.value) ? g.value : 0.0001;
-      g.setValueAtTime(Math.max(0.0001, cur), now);
-      g.exponentialRampToValueAtTime(0.001, now + Math.max(0.06, rel * 0.75));
-      g.linearRampToValueAtTime(0, now + rel);
-    }catch(e){}
-    try{
-      const stopAt = now + rel + 0.08;
-      if(Array.isArray(v.osc)) v.osc.forEach(o=>{ try{o.stop(stopAt);}catch(_){ }});
-      else if(v.osc && v.osc.stop) v.osc.stop(stopAt);
-    }catch(e){}
-    try{ if(v.filter) v.filter.disconnect(); }catch(_){ }
-    v.endTime = now + rel + 0.10;
-  }
-
-  function limitVoices(extraComing){
-    pruneVoices();
-    const incoming = Number.isFinite(extraComing) ? extraComing : 1;
-    const keep = Math.max(4, MAX_ACTIVE_VOICES - incoming);
-    while(activeVoices.length > keep){
-      const v = activeVoices.shift();
-      try{ softReleaseVoice(v, 0.14); }catch(_){ }
-    }
-  }
+  const activeVoices = []; // {osc, gain, startTime}
 
   function stopAllVoices(){
     if(!tapAudioCtx) return;
@@ -3636,17 +3672,10 @@ window.addEventListener('pageshow', ()=>{
     activeVoices.length = 0;
   }
 
-  // Tap Release Handler (v33)
-  // 1タップでも余韻を残すため、touchend/mouseup では止めない。
-  // 代わりにページ非表示/キャンセル時のみ停止する。
-  const __stopAllOnHide = ()=>{
-    try{ stopAllVoices(); }catch(e){}
-  };
-  window.addEventListener('touchcancel', __stopAllOnHide, {passive:true});
-  window.addEventListener('pointercancel', __stopAllOnHide, {passive:true});
-  window.addEventListener('blur', __stopAllOnHide, {passive:true});
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) __stopAllOnHide(); }, {passive:true});
-  window.addEventListener('pagehide', __stopAllOnHide, {passive:true});
+  // Tap Release Handler
+  window.addEventListener('touchend', stopAllVoices, {passive:true});
+  window.addEventListener('mouseup', stopAllVoices, {passive:true});
+  window.addEventListener('pointerup', stopAllVoices, {passive:true});
 
   // ノイズバッファの生成（キャッシュ）
   function getUkeNoiseBuffer() {
@@ -3667,7 +3696,7 @@ window.addEventListener('pageshow', ()=>{
   window.playFreqs = function(freqs, dur){
     try{
       ensureTapAudio();
-      limitVoices(Array.isArray(freqs)? freqs.length : 1);
+      stopAllVoices();
 
       // v0.4: サンプリング音源モード（準備できていればこちらで再生）
       if(window.UKE_SAMPLE && window.UKE_SAMPLE.mode === 'SAMPLE' && window.UKE_SAMPLE.ready && typeof window.playSampleFreqs === 'function'){
@@ -3679,8 +3708,6 @@ window.addEventListener('pageshow', ()=>{
 
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
-
-      limitVoices(N);
 
       // Volume Scaling to prevent clipping before compressor
       // 弦の数が多いほどゲインを下げる
@@ -3802,8 +3829,7 @@ window.addEventListener('pageshow', ()=>{
         activeVoices.push({
             osc: [osc1, osc2, osc3],
             gain: voiceGain,
-            startTime: startTime,
-            endTime: stopTime
+            startTime: startTime
         });
       });
     }catch(e){ console.error(e); }
@@ -3832,7 +3858,7 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
-      const baseGain = 0.56 / Math.sqrt(N);
+      const baseGain = 0.78 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
@@ -3873,36 +3899,18 @@ window.addEventListener('pageshow', ()=>{
         const rate = Math.max(0.35, Math.min(3.0, f / (base[k] || 440)));
         src.playbackRate.setValueAtTime(rate, startTime);
 
-        // フェード/余韻（タップでも“伸び”を残しつつ、濁りにくい減衰）
+        // フェード/余韻（短すぎない自然な減衰）
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, startTime);
         const mult = (gMap && gMap[k]) ? gMap[k] : 1.0;
-        let peak = baseGain * mult;
-        peak = Math.min(0.62, peak);
+        const peak = baseGain * mult;
+        g.gain.linearRampToValueAtTime(peak, startTime + 0.010);
 
-        // ★v33: 余韻をしっかり残す（ただし濁りすぎない）
-        const attack = 0.010;
-        const decay  = 0.110;
-        const sustain= 0.62;
-        const release= 0.18;
-
-        // dur(秒)が来る場合は“リング感”に変換。短いdurでも最低0.95秒は鳴らす。
-        let tail = (Number.isFinite(Number(dur)) && Number(dur) > 0)
-          ? Math.max(0.95, Math.min(1.90, Number(dur) * 3.8))
-          : 1.35;
-
-        // サンプル長（ピッチシフト後）の範囲に寄せる（ただし短すぎない）
-        const bufDur = (buf.duration / rate);
-        tail = Math.min(tail, Math.max(0.85, bufDur + 0.06));
-
-        const tA = startTime + attack;
-        const tD = tA + decay;
-        const tR = startTime + Math.max((tD - startTime) + 0.05, tail - release);
-
-        g.gain.linearRampToValueAtTime(peak, tA);
-        g.gain.linearRampToValueAtTime(peak * sustain, tD);
-        g.gain.setValueAtTime(peak * sustain, tR);
-        g.gain.linearRampToValueAtTime(0.0, tR + release);
+        // dur は指定が来る場合だけ少し反映（通常は固定の余韻）
+        const tail = Math.max(2.2, Math.min(3.4, (Number(dur)||0) * 3.0 || 2.6));
+        g.gain.setValueAtTime(peak, startTime + Math.max(0.45, tail - 1.2));
+        g.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
+        g.gain.linearRampToValueAtTime(0, startTime + tail + 0.14);
 
         // 軽いローパスで耳に痛い成分を抑える（実録の高域ノイズ対策）
         const hp = tapAudioCtx.createBiquadFilter();
@@ -3911,22 +3919,12 @@ window.addEventListener('pageshow', ()=>{
 
         const lp = tapAudioCtx.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(7200, startTime);
+        lp.frequency.setValueAtTime(6000, startTime);
 
         src.connect(hp);
-
-        // ★v33: “ウクレレっぽい胴鳴り”を少しだけ足す（濁らない程度）
-        const bodyF = tapAudioCtx.createBiquadFilter();
-        bodyF.type = 'peaking';
-        bodyF.frequency.setValueAtTime(520, startTime);
-        bodyF.Q.setValueAtTime(1.1, startTime);
-        bodyF.gain.setValueAtTime(1.6, startTime);
-
-        hp.connect(bodyF);
-        bodyF.connect(lp);
+        hp.connect(lp);
         lp.connect(g);
-        if(sampleCompressor) g.connect(sampleCompressor);
-        else g.connect(tapMaster);
+        g.connect(tapMaster);
 
         src.start(startTime);
         // 長時間ぶら下げない（安全停止）
@@ -3935,7 +3933,7 @@ window.addEventListener('pageshow', ()=>{
 
         played++;
 
-        activeVoices.push({ osc: src, gain: g, startTime, endTime: stopTime, filter: lp });
+        activeVoices.push({ osc: src, gain: g, startTime, filter: lp });
       });
       return (played > 0);
     }catch(e){ console.error(e); return false; }
@@ -4015,7 +4013,7 @@ window.addEventListener('pageshow', ()=>{
           const r = (candMeta[k] && candMeta[k].rms) ? candMeta[k].rms : target;
           let mult = target / Math.max(1e-6, r);
           // clamp to avoid over-amplifying noise
-          mult = Math.max(0.70, Math.min(1.65, mult));
+          mult = Math.max(0.55, Math.min(2.40, mult));
           candGain[k] = mult;
         });
       }catch(e){}
@@ -4024,7 +4022,7 @@ window.addEventListener('pageshow', ()=>{
 
     const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
 
-    const setMsg = (t)=>{ msgEl.textContent = t; };
+    const setMsg = (t)=>{ msgEl.textContent = t; msgEl.classList.toggle('is-ok', /OK/.test(String(t))); };
     const setHint = (t)=>{ hintEl.textContent = t; };
 
     const setProgress = (activeKey)=>{
@@ -4075,14 +4073,13 @@ window.addEventListener('pageshow', ()=>{
       preRing = null; preLen = 0; preWrite = 0;
     };
 
-    const autocorrelate = (buf, sampleRate, rmsThr)=>{
+    const autocorrelate = (buf, sampleRate)=>{
       const SIZE = buf.length;
       // RMS check
       let rms = 0;
       for(let i=0;i<SIZE;i++){ const v=buf[i]; rms += v*v; }
       rms = Math.sqrt(rms / SIZE);
-      const thr = Number.isFinite(rmsThr) ? rmsThr : minRms;
-      if(rms < thr) return -1;
+      if(rms < minRms) return -1;
 
       const minFreq = 180;
       const maxFreq = 600;
@@ -4212,7 +4209,7 @@ window.addEventListener('pageshow', ()=>{
         setMsg('静かにしてね（ノイズをはかるよ）');
         await sleep(250);
         noiseRms = await measureNoise();
-        minRms = Math.max(IS_IOS ? 0.0010 : 0.0032, noiseRms * 1.55);
+        minRms = Math.max(IS_IOS ? 0.0012 : 0.0045, noiseRms * 1.7);
         setMsg(`${t.label} を弾いてね`);
       }
 
@@ -4232,26 +4229,23 @@ window.addEventListener('pageshow', ()=>{
           }
           const rms = Math.sqrt(s/bufTD.length);
 
-          // ★v33: 1弦(A)は小さめでもOKが出るように閾値を少し下げる
-          const rmsFloor = minRms * ((takeKey === 'A') ? 0.50 : 1.0);
-
           // 強すぎ（クリップ/ペチン音）を避ける：大きすぎる場合はOKにしない
           const tooLoud = (peak > 0.94) || (rms > Math.max(0.22, minRms * 18));
           if(tooLoud){
             stableCount = 0;
             lastHz = 0;
             setHint('強すぎるよ…少し小さめで弾いてね');
-          }else if(rms < rmsFloor){
+          }else if(rms < minRms){
             stableCount = 0;
             lastHz = 0;
             // うるさくなりすぎないよう、毎回は文言を変えない
             setHint('もう一度、はっきり弾いてね');
           }else{
-            const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate, rmsFloor);
+            const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate);
             if(hz > 0){
               const cents = 1200 * Math.log2(Math.max(1e-6, hz / t.freq));
-              const okPitch = Math.abs(cents) < ((takeKey === 'A') ? 90 : 55);
-              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < ((takeKey === 'A') ? 38 : 18));
+              const okPitch = Math.abs(cents) < 55;
+              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < 18);
 
               if(okPitch && okStable){
                 stableCount++;
@@ -4263,8 +4257,7 @@ window.addEventListener('pageshow', ()=>{
                 setHint('ちょっとだけ合わせてね（近いよ）');
               }
 
-              const need = (takeKey === 'A') ? 4 : 6;
-              if(stableCount >= need && !recActive){
+              if(stableCount >= 6 && !recActive){
                 triggerRecord();
               }
             }else{
@@ -4327,7 +4320,7 @@ window.addEventListener('pageshow', ()=>{
         }
 
         // trim leading silence
-        const thr = Math.max(0.010, minRms * 2.4);
+        const thr = Math.max(0.012, minRms * 2.8);
         let st = 0;
         for(let i=0; i<recBuf.length; i++){
           if(Math.abs(recBuf[i]) > thr){ st = Math.max(0, i - Math.floor(tapAudioCtx.sampleRate*0.01)); break; }
@@ -4335,7 +4328,7 @@ window.addEventListener('pageshow', ()=>{
 
         // ★クリア化：開始点を少しだけ調整（取り込み音は維持しつつ、ペチン/指ノイズの確率を下げる）
         const sr = tapAudioCtx.sampleRate;
-        const skipSec = (peakAbs > 0.70) ? 0.020 : 0.012; // 強めほど少しだけ後ろへ
+        const skipSec = (peakAbs > 0.70) ? 0.028 : 0.018; // 強めほど少しだけ後ろへ
         const skip = Math.floor(sr * skipSec);
         if((recBuf.length - st) > (skip + Math.floor(sr * 0.55))){ st += skip; }
 
@@ -4347,7 +4340,7 @@ window.addEventListener('pageshow', ()=>{
           const headN = Math.min(data.length, Math.floor(sr * 0.08));
           let pk = 0;
           for(let i=0;i<headN;i++){ const av=Math.abs(data[i]); if(av>pk) pk=av; }
-          const onsetThr = Math.max(0.018, pk * 0.22, (minRms||0) * 3.0);
+          const onsetThr = Math.max(0.018, pk * 0.22, (minRms||0) * 4.0);
           let on = 0;
           for(let i=0;i<data.length;i++){
             if(Math.abs(data[i]) >= onsetThr){ on = Math.max(0, i - Math.floor(sr * 0.004)); break; }
@@ -4365,22 +4358,21 @@ window.addEventListener('pageshow', ()=>{
         mean = mean / Math.max(1, data.length);
 
         // 1-pole highpass to remove low rumble (≈70Hz)
-        const fc = 70;
+        const fc = 90;
         const dt = 1 / sr;
         const rc = 1 / (2 * Math.PI * fc);
         const a = rc / (rc + dt);
         let y1 = 0, x1 = 0;
 
         // 1-pole lowpass to soften hiss/aliasing (≈6500Hz)
-        const lfc = 7800;
+        const lfc = 6500;
         const lrc = 1 / (2 * Math.PI * lfc);
         const la = dt / (lrc + dt);
         let ly = 0;
 
         // soft noise gate threshold (avoid boosting room noise)
-        const gate = Math.max(0.0011, (noiseRms||0) * 2.4, (minRms||0) * 0.30);
+        const gate = Math.max(0.0018, (noiseRms||0) * 2.4, (minRms||0) * 0.32);
 
-        let kg = 1.0;
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
           let y = a * (y1 + x - x1);
@@ -4392,21 +4384,8 @@ window.addEventListener('pageshow', ()=>{
 
           const ay = Math.abs(y);
           if(ay < gate){
-            // ★v34: 余韻は残しつつ、部屋ノイズは“自然に”落とす
-            // 先頭(アタック)は加工しすぎない
-            if(i < Math.floor(sr * 0.15)){
-              // keep as-is
-            }else{
-              const m = Math.max(0, Math.min(1, ay / gate)); // 0..1
-              // 低レベル域は強めに落として“録音っぽいザラつき”を減らす
-              const desired = 0.10 + 0.90 * (m*m);
-              // なめらかに追従（ポンピング抑制）
-              kg = kg + ((desired < kg) ? 0.035 : 0.008) * (desired - kg);
-              y *= kg;
-            }
-          }else{
-            // 回復はゆっくり（急に戻ると不自然）
-            kg = kg + 0.006 * (1.0 - kg);
+            const m = ay / gate; // 0..1
+            y *= m;            // soften near-zero noise
           }
           proc[i] = y;
         }
@@ -4414,55 +4393,30 @@ window.addEventListener('pageshow', ()=>{
         // peak normalize (keep headroom for chords)
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-        const g = (mx > 0.0005) ? (0.74 / mx) : 1.0;
+        const g = (mx > 0.0005) ? (0.95 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
-        let b = tapAudioCtx.createBuffer(1, proc.length, sr);
-        let ch = b.getChannelData(0);
+        const b = tapAudioCtx.createBuffer(1, proc.length, sr);
+        const ch = b.getChannelData(0);
         for(let i=0;i<proc.length;i++){ ch[i] = proc[i] * g; }
 
-        // fade in/out + mild shaping (click防止 + 自然な余韻)
-        const fi = Math.min(ch.length, Math.floor(sr * 0.010));
-        for(let i=0;i<fi;i++){ ch[i] *= (i/Math.max(1,fi)); }
-        const fo = Math.min(ch.length, Math.floor(sr * 0.220));
+// fade in/out to avoid clicks
+        const fi = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.012));
+        for(let i=0;i<fi;i++){ ch[i] *= (i/fi); }
+        const fo = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.060));
         for(let i=0;i<fo;i++){
-          const p = (fo - i) / Math.max(1,fo);
-          const q = p * p; // 自然なフェード（線形より耳に優しい）
-          ch[ch.length-1-i] *= q;
+          const p = (fo - i) / fo;
+          ch[ch.length-1-i] *= p;
         }
 
-        // trailing trim（部屋ノイズ/濁り対策。最低限のリリースは残す）
-        try{
-          const endThr = Math.max(0.0018, gate * 0.55);
-          let last = 0;
-          for(let i=ch.length-1;i>=0;i--){
-            if(Math.abs(ch[i]) > endThr){ last = i; break; }
-          }
-          const keep = Math.min(ch.length, last + Math.floor(sr * 0.22)); // +220ms（余韻は残しつつノイズを抑える）
-          if(keep > Math.floor(sr * 0.35) && keep < ch.length - Math.floor(sr * 0.05)){
-            const b2 = tapAudioCtx.createBuffer(1, keep, sr);
-            b2.copyToChannel(ch.subarray(0, keep), 0, 0);
-            b = b2;
-            ch = b.getChannelData(0);
-          
-            // trim後の末尾をもう一度なめらかにフェード（変な後ノイズを残さない）
-            const fo2 = Math.min(ch.length, Math.floor(sr * 0.24));
-            for(let i=0;i<fo2;i++){
-              const p = (fo2 - i) / Math.max(1, fo2);
-              const q = p * p;
-              ch[ch.length-1-i] *= q;
-            }
-}
-        }catch(e){}
-
-        // compute rms for leveling（after trim）
+        // compute rms for leveling
         try{
           let rr=0, pk=0;
           for(let i=0;i<ch.length;i++){ const v=ch[i]; rr += v*v; const av=Math.abs(v); if(av>pk) pk=av; }
           const rms = Math.sqrt(rr / Math.max(1, ch.length));
           candMeta[key] = { rms, peak: pk };
         }catch(e){}
-        candidates[key] = b;
+candidates[key] = b;
 
         recalcLevels();
 
@@ -4524,7 +4478,7 @@ window.addEventListener('pageshow', ()=>{
           const t = now + i*gap;
           g.gain.setValueAtTime(0.0001, t);
           const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-          const peak = Math.min(0.62, 0.50 * mult);
+          const peak = Math.min(1.55, 1.35 * mult);
           g.gain.linearRampToValueAtTime(peak, t + 0.01);
           g.gain.exponentialRampToValueAtTime(0.001, t + 2.55);
           g.gain.linearRampToValueAtTime(0, t + 2.70);
@@ -4534,27 +4488,17 @@ window.addEventListener('pageshow', ()=>{
           hp.frequency.setValueAtTime(70, t);
           const lp = tapAudioCtx.createBiquadFilter();
           lp.type = 'lowpass';
-          lp.frequency.setValueAtTime(7200, t);
+          lp.frequency.setValueAtTime(5600, t);
 
           src.connect(hp);
-
-        // ★v33: “ウクレレっぽい胴鳴り”を少しだけ足す（濁らない程度）
-        const bodyF = tapAudioCtx.createBiquadFilter();
-        bodyF.type = 'peaking';
-        bodyF.frequency.setValueAtTime(520, t);
-        bodyF.Q.setValueAtTime(1.1, t);
-        bodyF.gain.setValueAtTime(1.6, t);
-
-        hp.connect(bodyF);
-        bodyF.connect(lp);
-        lp.connect(g);
-          if(sampleCompressor) g.connect(sampleCompressor);
-          else g.connect(tapMaster);
+          hp.connect(lp);
+          lp.connect(g);
+          g.connect(tapMaster);
 
           src.start(t);
           src.stop(t + 2.90);
 
-          activeVoices.push({ osc: src, gain: g, startTime: t, endTime: (t + 2.90) });
+          activeVoices.push({ osc: src, gain: g, startTime: t });
         });
       }catch(e){}
     };
@@ -4572,7 +4516,7 @@ window.addEventListener('pageshow', ()=>{
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, now);
         const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-        const peak = Math.min(0.65, 0.55 * mult);
+        const peak = Math.min(1.70, 1.55 * mult);
         g.gain.exponentialRampToValueAtTime(peak, now + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, now + 3.80);
         const hp = tapAudioCtx.createBiquadFilter();
@@ -4580,25 +4524,15 @@ window.addEventListener('pageshow', ()=>{
         hp.frequency.setValueAtTime(70, now);
         const lp = tapAudioCtx.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(7200, now);
+        lp.frequency.setValueAtTime(5600, now);
 
         src.connect(hp);
-
-        // ★v33: “ウクレレっぽい胴鳴り”を少しだけ足す（濁らない程度）
-        const bodyF = tapAudioCtx.createBiquadFilter();
-        bodyF.type = 'peaking';
-        bodyF.frequency.setValueAtTime(520, now);
-        bodyF.Q.setValueAtTime(1.1, now);
-        bodyF.gain.setValueAtTime(1.6, now);
-
-        hp.connect(bodyF);
-        bodyF.connect(lp);
+        hp.connect(lp);
         lp.connect(g);
-        if(sampleCompressor) g.connect(sampleCompressor);
-        else g.connect(tapMaster);
+        g.connect(tapMaster);
         src.start(now);
         try{ src.stop(now + 4.05); }catch(e){}
-        activeVoices.push({ osc: src, gain: g, startTime: now, endTime: (now + 4.05) });
+        activeVoices.push({ osc: src, gain: g, startTime: now });
       }catch(e){}
     };
 
@@ -4666,38 +4600,16 @@ window.addEventListener('pageshow', ()=>{
     };
 
     // UI events
-    // 外部（ウクレレのおと等）からも確実に開けるように公開
-    window.openSamplingFlow = startFlow;
-
-    const _isUkeSoundTap = (ev)=>{
-      try{
-        const t = ev && ev.target;
-        if(!t || !t.closest) return false;
-        return !!t.closest('#ukeSoundPill');
-      }catch(e){ return false; }
-    };
-
-    btn.addEventListener('click', (ev)=>{
+    btn.addEventListener('click', ()=>{
       // user gesture => audio unlock
       try{ ensureTapAudio(); }catch(e){}
-      // 重要：#ukeSoundPill は録音開始ではなく ON/OFF の切替
-      if(_isUkeSoundTap(ev)){
-        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-        try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-        return;
-      }
       startFlow();
     });
     // iOS Safari: click が飛ばないケース対策（重複しても running ガードで1回だけ動く）
-    btn.addEventListener('touchend', (ev)=>{
+    btn.addEventListener('touchend', ()=>{
       try{ ensureTapAudio(); }catch(e){}
-      if(_isUkeSoundTap(ev)){
-        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
-        try{ window.toggleUkeSound && window.toggleUkeSound(); }catch(e){}
-        return;
-      }
       startFlow();
-    }, {passive:false});
+    }, {passive:true});
 
     bCancel.addEventListener('click', ()=>{ endFlow(true); });
 
@@ -4714,7 +4626,6 @@ window.addEventListener('pageshow', ()=>{
       window.UKE_SAMPLE.mode = 'OSC';
       window.UKE_SAMPLE.ready = false;
       window.UKE_SAMPLE.buffers = {A:null,E:null,C:null,G:null};
-      try{ saveUkeSoundMode && saveUkeSoundMode('OSC'); }catch(e){}
       endFlow(true);
     });
 
@@ -4724,7 +4635,6 @@ window.addEventListener('pageshow', ()=>{
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
       window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
-      try{ saveUkeSoundMode && saveUkeSoundMode(window.UKE_SAMPLE.mode); }catch(e){}
       endFlow(true);
     });
 
@@ -4940,8 +4850,6 @@ window.addEventListener('pageshow', ()=>{
     try{ hookSlider(); }catch(e){}
     try{ bindSongSpeedUI(); }catch(e){}
     try{ window.bindSamplingUI && window.bindSamplingUI(); }catch(e){}
-    try{ window.bindUkeSoundPillDirect && window.bindUkeSoundPillDirect(); }catch(e){}
-    try{ window.applySavedUkeSoundMode && window.applySavedUkeSoundMode(); }catch(e){}
     try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
   };
   if(document.readyState === 'loading'){
@@ -4990,24 +4898,110 @@ window.addEventListener('pageshow', ()=>{
 
 <script>
 (function(){
+  function _portraitByViewport(){
+    // Robust portrait detection for iOS Safari / embedded webviews (Files preview, etc.)
+    // Goal: if the screen is effectively portrait OR too narrow to play, force the landscape lock overlay,
+    // and avoid laying out the menu (prevents "stretched buttons" being cached).
+    var vv = window.visualViewport;
+    var w = (vv && vv.width) ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 0);
+    var h = (vv && vv.height) ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0);
+
+    // iOS embedded previews sometimes ignore viewport meta and render a wide layout viewport,
+    // then scale it down. In that case visualViewport.scale becomes < 1.
+    try{
+      if(vv && typeof vv.scale === 'number' && vv.scale > 0 && vv.scale < 0.95){
+        return true;
+      }
+    }catch(e){}
+    var sw = 0, sh = 0;
+    try{ if(window.screen && typeof screen.width === 'number' && typeof screen.height === 'number'){ sw = screen.width; sh = screen.height; } }catch(e){}
+    var screenPortrait = (sh && sw) ? (sh > sw) : null;
+
+    // 1) Explicit orientation APIs (when available)
+    try{
+      if(typeof window.orientation === 'number'){
+        var o = window.orientation;
+        if(o === 0 || o === 180) return true;
+        if(o === 90 || o === -90) return false;
+      }
+    }catch(e){}
+    try{
+      if(screen && screen.orientation && typeof screen.orientation.type === 'string'){
+        if(screen.orientation.type.indexOf('portrait') >= 0) return true;
+        if(screen.orientation.type.indexOf('landscape') >= 0) return false;
+      }
+    }catch(e){}
+
+    // 2) If physical screen says portrait but the viewport reports landscape (common in embedded previews), lock to portrait.
+    if(screenPortrait === true && (w > h)) return true;
+
+    // 2.5) outer size can still reflect device orientation even when layout viewport is "stuck".
+    try{
+      var ow = window.outerWidth || 0;
+      var oh = window.outerHeight || 0;
+      if(oh > ow) return true;
+    }catch(e){}
+
+    // 3) Viewport ratio (most reliable across Safari UI-chrome changes)
+    var byRatio = (h > w);
+
+    // 3) matchMedia is sometimes wrong in embedded viewers: treat only "true" as strong signal
+    var mmPortrait = null;
+    try{
+      if(window.matchMedia){
+        var mq = window.matchMedia('(orientation: portrait)');
+        if(typeof mq.matches === 'boolean') mmPortrait = mq.matches;
+      }
+    }catch(e){}
+
+    // 4) Too narrow to safely show the 3x2 menu => treat as portrait lock (prevents broken preview)
+    var tooNarrow = (w && w < 650);
+
+    return (mmPortrait === true) || byRatio || tooNarrow;
+  }
+
+  var _prevPortrait = null;
   function apply(){
-    var portrait = window.innerHeight > window.innerWidth;
+    var portrait = _portraitByViewport();
+    document.documentElement.classList.toggle('needLandscape', portrait);
     document.body.classList.toggle('needLandscape', portrait);
+
     var lock = document.getElementById('landscapeLock');
     if(lock){
       lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
     }
+
+    // When leaving portrait, force a clean relayout (prevents cached stretched heights)
+    if(_prevPortrait === true && portrait === false){
+      try{
+        if(typeof scheduleViewportSize === 'function') scheduleViewportSize();
+      }catch(e){}
+    }
+    _prevPortrait = portrait;
   }
-  window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
-  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
+
+  function applySoon(){
+    apply();
+    setTimeout(apply, 80);
+    setTimeout(apply, 220);
+  }
+
+  window.addEventListener('resize', applySoon);
+  window.addEventListener('orientationchange', applySoon);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', applySoon);
+    window.visualViewport.addEventListener('scroll', applySoon);
+  }
+  document.addEventListener('visibilitychange', function(){ setTimeout(applySoon, 60); });
+
   // try to lock orientation when supported (PWA/Android)
   try{
     if(screen.orientation && screen.orientation.lock){
       screen.orientation.lock('landscape').catch(function(){});
     }
   }catch(e){}
-  apply();
+
+  applySoon();
 })();
 // 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
 // ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼

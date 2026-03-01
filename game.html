@@ -1137,73 +1137,234 @@ body.is-uke .vol-inline{ display:none !important; }
 body.menuOpen #back-btn{ display:none !important; }
 </style>
 
+
+<style id="MENU_GRID_3X2_V25">
+/* ===== MENU_GRID_3X2_V25: 1画面フィット（スクロール禁止） ===== */
+
+/* 3x2 grid (6 buttons) */
+.menu-main.menu-grid-3x2{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+}
+
+/* import JSON button color (same size) */
+.menu-btn.mode6{
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(230,245,255,0.92));
+}
+
+/* Buttons with embedded controls */
+.menu-btn.has-extra{
+  justify-content: space-between;
+  gap: 10px;
+  padding-right: 10px;
+}
+.menu-btn.has-extra .menu-left{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.menu-btn.has-extra .menu-left .menu-text{
+  min-width: 0;
+}
+
+/* right-side extra area */
+.menu-btn.has-extra .menu-extra{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 52%;
+}
+
+/* Compact pills inside buttons */
+.menu-btn.has-extra .menu-extra .mode-pills{
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px !important;
+}
+.menu-btn.has-extra .menu-extra .mode-pill{
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  box-shadow: 0 8px 14px rgba(0,0,0,0.10) !important;
+}
+.menu-btn.has-extra #song-speed-wrap{
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  min-height: 0 !important;
+}
+.menu-btn.has-extra #song-speed-wrap .song-speed-title{
+  margin: 0 0 2px !important;
+  font-size: 10px !important;
+  text-align: right !important;
+}
+.menu-btn.has-extra #song-speed-wrap .song-only-note{ display: none !important; }
+.menu-btn.has-extra #song-speed-note{ display: none !important; }
+
+/* mode row inside button */
+.mode-row.mode-row-mini{
+  display: flex !important;
+  grid-template-columns: none !important;
+  min-height: 0 !important;
+  gap: 6px !important;
+  align-items: center;
+  justify-content: flex-end;
+}
+.mode-row.mode-row-mini #ukeSoundPill{
+  justify-self: auto !important;
+}
+.mode-row.mode-row-mini #play-mode-pills{
+  justify-content: flex-end !important;
+}
+.menu-btn.has-extra #mode-desc{
+  margin-top: 0 !important;
+  font-size: 9px !important;
+  opacity: .75;
+  text-align: right;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* very low landscape: squeeze a bit more */
+
+/* global play mode controls (outside buttons) */
+#globalModeWrap{ margin-top: 6px !important; }
+#globalModeWrap .global-mode-row{
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+#globalModeWrap .global-mode-row .top-inline-btn{ margin: 0; }
+#globalModeWrap .global-mode-row #play-mode-pills{ justify-content: center; }
+@media (orientation: landscape) and (max-height: 430px){
+  #mode-desc{ display:none !important; }
+  #globalModeWrap{ margin-top: 4px !important; }
+  #globalModeWrap .global-mode-row{ gap: 8px; }
+  .menu-btn.has-extra .menu-extra{ max-width: 56%; }
+  .menu-btn.has-extra .menu-extra .mode-pill{
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+  .menu-btn.has-extra #mode-desc{ display:none !important; } /* 低い時は説明を隠して1画面優先 */
+}
+</style>
+
 </head>
 <body class="menuOpen">
 <div id="app">
 <div id="menu-overlay">
 <div class="menu-card">
-<button class="menu-btn" id="import-json-btn">
-  <div class="badge" style="background:#ff3d3d;">📥</div>
-  <div class="menu-text">
-    <div class="title">先生のオリジナル譜面</div>
-    <small>JSONデータをよみこんでれんしゅう</small>
-  </div>
-</button>
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.22</div>
-<div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
-<div class="menu-main">
-<button class="menu-btn mode1" onclick="prepGame('scale')">
-<div class="badge">🐤</div>
-<div class="menu-text">
-  <div class="title">ドレミファソラシド</div>
-  <small>だんだん速くなるよ</small>
-  </div>
-</button>
-<button class="menu-btn mode2" onclick="prepGame('easy')">
-<div class="badge">🐱</div>
-<div class="menu-text"><div class="title">コード かんたん</div><small>C / F / G7 / Am</small></div>
-</button>
-<button class="menu-btn mode3" onclick="prepGame('hard')">
-<div class="badge">🐼</div>
-<div class="menu-text"><div class="title">コード ちょいむず</div><small>いろいろなコード</small></div>
-</button>
-  <button class="menu-btn mode4 song-start" onclick="prepGame('song')" aria-label="きらきらぼしをはじめる">
-    <div class="badge">🦁</div>
-    <div class="menu-text"><div class="title song-title">きらきらぼし</div><small>メロディ＋コード</small></div>
-  </button>
-  <button id="sampleBtn" class="menu-btn mode5 sample-btn" type="button" aria-label="ウクキャプ">
-    <div class="badge">🎙️</div>
-    <div class="menu-text"><div class="title">ウクキャプ</div><small>じぶんの音であそべる</small></div>
-  </button>
-<div class="song-speed-inline" id="song-speed-wrap">
-    <div class="song-speed-title">♪ きらきらぼしの速さ <span class="song-only-note">(この曲だけ)</span></div>
-    <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-start; flex-wrap:wrap; gap:6px;">
-      <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
-      <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
-      <div class="mode-pill" data-ss="FAST">はやい</div>
-    </div>
-    <div id="song-speed-note" class="song-speed-note">※この設定は「きらきらぼし」だけに効きます</div>
-  </div>
-</div>
+<div id="verTag">v0.27</div>
 
-</div>
-<div class="mode-select">
-  <div class="mode-row">
-    <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
+<div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
+  <div class="menu-main menu-grid-3x2">
+
+    <button class="menu-btn mode1" onclick="prepGame('scale')">
+      <div class="badge">🐤</div>
+      <div class="menu-text">
+        <div class="title">ドレミファソラシド</div>
+        <small>だんだん速くなるよ</small>
+      </div>
+    </button>
+
+    <button class="menu-btn mode2" onclick="prepGame('easy')">
+      <div class="badge">🐱</div>
+      <div class="menu-text">
+        <div class="title">コード かんたん</div>
+        <small>C / F / G7 / Am</small>
+      </div>
+    </button>
+
+    <button class="menu-btn mode3" onclick="prepGame('hard')">
+      <div class="badge">🐼</div>
+      <div class="menu-text">
+        <div class="title">コード ちょいむず</div>
+        <small>いろいろなコード</small>
+      </div>
+    </button>
+
+    <button class="menu-btn mode4 song-start has-extra" onclick="prepGame('song')" aria-label="きらきらぼしをはじめる">
+      <div class="menu-left">
+        <div class="badge">🦁</div>
+        <div class="menu-text">
+          <div class="title song-title">きらきらぼし</div>
+          <small>メロディ＋コード</small>
+        </div>
+      </div>
+
+      <!-- きらきらぼし速度（この曲だけ）: ボタン右側余白に収納 -->
+      <div class="menu-extra" onclick="event.stopPropagation();">
+        <div class="song-speed-inline in-btn" id="song-speed-wrap">
+          <div class="song-speed-title">♪ 速さ <span class="song-only-note">(この曲だけ)</span></div>
+          <div class="mode-pills" id="song-speed-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
+            <div class="mode-pill" data-ss="SLOW">ゆっくり</div>
+            <div class="mode-pill active" data-ss="NORMAL">ふつう</div>
+            <div class="mode-pill" data-ss="FAST">はやい</div>
+          </div>
+          <div id="song-speed-note" class="song-speed-note">※この設定は「きらきらぼし」だけに効きます</div>
+        </div>
+      </div>
+    </button>
+
+    <button id="sampleBtn" class="menu-btn mode5 sample-btn has-extra" type="button" aria-label="ウクキャプ">
+      <div class="menu-left">
+        <div class="badge">🎙️</div>
+        <div class="menu-text">
+          <div class="title">ウクキャプ</div>
+          <small>じぶんの音であそべる</small>
+        </div>
+      </div>
+
+      <!-- ウクレレのおと: ボタン右側余白に収納（右スペース） -->
+      <div class="menu-extra" onclick="event.stopPropagation();">
+        <div class="mode-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
+          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
+        </div>
+
+        <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
+        <div class="tap-vol-wrap" id="tap-vol-wrap">
+          <div class="tap-vol-label">🔊 タップ音の大きさ</div>
+          <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+        </div>
+      </div>
+    </button>
+
+    <button class="menu-btn mode6" id="import-json-btn">
+      <div class="badge" style="background:#ff3d3d;">📥</div>
+      <div class="menu-text">
+        <div class="title">先生のオリジナル譜面</div>
+        <small>JSONデータをよみこんでれんしゅう</small>
+      </div>
+    </button>
+
+  </div>
+<div class="mode-select" id="globalModeWrap" style="margin-top:6px; padding-top:0;" onclick="event.stopPropagation();">
+  <div class="global-mode-row">
+    <button class="top-inline-btn" type="button" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
     <div class="mode-pills" id="play-mode-pills">
       <div class="mode-pill" data-mode="NORMAL" onclick="setMode(this, 'NORMAL')">ふつう</div>
       <div class="mode-pill active" data-mode="WAIT" onclick="setMode(this, 'WAIT')">サポート</div>
     </div>
   </div>
-<div id="mode-desc" class="mode-desc">サポート：とまって まつよ（はじめてにおすすめ）</div>
-<div class="tap-vol-wrap" id="tap-vol-wrap">
-  <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-  <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+  <div id="mode-desc" class="mode-desc">サポート：とまって まつよ（はじめてにおすすめ）</div>
 </div>
 
 </div>
+
+<!-- legacy menu back button (kept for JS; hidden by existing CSS) -->
 <button id="menuBackBtn" class="action-btn btn-secondary" onclick="goBackFromGameMenu()" style="margin-top:10px;">🏝️ TOPへもどる</button>
 
 <div class="bottom-inline">
@@ -1211,8 +1372,8 @@ body.menuOpen #back-btn{ display:none !important; }
     <div class="vol-label">🔊 タップ音</div>
     <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.5">
   </div>
-  <button class="top-inline-btn" onclick="goFlip('index.html')">🏝️ TOPへもどる</button>
 </div>
+
 </div>
 </div>
 <div id="screenFlash"></div>
@@ -1347,6 +1508,8 @@ body.menuOpen #back-btn{ display:none !important; }
   body.classList.add('menuOpen');
 
   function handler(ev){
+    // Ignore clicks inside embedded controls (speed/mode pills)
+    try{ if(ev.target && ev.target.closest && ev.target.closest('.menu-extra')) return; }catch(_){ }
     const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
     if (!btn) return;
     const oc = btn.getAttribute('onclick') || '';

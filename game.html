@@ -4708,63 +4708,223 @@ candidates[key] = b;
 </div>
 
 
+
+
+
 <script>
-(function(){
-  function apply(){
-    var portrait = window.innerHeight > window.innerWidth;
-    document.body.classList.toggle('needLandscape', portrait);
-    var lock = document.getElementById('landscapeLock');
-    if(lock){
-      lock.setAttribute('aria-hidden', portrait ? 'false' : 'true');
-    }
+  // 録音データがすべて揃っているかチェックする関数
+  function hasRecordedSounds() {
+    return localStorage.getItem('uke_sound_G') && localStorage.getItem('uke_sound_C') &&
+           localStorage.getItem('uke_sound_E') && localStorage.getItem('uke_sound_A');
   }
-  window.addEventListener('resize', apply);
-  window.addEventListener('orientationchange', function(){ setTimeout(apply, 60); });
-  document.addEventListener('visibilitychange', function(){ setTimeout(apply, 60); });
-  // try to lock orientation when supported (PWA/Android)
-  try{
-    if(screen.orientation && screen.orientation.lock){
-      screen.orientation.lock('landscape').catch(function(){});
-    }
-  }catch(e){}
-  apply();
-})();
-// 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
-// ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
-    document.addEventListener('click', function(e) {
+
+  // ==========================================
+  // ① 「オト」ボタンのON/OFF切り替えシステム
+  // ==========================================
+  const soundBtn = document.getElementById('btn-sound-setting');
+  let isCustomSound = localStorage.getItem('useCustomSound') === 'true';
+
+  function updateSoundBtn() {
+    if (!soundBtn) return;
+    soundBtn.innerHTML = isCustomSound ? '🎸 オト: ON' : '🎸 オト: OFF';
+    soundBtn.style.background = isCustomSound ? '#4caf50' : '#ffaa00';
+    soundBtn.style.color = isCustomSound ? '#fff' : '#111';
+  }
+  updateSoundBtn(); // 初期表示
+
+  if (soundBtn) {
+    soundBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // 親のウクキャプボタンが反応しないようにバリア
       
-      // 📥「先生のオリジナル譜面」を開く
-      if (e.target.closest('#import-json-btn')) {
-        document.getElementById('task-modal').style.display = 'flex';
+      if (!isCustomSound) {
+        // OFF -> ON にしようとした時、録音データがなければブロック
+        if (!hasRecordedSounds()) {
+          alert('まだ ぜんぶのオトが ろくおんされていません！\n「ウクキャプ」から 録音してね。');
+          return;
+        }
       }
-      
-      // ①「お手本をきく」ボタン
-      if (e.target.closest('.play-sample')) {
-        const checked = document.querySelector('input[name="sound-type"]:checked');
-        const soundName = checked ? checked.parentNode.textContent.trim() : 'でんし音';
-        alert('【テスト】' + soundName + ' でお手本を再生！');
-      }
-      
-      // ②「れんしゅうスタート！」ボタン
-      if (e.target.closest('.start-game')) {
-        alert('【テスト】ゲーム画面へ切り替わります！');
-        document.getElementById('task-modal').style.display = 'none';
-      }
-      
-      // ③「とうろく」ボタン
-      if (e.target.closest('.record-uke')) {
-        alert('【テスト】録音（ウクレレ登録）画面を開きます！');
+      // 切り替え
+      isCustomSound = !isCustomSound;
+      localStorage.setItem('useCustomSound', isCustomSound);
+      updateSoundBtn();
+    });
+  }
+
+  // ==========================================
+  // ② 「ウクキャプ」ボタンの動作
+  // ==========================================
+  const btnFree = document.getElementById('btn-free');
+  if (btnFree) {
+    btnFree.addEventListener('click', () => {
+      if (!hasRecordedSounds()) {
+        // 録音がまだなら、録音スタジオ（モーダル）を開く
+        document.getElementById('record-modal').style.display = 'flex';
+      } else {
+        // 録音済みなら、フリープレイ画面へ
+        alert('【テスト】じゆうに弾く画面（free.html）へ移動します！\n※現在カスタム音: ' + (isCustomSound ? 'ON' : 'OFF'));
+        // window.location.href = 'free.html'; 
       }
     });
+  }
 
-    const importBtn = document.getElementById('import-json-btn');
-    if(importBtn) {
-      importBtn.addEventListener('click', () => {
-        // ポップアップ画面を表示する（flexにして中央揃え）
-        document.getElementById('task-modal').style.display = 'flex';
-      });
+
+  // ==========================================
+  // ③ 究極のオーディオ自動整形処理 (Trim & Normalize & ADSR)
+  // ==========================================
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  let audioCtx;
+  
+  async function processAndSaveAudio(blob, stringName) {
+    if (!audioCtx) audioCtx = new AudioContext();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    const channelData = audioBuffer.getChannelData(0); // モノラルとして処理
+    const sampleRate = audioBuffer.sampleRate;
+
+    // 【1. 無音カット (Trim)】: アタックの遅延をなくす
+    let startIndex = 0;
+    const threshold = 0.03; // この音量を超えた瞬間を「弾いた瞬間」とする
+    for (let i = 0; i < channelData.length; i++) {
+      if (Math.abs(channelData[i]) > threshold) {
+        startIndex = i;
+        break;
+      }
     }
-</script>
+
+    // 【2. 音量の均一化 (Normalize) & 長さ調整】
+    const maxDuration = 1.2; // 最大1.2秒
+    const targetLength = Math.min(channelData.length - startIndex, Math.floor(sampleRate * maxDuration));
+    
+    const newBuffer = audioCtx.createBuffer(1, targetLength, sampleRate);
+    const newData = newBuffer.getChannelData(0);
+
+    let maxAmp = 0;
+    for (let i = 0; i < targetLength; i++) {
+      maxAmp = Math.max(maxAmp, Math.abs(channelData[startIndex + i]));
+    }
+    const normalizeFactor = maxAmp > 0 ? (0.9 / maxAmp) : 1; 
+
+    // 【3. 余韻のフェードアウト (ADSR: Release)】
+    const releaseTime = 0.15; // 最後の0.15秒かけてフワッと消える
+    const releaseSamples = Math.floor(sampleRate * releaseTime);
+
+    for (let i = 0; i < targetLength; i++) {
+      let sample = channelData[startIndex + i] * normalizeFactor; 
+      if (i > targetLength - releaseSamples) {
+        const fade = 1.0 - ((i - (targetLength - releaseSamples)) / releaseSamples);
+        sample *= fade; 
+      }
+      newData[i] = sample;
+    }
+
+    // 整形した音をWAVデータに変換して保存
+    const wavBlob = audioBufferToWav(newBuffer);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      localStorage.setItem('uke_sound_' + stringName, reader.result);
+      if (hasRecordedSounds()) {
+        isCustomSound = true; // 全部録音し終わったら自動的にONにする
+        localStorage.setItem('useCustomSound', 'true');
+        updateSoundBtn();
+      }
+    };
+    reader.readAsDataURL(wavBlob);
+  }
+
+  // ==========================================
+  // ④ 録音の実行とマイク制御
+  // ==========================================
+  const statusText = document.getElementById('record-status');
+  document.querySelectorAll('.record-string-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const stringName = e.target.getAttribute('data-string');
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const audioChunks = [];
+
+        mediaRecorder.addEventListener("dataavailable", event => {
+          audioChunks.push(event.data);
+        });
+
+        mediaRecorder.addEventListener("stop", async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          statusText.textContent = "✨ オーディオを かこう中...";
+          await processAndSaveAudio(audioBlob, stringName);
+          statusText.textContent = stringName + "弦の ろくおんが かんりょう！";
+          e.target.innerHTML = stringName + "弦 (ろくおん済✅)";
+          e.target.style.opacity = "0.7";
+          stream.getTracks().forEach(track => track.stop());
+        });
+
+        mediaRecorder.start();
+        statusText.textContent = "🔴 " + stringName + "弦を 1かい弾いてね！（1.2秒で自動ストップ）";
+        
+        setTimeout(() => {
+          if (mediaRecorder.state === "recording") mediaRecorder.stop();
+        }, 1200);
+
+      } catch (err) {
+        alert("マイクの使用が許可されていません！ブラウザの設定を確認してね。");
+      }
+    });
+  });
+
+  // WAV変換ツール
+  function audioBufferToWav(buffer) {
+    let numOfChan = buffer.numberOfChannels, length = buffer.length * numOfChan * 2 + 44;
+    let bufferArray = new ArrayBuffer(length), view = new DataView(bufferArray);
+    let channels = [], i, sample, offset = 0;
+    let setStr = (s) => { for(let i=0; i<s.length; i++) view.setUint8(offset+i, s.charCodeAt(i)); offset += s.length; };
+    setStr('RIFF'); view.setUint32(4, 36 + buffer.length * 2, true); setStr('WAVEfmt '); view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); view.setUint16(22, numOfChan, true); view.setUint32(24, buffer.sampleRate, true);
+    view.setUint32(28, buffer.sampleRate * 2 * numOfChan, true); view.setUint16(32, numOfChan * 2, true);
+    view.setUint16(34, 16, true); setStr('data'); view.setUint32(40, buffer.length * 2, true); offset = 44;
+    for(i=0; i<buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+    for(i=0; i<buffer.length; i++) {
+      for(let c=0; c<numOfChan; c++) {
+        sample = Math.max(-1, Math.min(1, channels[c][i]));
+        sample = (sample < 0 ? sample * 32768 : sample * 32767)|0;
+        view.setInt16(offset, sample, true); offset += 2;
+      }
+    }
+    return new Blob([bufferArray], {type: 'audio/wav'});
+  }
+
+  // 先生の課題曲ポップアップを開くボタン等の処理
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('#import-json-btn')) {
+      const modal = document.getElementById('task-modal');
+      if(modal) modal.style.display = 'flex';
+    }
+    if (e.target.closest('.play-sample')) {
+      alert('【テスト】お手本を再生！');
+    }
+    if (e.target.closest('.start-game')) {
+      alert('【テスト】ゲーム画面へ切り替わります！');
+      const modal = document.getElementById('task-modal');
+      if(modal) modal.style.display = 'none';
+    }
+  });
+</script><div class="modal-overlay" id="record-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 10000;">
+  <div class="modal-content" style="background: #fff; width: 90%; max-width: 420px; border: 3px solid #111; border-radius: 16px; padding: 20px; text-align: center; position: relative;">
+    <button class="modal-close" style="position: absolute; top: 8px; right: 8px; background: #ff3d3d; color: #fff; border: 2px solid #111; border-radius: 50%; width: 30px; height: 30px; font-weight: bold; cursor: pointer;" onclick="document.getElementById('record-modal').style.display='none'">×</button>
+    
+    <h2 style="color: #111; margin-bottom: 8px;">🎙️ ウクキャプ</h2>
+    <p style="font-size: 13px; font-weight: 900; margin-bottom: 12px;">きみのウクレレの オトをきかせてね！<br>（ポロロン♪と 1回ずつひいてね）</p>
+    
+    <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+      <button class="action-btn record-string-btn" data-string="G" style="background: #ffaa00; padding: 12px; font-weight: bold; border: 2px solid #111; border-radius: 8px;">G弦（4げん）を ろくおん</button>
+      <button class="action-btn record-string-btn" data-string="C" style="background: #4caf50; padding: 12px; font-weight: bold; border: 2px solid #111; border-radius: 8px;">C弦（3げん）を ろくおん</button>
+      <button class="action-btn record-string-btn" data-string="E" style="background: #5ce1e6; padding: 12px; font-weight: bold; border: 2px solid #111; border-radius: 8px;">E弦（2げん）を ろくおん</button>
+      <button class="action-btn record-string-btn" data-string="A" style="background: #ff3d3d; color: #fff; padding: 12px; font-weight: bold; border: 2px solid #111; border-radius: 8px;">A弦（1げん）を ろくおん</button>
+    </div>
+    
+    <p id="record-status" style="font-weight: 900; color: #ff3d3d; margin-top: 12px; height: 1em;"></p>
+  </div>
+</div>
+
 <div class="modal-overlay" id="task-modal">
   <div class="modal-content">
     <button class="modal-close" onclick="document.getElementById('task-modal').style.display='none'">×</button>

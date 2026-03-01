@@ -1146,6 +1146,7 @@ body.menuOpen #back-btn{ display:none !important; }
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 8px !important;
+  align-content: start;
 }
 
 /* import JSON button color (same size) */
@@ -1240,37 +1241,38 @@ body.menuOpen #back-btn{ display:none !important; }
 /* global play mode controls (outside buttons) */
 #globalModeWrap{ margin-top: 6px !important; }
 #globalModeWrap .global-mode-row{
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "top pills vol";
+  display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: nowrap;
 }
-#globalModeWrap .global-mode-row .top-inline-btn{ margin: 0; }
-#globalModeWrap .global-mode-row #play-mode-pills{ justify-content: center; }
+#globalModeWrap .global-mode-row .top-inline-btn{ margin: 0; flex-shrink: 0; }
+#globalModeWrap .global-mode-row #play-mode-pills{ flex: 1 1 auto; justify-content: center; }
 
-#globalModeWrap .global-mode-row .top-inline-btn{ grid-area: top; }
-#globalModeWrap .global-mode-row #play-mode-pills{ grid-area: pills; }
-#globalModeWrap .global-mode-row .global-vol-inline{ grid-area: vol; justify-content: flex-end; }
-
+/* tap volume inline (tap entry only) */
+#globalModeWrap .global-mode-row .global-vol-inline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:flex-end;
+  flex: 0 0 auto;
+}
 #globalModeWrap .global-mode-row .global-vol-inline #tapVolume{
   max-width: 190px;
 }
 
 @media (max-width: 520px){
-  #globalModeWrap .global-mode-row{
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      "top pills"
-      "vol vol";
-    row-gap: 8px;
+  #globalModeWrap .global-mode-row{ flex-wrap: wrap; }
+  #globalModeWrap .global-mode-row .global-vol-inline{
+    flex: 1 1 100%;
+    justify-content: center;
   }
-  #globalModeWrap .global-mode-row .global-vol-inline{ justify-self: stretch; }
   #globalModeWrap .global-mode-row .global-vol-inline #tapVolume{
     max-width: none;
     width: 100%;
   }
 }
+
 
 @media (orientation: landscape) and (max-height: 430px){
   #mode-desc{ display:none !important; }
@@ -1292,7 +1294,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.28</div>
+<div id="verTag">v0.29</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">

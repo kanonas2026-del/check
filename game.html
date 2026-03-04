@@ -914,47 +914,6 @@ body.is-uke .vol-inline{ display:none !important; }
   line-height: 1.25;
 }
 
-/* v38: ウクキャプ（サンプリング）UIを大きく＆OKを強調（他UIは触らない） */
-#sample-overlay .sample-card h2{
-  font-size: 26px;
-  margin: 4px 0 10px;
-}
-#sample-overlay #sample-msg{
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1.25;
-  margin: 6px 0 8px;
-}
-#sample-overlay #sample-msg.is-ok{
-  font-size: 22px;
-  background: #dff6e6;
-  border: 2px solid rgba(0,0,0,0.12);
-  border-radius: 14px;
-  padding: 10px 12px;
-}
-#sample-overlay .sample-progress{
-  gap: 10px;
-  margin: 12px 0 8px;
-}
-#sample-overlay .sample-progress .sp-item{
-  font-size: 16px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  border: 2px solid rgba(0,0,0,0.10);
-}
-#sample-overlay .sample-progress .sp-item.done{
-  border-color: rgba(0,0,0,0.16);
-}
-#sample-overlay .sample-progress .sp-item.done::after{
-  content: " OK";
-  font-weight: 1000;
-}
-#sample-overlay .sample-hint{
-  font-size: 14px;
-  line-height: 1.35;
-  margin-top: 6px;
-}
-
 /* iPhone横：必ず1画面 */
 @media (orientation: landscape) and (max-height: 430px){
   #menu-overlay{
@@ -1425,7 +1384,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.44</div>
+<div id="verTag">v0.37</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1489,7 +1448,7 @@ body.menuOpen #back-btn{ display:none !important; }
       <!-- ウクレレのおと: ボタン右側余白に収納（右スペース） -->
       <div class="menu-extra" onclick="event.stopPropagation();">
         <div class="mode-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
-          <div class="mode-pill sound-pill" id="ukeSoundPill"  aria-pressed="false">ウクレレのおと</div>
+          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
         </div>
 
         <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
@@ -1980,10 +1939,9 @@ let gameState = 'MENU';
 let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
-const OUTPUT_BOOST = 4.0; // iPhone内蔵SP向け：全体の基本音量を底上げ（v0.44 さらにアップ）
-const MASTER_GAIN_CAP = 6.0; // スライダー最大でも足りない対策（コンプで保護）
+const OUTPUT_BOOST = 1.5; // iPhone内蔵SP向け：全体の基本音量を底上げ
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
-let tapVol = 0.92;
+let tapVol = 0.85;
 let tapAudioCtx = null;
 let tapMaster = null;
 let tapCompressor = null; // コンプレッサー追加
@@ -1993,7 +1951,7 @@ function loadTapVol(){
     const raw = localStorage.getItem(TAP_VOL_KEY);
     // 初回（または旧既定値のまま）の場合は聞き取りやすい音量へ自動調整
     if(raw === null || raw === ''){
-      tapVol = 0.92;
+      tapVol = 0.85;
       try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       return;
     }
@@ -2001,7 +1959,7 @@ function loadTapVol(){
     if(!Number.isNaN(v) && v>=0 && v<=1){
       if(Math.abs(v - 0.35) < 1e-6 || Math.abs(v - 0.65) < 1e-6){
         // 旧バージョンの既定値(0.35/0.65)を自動で引き上げ
-        tapVol = 0.92;
+        tapVol = 0.85;
         try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       }else{
         tapVol = v;
@@ -2029,92 +1987,15 @@ function ensureTapAudio(){
       tapCompressor.attack.setValueAtTime(0.003, tapAudioCtx.currentTime);
       tapCompressor.release.setValueAtTime(0.25, tapAudioCtx.currentTime);
 
-      // --- Tone sum node (dry+wet) ---
-      const tapSum = tapAudioCtx.createGain();
-      tapSum.gain.value = 1.0;
-
-      // --- Light Room Reverb (keeps your ukulele tone, adds a little sustain) ---
-      // very small convolver IR generated in-code (no external file)
-      if(!window.__tapReverb){
-        try{
-          const sr = tapAudioCtx.sampleRate;
-          const irSec = 0.38; // short room (reduce hiss/noise tail)
-          const len = Math.max(1, Math.floor(sr * irSec));
-          const ir = tapAudioCtx.createBuffer(2, len, sr);
-          const decay = 5.5;
-          for(let ch=0; ch<2; ch++){
-            const d = ir.getChannelData(ch);
-            for(let i=0;i<len;i++){
-              const t = i / len;
-              const env = Math.pow(1 - t, decay);
-              d[i] = (Math.random()*2-1) * env;
-            }
-          }
-          const conv = tapAudioCtx.createConvolver();
-          conv.buffer = ir;
-          const wet = tapAudioCtx.createGain();
-          wet.gain.value = 0.0; // disabled: convolver IR can sound like hiss on iPhone (keep chain stable)
-          // dry is tapMaster -> compressor (existing). Add wet send to compressor.
-          tapMaster.connect(conv);
-          conv.connect(wet);
-          // tame reverb hiss with gentle lowpass
-          const wetLPF = tapAudioCtx.createBiquadFilter();
-          wetLPF.type = 'lowpass';
-          wetLPF.frequency.setValueAtTime(5200, tapAudioCtx.currentTime);
-          wetLPF.Q.setValueAtTime(0.7, tapAudioCtx.currentTime);
-          wet.connect(wetLPF);
-          // wet will be summed into tapSum (tone chain)
-          wetLPF.connect(tapSum);
-          window.__tapReverb = { conv, wet };
-        }catch(e){ console.error(e); window.__tapReverb = {failed:true}; }
-      }
-
-      // --- Tone / warmth chain (adds body, reduces "pein" harshness) ---
-      // Mild saturation for warmth (very subtle)
-      const tapShaper = tapAudioCtx.createWaveShaper();
-      (function(){
-        const n = 2048;
-        const curve = new Float32Array(n);
-        const drive = 1.85; // 1.3〜2.0（少し暖かさ）
-        for(let i=0;i<n;i++){
-          const x = (i/(n-1))*2-1;
-          curve[i] = Math.tanh(drive*x) / Math.tanh(drive);
-        }
-        tapShaper.curve = curve;
-        tapShaper.oversample = '2x';
-      })();
-
-      // Body EQ: add depth (low shelf), tame "pein" (mid cut), soften highs a bit
-      const eqLow = tapAudioCtx.createBiquadFilter();
-      eqLow.type = 'lowshelf';
-      eqLow.frequency.setValueAtTime(200, tapAudioCtx.currentTime);
-      eqLow.gain.setValueAtTime(5.0, tapAudioCtx.currentTime);
-
-      const eqMid = tapAudioCtx.createBiquadFilter();
-      eqMid.type = 'peaking';
-      eqMid.frequency.setValueAtTime(3300, tapAudioCtx.currentTime);
-      eqMid.Q.setValueAtTime(1.05, tapAudioCtx.currentTime);
-      eqMid.gain.setValueAtTime(-5.0, tapAudioCtx.currentTime);
-
-      const eqHigh = tapAudioCtx.createBiquadFilter();
-      eqHigh.type = 'highshelf';
-      eqHigh.frequency.setValueAtTime(6500, tapAudioCtx.currentTime);
-      eqHigh.gain.setValueAtTime(-2.0, tapAudioCtx.currentTime);
-
-      // Route: tapMaster (dry) -> tapSum -> shaper -> EQ -> compressor -> destination
-      tapMaster.connect(tapSum);
-      tapSum.connect(tapShaper);
-      tapShaper.connect(eqLow);
-      eqLow.connect(eqMid);
-      eqMid.connect(eqHigh);
-      eqHigh.connect(tapCompressor);
-
+      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+      
+      // 接続: Master -> Compressor -> Destination
+      tapMaster.connect(tapCompressor);
       tapCompressor.connect(tapAudioCtx.destination);
-
-      tapMaster.gain.value = Math.min(MASTER_GAIN_CAP, tapVol * OUTPUT_BOOST);
-applyTapVolumeToGain();
+      
+      applyTapVolumeToGain();
     } else {
-      tapMaster.gain.value = Math.min(MASTER_GAIN_CAP, tapVol * OUTPUT_BOOST);
+      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
     }
   }catch(e){}
 }
@@ -2201,7 +2082,7 @@ function bindTapVolUI(){
   enhanceRangeSlider(el);
   const apply = ()=>{
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
-    if(tapMaster) tapMaster.gain.value = Math.min(MASTER_GAIN_CAP, tapVol * OUTPUT_BOOST);
+    if(tapMaster) tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
     saveTapVol();
     // user gesture => allow audio on iOS
     ensureTapAudio();
@@ -2704,69 +2585,26 @@ window.applyUkeSoundUi = function(){
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
-window.toggleUkeSound = function(el, ev){
-  try{ if(ev){ ev.preventDefault(); ev.stopPropagation(); } }catch(e){}
-
+window.toggleUkeSound = function(){
   try{ ensureTapAudio(); }catch(e){}
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
-
-  const hasAny = !!(us.buffers && (us.buffers.A || us.buffers.E || us.buffers.C || us.buffers.G));
-  const isOn = (us.mode === 'SAMPLE' && hasAny);
-
-  // OFF -> OSC
+  const isOn = (us.mode === 'SAMPLE' && us.ready);
   if(isOn){
     us.mode = 'OSC';
-    try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
+    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
-  // ON -> SAMPLE (録音済みがある場合のみ)
-  if(hasAny){
+  // ONにしたい
+  if(us.ready){
     us.mode = 'SAMPLE';
-    try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
+    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-
-  // 録音がない場合：勝手に録音モードへ入らない（誤操作防止）
-  try{
-    const go = confirm('録音したウクレレ音がまだありません。録音しますか？');
-    if(go){
-      const sb = document.getElementById('sampleBtn');
-      if(sb){ sb.click(); }
-    }
-  }catch(e){}
-  try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
-};
-
-// iOS対策：このピルは #sampleBtn (親ボタン) の中にあるため、touchend が親に伝搬すると「録音画面へ入る」。
-// clickのstopPropagationだけでは止まらないので、touch/pointer をキャプチャで遮断してからトグルする。
-window.bindUkeSoundPillGuards = function(){
-  try{
-    const pill = document.getElementById('ukeSoundPill');
-    if(!pill || pill.__guarded) return;
-    pill.__guarded = true;
-
-    let lastFire = 0;
-    const stop = (ev)=>{
-      try{ ev.preventDefault(); }catch(_){}
-      try{ ev.stopPropagation(); }catch(_){}
-      try{ if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); }catch(_){}
-    };
-    const fire = (ev)=>{
-      const now = Date.now();
-      if(now - lastFire < 320) return; // avoid double fire (touchend + click)
-      lastFire = now;
-      try{ window.toggleUkeSound && window.toggleUkeSound(pill, ev); }catch(e){}
-    };
-
-    // capture phase to beat parent (#sampleBtn) handlers
-    pill.addEventListener('touchstart', (ev)=>{ stop(ev); }, {capture:true, passive:false});
-    pill.addEventListener('touchend', (ev)=>{ stop(ev); fire(ev); }, {capture:true, passive:false});
-    pill.addEventListener('pointerdown', (ev)=>{ stop(ev); }, {capture:true});
-    pill.addEventListener('pointerup', (ev)=>{ stop(ev); fire(ev); }, {capture:true});
-    pill.addEventListener('click', (ev)=>{ stop(ev); fire(ev); }, {capture:true});
-  }catch(e){}
+  // まだ録音がない → 取り込みフローへ
+  const sb = document.getElementById('sampleBtn');
+  if(sb){ sb.click(); }
+  if(window.applyUkeSoundUi) window.applyUkeSoundUi();
 };
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
@@ -2845,14 +2683,12 @@ function resumeGame(){
 async function prepGame(type){
   try{ window.stopTapPreview && window.stopTapPreview(); }catch(e){}
   try{ document.body.classList.add('playing'); document.body.classList.remove('menuOpen'); }catch(e){}
-  // ★音が鳴らない対策：ゲーム開始クリック(ユーザー操作)で必ずWebAudioをアンロック
-  try{ ensureTapAudio(); }catch(e){}
   // タップモードならマイク不要
   if(isTapMode()){ 
       // ★NEW: 音量チェックと確実なAudioContext起動
       try{
         ensureTapAudio();
-        const v = (window.getTapVolume01 ? window.getTapVolume01() : (typeof tapVol!=='undefined'?tapVol:0.35));
+        const v = getTapVolume01();
         // 音量が小さい、またはAudioContextが止まっている場合に警告
         if(v < 0.1 || (tapAudioCtx && tapAudioCtx.state === 'suspended')){
             if(tapAudioCtx && tapAudioCtx.state === 'suspended') tapAudioCtx.resume();
@@ -3241,9 +3077,8 @@ function handleAction(){
     if(best < win){
       // HIT
       target.active=false;
-      // ★音が鳴らない対策：TAP/ウクレレ両方でHIT音を鳴らす（録音音/OSCの切替はplayTapHitSound内で処理）
-      try{ ensureTapAudio(); }catch(e){}
-      try{ if(typeof playTapHitSound === 'function') playTapHitSound(target); }catch(e){}
+      // TAPモードはHIT時に音を鳴らす
+      try{ playTapHitSound(target); }catch(e){}
 
       if(waitHold){
         waitHold=false; scrollSpeed=currentScrollSpeed; waitTargetGroup=null; lastSpawn=performance.now();
@@ -3707,16 +3542,12 @@ window.addEventListener('pageshow', ()=>{
     try{ saveTapVol(); }catch(e){}
   }
 
-  // expose for outer code (e.g., prepGame warning)
-  try{ window.getTapVolume01 = getTapVolume01; }catch(e){}
-  try{ window.setTapVolume01 = setTapVolume01; }catch(e){}
-
   window.applyTapVolumeToGain = function(){
     try{
-      const v = (window.getTapVolume01 ? window.getTapVolume01() : (typeof tapVol!=='undefined'?tapVol:0.35));
+      const v = getTapVolume01();
       const g = Math.pow(v, 2.2); 
       if(typeof tapMaster !== 'undefined' && tapMaster && typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
-        tapMaster.gain.setTargetAtTime(Math.min(MASTER_GAIN_CAP, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.015);
+        tapMaster.gain.setTargetAtTime(Math.min(2.0, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.015);
       }
     }catch(e){}
   };
@@ -3800,11 +3631,10 @@ window.addEventListener('pageshow', ()=>{
     activeVoices.length = 0;
   }
 
-  // NOTE(v0.44): do NOT stop on pointer/touch release.
-  // It cuts the natural sustain (especially in SAMPLE mode). We stop on next note (playFreqs calls stopAllVoices),
-  // and on page hide / visibility change to avoid stuck sounds.
-  window.addEventListener('pagehide', stopAllVoices, {passive:true});
-  document.addEventListener('visibilitychange', ()=>{ try{ if(document.hidden) stopAllVoices(); }catch(_){ } }, {passive:true});
+  // Tap Release Handler
+  window.addEventListener('touchend', stopAllVoices, {passive:true});
+  window.addEventListener('mouseup', stopAllVoices, {passive:true});
+  window.addEventListener('pointerup', stopAllVoices, {passive:true});
 
   // ノイズバッファの生成（キャッシュ）
   function getUkeNoiseBuffer() {
@@ -3840,7 +3670,7 @@ window.addEventListener('pageshow', ()=>{
 
       // Volume Scaling to prevent clipping before compressor
       // 弦の数が多いほどゲインを下げる
-      const baseGain = 0.62 / Math.sqrt(N);
+      const baseGain = 0.4 / Math.sqrt(N);
       // Warm Tone Filter (Simulate wood body resonance around 400Hz)
       freqs.forEach((f0, i) => {
         const bodyFilter = tapAudioCtx.createBiquadFilter();
@@ -3903,9 +3733,9 @@ window.addEventListener('pageshow', ()=>{
         // ★修正: exponentialRampの前に0.001を入れて確実にエラーを防ぎ、最後まで減衰させる
         mix1.gain.setValueAtTime(0.001, startTime);
         mix1.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
-        mix1.gain.exponentialRampToValueAtTime(0.13, startTime + 1.2); // Main sustain (a bit longer)
-        mix1.gain.exponentialRampToValueAtTime(0.001, startTime + 3.2); // ★自然減衰して消える（タップでも余韻）
-        mix1.gain.linearRampToValueAtTime(0, startTime + 3.35); // ★完全に無音へ
+        mix1.gain.exponentialRampToValueAtTime(0.15, startTime + 0.8); // Main sustain
+        mix1.gain.exponentialRampToValueAtTime(0.001, startTime + 2.0); // ★自然減衰して消える
+        mix1.gain.linearRampToValueAtTime(0, startTime + 2.1); // ★完全に無音へ
 
         mix2.gain.setValueAtTime(0.001, startTime);
         mix2.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
@@ -3987,19 +3817,17 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
-      const baseGain = 1.22 / Math.sqrt(N);
+      const baseGain = 0.78 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
 
 
       const chooseString = (f)=>{
-        let bestKey = null;
+        let bestKey = 'A';
         let bestErr = 1e9;
         const keys = ['A','E','C','G'];
         for(const k of keys){
-          // prefer available recorded strings (avoid silent notes when a buffer is missing)
-          if(!buffers[k]) continue;
           const b = base[k] || 440;
           const x = 12 * Math.log2(Math.max(1e-6, f / b));
           // 現実的なフレット範囲（-1〜16）に寄せる
@@ -4011,10 +3839,6 @@ window.addEventListener('pageshow', ()=>{
             bestErr = cents;
             bestKey = k;
           }
-        }
-        // if nothing matched range, fall back to any available buffer
-        if(!bestKey){
-          for(const k of keys){ if(buffers[k]){ bestKey = k; break; } }
         }
         return bestKey;
       };
@@ -4042,7 +3866,7 @@ window.addEventListener('pageshow', ()=>{
         g.gain.linearRampToValueAtTime(peak, startTime + 0.010);
 
         // dur は指定が来る場合だけ少し反映（通常は固定の余韻）
-        const tail = Math.max(3.0, Math.min(4.6, (Number(dur)||0) * 3.2 || 3.6));
+        const tail = Math.max(2.2, Math.min(3.4, (Number(dur)||0) * 3.0 || 2.6));
         g.gain.setValueAtTime(peak, startTime + Math.max(0.45, tail - 1.2));
         g.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
         g.gain.linearRampToValueAtTime(0, startTime + tail + 0.14);
@@ -4050,7 +3874,7 @@ window.addEventListener('pageshow', ()=>{
         // 軽いローパスで耳に痛い成分を抑える（実録の高域ノイズ対策）
         const hp = tapAudioCtx.createBiquadFilter();
         hp.type = 'highpass';
-        hp.frequency.setValueAtTime(70, startTime);
+        hp.frequency.setValueAtTime(90, startTime);
 
         const lp = tapAudioCtx.createBiquadFilter();
         lp.type = 'lowpass';
@@ -4138,17 +3962,26 @@ window.addEventListener('pageshow', ()=>{
     let candGain = {A:1, E:1, C:1, G:1};
 
     const recalcLevels = ()=>{
-      // v0.43: 各弦を「RMSターゲット」で個別に正規化しているため、ここでの追加レベリングは基本不要。
-      // ここで動かすと「強く弾いた弦だけ大きい/小さい」等の再発要因になるので固定1.0にする。
       try{
-        candGain.A = 1; candGain.E = 1; candGain.C = 1; candGain.G = 1;
+        const keys = ['A','E','C','G'];
+        const rmsList = keys.map(k=>candMeta[k] && candMeta[k].rms).filter(v=>Number.isFinite(v));
+        if(rmsList.length < 4) return;
+        const s = rmsList.slice().sort((a,b)=>a-b);
+        const target = (s[1] + s[2]) * 0.5; // median(4)
+        keys.forEach(k=>{
+          const r = (candMeta[k] && candMeta[k].rms) ? candMeta[k].rms : target;
+          let mult = target / Math.max(1e-6, r);
+          // clamp to avoid over-amplifying noise
+          mult = Math.max(0.55, Math.min(2.40, mult));
+          candGain[k] = mult;
+        });
       }catch(e){}
     };
 
 
     const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
 
-    const setMsg = (t)=>{ msgEl.textContent = t; msgEl.classList.toggle('is-ok', /OK/.test(String(t))); };
+    const setMsg = (t)=>{ msgEl.textContent = t; };
     const setHint = (t)=>{ hintEl.textContent = t; };
 
     const setProgress = (activeKey)=>{
@@ -4403,7 +4236,7 @@ window.addEventListener('pageshow', ()=>{
       recActive = true;
 
       // pre-roll + recordTime
-      const recordTime = 2.20;
+      const recordTime = 1.35;
       recNeed = preLen + Math.floor(tapAudioCtx.sampleRate * recordTime);
       recBuf = new Float32Array(recNeed);
 
@@ -4458,7 +4291,7 @@ window.addEventListener('pageshow', ()=>{
         const skip = Math.floor(sr * skipSec);
         if((recBuf.length - st) > (skip + Math.floor(sr * 0.55))){ st += skip; }
 
-        const maxLen = Math.min(recBuf.length - st, Math.floor(sr * 5.00));
+        const maxLen = Math.min(recBuf.length - st, Math.floor(sr * 2.40));
         let data = recBuf.subarray(st, st + maxLen);
 
         // onset trim: 先頭の“ペチン/指ノイズ”や無音をなるべく避ける（音色は維持）
@@ -4484,23 +4317,20 @@ window.addEventListener('pageshow', ()=>{
         mean = mean / Math.max(1, data.length);
 
         // 1-pole highpass to remove low rumble (≈70Hz)
-        const fc = 70;
+        const fc = 90;
         const dt = 1 / sr;
         const rc = 1 / (2 * Math.PI * fc);
         const a = rc / (rc + dt);
         let y1 = 0, x1 = 0;
 
         // 1-pole lowpass to soften hiss/aliasing (≈6500Hz)
-        const lfc = 6000;
+        const lfc = 6500;
         const lrc = 1 / (2 * Math.PI * lfc);
         const la = dt / (lrc + dt);
         let ly = 0;
 
         // soft noise gate threshold (avoid boosting room noise)
-        let gate = Math.max(0.00055, (noiseRms||0) * 1.15, (minRms||0) * 0.11);
-        // 1弦(A)は余韻が細いので、ゲートをさらに弱めて伸びを残す
-        try{ if(key === 'A') gate = Math.max(0.00032, gate * 0.55); }catch(e){}
-
+        const gate = Math.max(0.0018, (noiseRms||0) * 2.4, (minRms||0) * 0.32);
 
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
@@ -4514,57 +4344,15 @@ window.addEventListener('pageshow', ()=>{
           const ay = Math.abs(y);
           if(ay < gate){
             const m = ay / gate; // 0..1
-            y *= Math.pow(m, 0.65); // soften near-zero noise (tail-friendly)
+            y *= m;            // soften near-zero noise
           }
           proc[i] = y;
         }
 
-
-        // transient softening + mild saturation (keeps your tone, reduces "pein")
-        try{
-          const nA = Math.min(proc.length, Math.floor(sr * 0.060)); // first 60ms
-          // extra gentle lowpass on attack only
-          const afc = 2600;
-          const arc = 1 / (2 * Math.PI * afc);
-          const aa = dt / (arc + dt);
-          let aly = 0;
-          for(let i=0;i<nA;i++){
-            aly = aly + aa * (proc[i] - aly);
-            const w = i / Math.max(1, nA);          // 0..1
-            const mix = 0.65*(1 - w);               // more smoothing at very beginning
-            proc[i] = proc[i] * (1 - mix) + aly * mix;
-          }
-          // mild saturation for warmth
-          const drive = 1.30; // 1.2〜1.8（ノイズ増幅を抑えつつ暖かさ）
-          const inv = 1 / Math.tanh(drive);
-          for(let i=0;i<proc.length;i++){
-            proc[i] = Math.tanh(drive * proc[i]) * inv;
-          }
-        }catch(e){}
-        // volume normalize (RMS target) to keep strings even regardless of how hard you pluck
+        // peak normalize (keep headroom for chords)
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-
-        // Measure RMS on the sustain (skip very first attack)
-        let w0 = Math.floor(sr * 0.10);
-        let w1 = Math.min(proc.length, Math.floor(sr * 0.70));
-        if(w1 <= w0 + 256){ w0 = 0; w1 = proc.length; }
-
-        let rr = 0;
-        for(let i=w0;i<w1;i++){ const v=proc[i]; rr += v*v; }
-        const rms = Math.sqrt(rr / Math.max(1, (w1 - w0)));
-
-        const TARGET_RMS = 0.18; // perceived loudness target (per-string)
-        let g = (rms > 1e-6) ? (TARGET_RMS / rms) : 1.0;
-
-        // Clamp so we don't boost room noise too much
-        g = Math.max(0.55, Math.min(2.20, g));
-
-        // Peak safety (avoid clipping)
-        const peakAfter = mx * g;
-        if(peakAfter > 0.98 && peakAfter > 1e-6){
-          g *= (0.98 / peakAfter);
-        }
+        const g = (mx > 0.0005) ? (0.95 / mx) : 1.0;
 
         // copy into AudioBuffer (tapAudioCtx)
         const b = tapAudioCtx.createBuffer(1, proc.length, sr);
@@ -4587,36 +4375,6 @@ window.addEventListener('pageshow', ()=>{
           const rms = Math.sqrt(rr / Math.max(1, ch.length));
           candMeta[key] = { rms, peak: pk };
         }catch(e){}
-
-        // pitch sanity check (4弦などの取り違え/失敗対策)
-        try{
-          const expect = (ORDER[idx] && ORDER[idx].freq) ? ORDER[idx].freq : null;
-          if(expect){
-            const off = Math.floor(sr * 0.06);
-            const win = Math.min(ch.length - off, 4096);
-            if(win > 1024){
-              const tmp = new Float32Array(win);
-              for(let i=0;i<win;i++){ tmp[i] = ch[off + i]; }
-              const hz = autocorrelate(tmp, sr);
-              if(hz > 0){
-                const cents = 1200 * Math.log2(Math.max(1e-6, hz / expect));
-                if(Math.abs(cents) > 35){
-                  setProgress(key);
-                  setMsg('音程が合ってないかも…もう一度録音しよう');
-                  setHint('同じ弦を、少し優しく弾いてね（強打ちNG）');
-                  // discard
-                  candidates[key] = null;
-                  candMeta[key] = null;
-                  recActive = false;
-                  recBuf = null;
-                  nextTimer = setTimeout(()=>{ if(running) beginTake(); }, 850);
-                  return;
-                }
-              }
-            }
-          }
-        }catch(e){}
-
 candidates[key] = b;
 
         recalcLevels();
@@ -4798,7 +4556,6 @@ candidates[key] = b;
       if(stopMic) stopStream();
       closeOverlay();
       try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
-    try{ window.bindUkeSoundPillGuards && window.bindUkeSoundPillGuards(); }catch(e){}
     };
 
     // UI events
@@ -4835,9 +4592,8 @@ candidates[key] = b;
       // accept
       window.UKE_SAMPLE.buffers = { A:candidates.A, E:candidates.E, C:candidates.C, G:candidates.G };
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
-      window.UKE_SAMPLE.ready = !!(candidates.A || candidates.E || candidates.C || candidates.G); // allow partial (fallback per-string)
+      window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
-      try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
       endFlow(true);
     });
 

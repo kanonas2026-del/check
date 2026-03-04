@@ -1425,7 +1425,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.43</div>
+<div id="verTag">v0.44</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1980,8 +1980,8 @@ let gameState = 'MENU';
 let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
-const OUTPUT_BOOST = 3.0; // iPhone内蔵SP向け：全体の基本音量を底上げ（さらにアップ）
-const MASTER_GAIN_CAP = 4.2; // スライダー最大でも足りない対策（コンプで保護）
+const OUTPUT_BOOST = 4.0; // iPhone内蔵SP向け：全体の基本音量を底上げ（v0.44 さらにアップ）
+const MASTER_GAIN_CAP = 6.0; // スライダー最大でも足りない対策（コンプで保護）
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 0.92;
 let tapAudioCtx = null;
@@ -3800,10 +3800,11 @@ window.addEventListener('pageshow', ()=>{
     activeVoices.length = 0;
   }
 
-  // Tap Release Handler
-  window.addEventListener('touchend', stopAllVoices, {passive:true});
-  window.addEventListener('mouseup', stopAllVoices, {passive:true});
-  window.addEventListener('pointerup', stopAllVoices, {passive:true});
+  // NOTE(v0.44): do NOT stop on pointer/touch release.
+  // It cuts the natural sustain (especially in SAMPLE mode). We stop on next note (playFreqs calls stopAllVoices),
+  // and on page hide / visibility change to avoid stuck sounds.
+  window.addEventListener('pagehide', stopAllVoices, {passive:true});
+  document.addEventListener('visibilitychange', ()=>{ try{ if(document.hidden) stopAllVoices(); }catch(_){ } }, {passive:true});
 
   // ノイズバッファの生成（キャッシュ）
   function getUkeNoiseBuffer() {
@@ -3839,7 +3840,7 @@ window.addEventListener('pageshow', ()=>{
 
       // Volume Scaling to prevent clipping before compressor
       // 弦の数が多いほどゲインを下げる
-      const baseGain = 0.52 / Math.sqrt(N);
+      const baseGain = 0.62 / Math.sqrt(N);
       // Warm Tone Filter (Simulate wood body resonance around 400Hz)
       freqs.forEach((f0, i) => {
         const bodyFilter = tapAudioCtx.createBiquadFilter();
@@ -3986,17 +3987,19 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
-      const baseGain = 0.92 / Math.sqrt(N);
+      const baseGain = 1.22 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
 
 
       const chooseString = (f)=>{
-        let bestKey = 'A';
+        let bestKey = null;
         let bestErr = 1e9;
         const keys = ['A','E','C','G'];
         for(const k of keys){
+          // prefer available recorded strings (avoid silent notes when a buffer is missing)
+          if(!buffers[k]) continue;
           const b = base[k] || 440;
           const x = 12 * Math.log2(Math.max(1e-6, f / b));
           // 現実的なフレット範囲（-1〜16）に寄せる
@@ -4008,6 +4011,10 @@ window.addEventListener('pageshow', ()=>{
             bestErr = cents;
             bestKey = k;
           }
+        }
+        // if nothing matched range, fall back to any available buffer
+        if(!bestKey){
+          for(const k of keys){ if(buffers[k]){ bestKey = k; break; } }
         }
         return bestKey;
       };
@@ -4547,11 +4554,11 @@ window.addEventListener('pageshow', ()=>{
         for(let i=w0;i<w1;i++){ const v=proc[i]; rr += v*v; }
         const rms = Math.sqrt(rr / Math.max(1, (w1 - w0)));
 
-        const TARGET_RMS = 0.16; // perceived loudness target (per-string)
+        const TARGET_RMS = 0.18; // perceived loudness target (per-string)
         let g = (rms > 1e-6) ? (TARGET_RMS / rms) : 1.0;
 
         // Clamp so we don't boost room noise too much
-        g = Math.max(0.55, Math.min(1.85, g));
+        g = Math.max(0.55, Math.min(2.20, g));
 
         // Peak safety (avoid clipping)
         const peakAfter = mx * g;

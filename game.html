@@ -914,6 +914,47 @@ body.is-uke .vol-inline{ display:none !important; }
   line-height: 1.25;
 }
 
+/* v38: ウクキャプ（サンプリング）UIを大きく＆OKを強調（他UIは触らない） */
+#sample-overlay .sample-card h2{
+  font-size: 26px;
+  margin: 4px 0 10px;
+}
+#sample-overlay #sample-msg{
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.25;
+  margin: 6px 0 8px;
+}
+#sample-overlay #sample-msg.is-ok{
+  font-size: 22px;
+  background: #dff6e6;
+  border: 2px solid rgba(0,0,0,0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+#sample-overlay .sample-progress{
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+#sample-overlay .sample-progress .sp-item{
+  font-size: 16px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 2px solid rgba(0,0,0,0.10);
+}
+#sample-overlay .sample-progress .sp-item.done{
+  border-color: rgba(0,0,0,0.16);
+}
+#sample-overlay .sample-progress .sp-item.done::after{
+  content: " OK";
+  font-weight: 1000;
+}
+#sample-overlay .sample-hint{
+  font-size: 14px;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
 /* iPhone横：必ず1画面 */
 @media (orientation: landscape) and (max-height: 430px){
   #menu-overlay{
@@ -1384,7 +1425,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.37</div>
+<div id="verTag">v0.38</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1462,7 +1503,7 @@ body.menuOpen #back-btn{ display:none !important; }
     <button class="menu-btn mode6" id="import-json-btn">
       <div class="badge" style="background:#ff3d3d;">📥</div>
       <div class="menu-text">
-        <div class="title">オリジナル譜面</div>
+        <div class="title">先生のオリジナル譜面</div>
         <small>JSONデータをよみこんでれんしゅう</small>
       </div>
     </button>
@@ -3981,7 +4022,7 @@ window.addEventListener('pageshow', ()=>{
 
     const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
 
-    const setMsg = (t)=>{ msgEl.textContent = t; };
+    const setMsg = (t)=>{ msgEl.textContent = t; msgEl.classList.toggle('is-ok', /OK/.test(String(t))); };
     const setHint = (t)=>{ hintEl.textContent = t; };
 
     const setProgress = (activeKey)=>{
@@ -4168,7 +4209,7 @@ window.addEventListener('pageshow', ()=>{
         setMsg('静かにしてね（ノイズをはかるよ）');
         await sleep(250);
         noiseRms = await measureNoise();
-        minRms = Math.max(IS_IOS ? 0.0012 : 0.0045, noiseRms * 1.7);
+        minRms = Math.max(IS_IOS ? 0.0012 : 0.0045, noiseRms * (takeKey==='A' ? 1.35 : 1.7));
         setMsg(`${t.label} を弾いてね`);
       }
 
@@ -4203,7 +4244,7 @@ window.addEventListener('pageshow', ()=>{
             const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate);
             if(hz > 0){
               const cents = 1200 * Math.log2(Math.max(1e-6, hz / t.freq));
-              const okPitch = Math.abs(cents) < 55;
+              const okPitch = Math.abs(cents) < (takeKey==='A' ? 75 : 55);
               const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < 18);
 
               if(okPitch && okStable){
@@ -4216,7 +4257,7 @@ window.addEventListener('pageshow', ()=>{
                 setHint('ちょっとだけ合わせてね（近いよ）');
               }
 
-              if(stableCount >= 6 && !recActive){
+              if(stableCount >= (takeKey==='A' ? 5 : 6) && !recActive){
                 triggerRecord();
               }
             }else{
@@ -4962,7 +5003,7 @@ candidates[key] = b;
 
   applySoon();
 })();
-// 「オリジナル譜面」ボタンを押したときの処理（テスト用）
+// 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
 // ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
     document.addEventListener('click', function(e) {
       

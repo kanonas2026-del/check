@@ -1980,7 +1980,7 @@ let gameState = 'MENU';
 let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
-const OUTPUT_BOOST = 1.5; // iPhone内蔵SP向け：全体の基本音量を底上げ
+const OUTPUT_BOOST = 2.2; // iPhone内蔵SP向け：全体の基本音量を底上げ // iPhone内蔵SP向け：全体の基本音量を底上げ
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 0.85;
 let tapAudioCtx = null;
@@ -2037,7 +2037,7 @@ function ensureTapAudio(){
       if(!window.__tapReverb){
         try{
           const sr = tapAudioCtx.sampleRate;
-          const irSec = 0.55; // short room
+          const irSec = 0.38; // short room (reduce hiss/noise tail)
           const len = Math.max(1, Math.floor(sr * irSec));
           const ir = tapAudioCtx.createBuffer(2, len, sr);
           const decay = 5.5;
@@ -2052,12 +2052,18 @@ function ensureTapAudio(){
           const conv = tapAudioCtx.createConvolver();
           conv.buffer = ir;
           const wet = tapAudioCtx.createGain();
-          wet.gain.value = 0.12; // 0.08〜0.15 推奨
+          wet.gain.value = 0.07; // subtle (reduce perceived noise)
           // dry is tapMaster -> compressor (existing). Add wet send to compressor.
           tapMaster.connect(conv);
           conv.connect(wet);
+          // tame reverb hiss with gentle lowpass
+          const wetLPF = tapAudioCtx.createBiquadFilter();
+          wetLPF.type = 'lowpass';
+          wetLPF.frequency.setValueAtTime(5200, tapAudioCtx.currentTime);
+          wetLPF.Q.setValueAtTime(0.7, tapAudioCtx.currentTime);
+          wet.connect(wetLPF);
           // wet will be summed into tapSum (tone chain)
-          wet.connect(tapSum);
+          wetLPF.connect(tapSum);
           window.__tapReverb = { conv, wet };
         }catch(e){ console.error(e); window.__tapReverb = {failed:true}; }
       }
@@ -2104,10 +2110,10 @@ function ensureTapAudio(){
 
       tapCompressor.connect(tapAudioCtx.destination);
 
-      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+      tapMaster.gain.value = Math.min(3.0, tapVol * OUTPUT_BOOST);
 applyTapVolumeToGain();
     } else {
-      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+      tapMaster.gain.value = Math.min(3.0, tapVol * OUTPUT_BOOST);
     }
   }catch(e){}
 }
@@ -2194,7 +2200,7 @@ function bindTapVolUI(){
   enhanceRangeSlider(el);
   const apply = ()=>{
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
-    if(tapMaster) tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+    if(tapMaster) tapMaster.gain.value = Math.min(3.0, tapVol * OUTPUT_BOOST);
     saveTapVol();
     // user gesture => allow audio on iOS
     ensureTapAudio();
@@ -2703,22 +2709,33 @@ window.toggleUkeSound = function(el, ev){
   try{ ensureTapAudio(); }catch(e){}
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
-  const isOn = (us.mode === 'SAMPLE' && us.ready);
+
+  const hasAny = !!(us.buffers && (us.buffers.A || us.buffers.E || us.buffers.C || us.buffers.G));
+  const isOn = (us.mode === 'SAMPLE' && hasAny);
+
+  // OFF -> OSC
   if(isOn){
     us.mode = 'OSC';
-    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+    try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
     return;
   }
-  // ONにしたい
-  if(us.ready){
+
+  // ON -> SAMPLE (録音済みがある場合のみ)
+  if(hasAny){
     us.mode = 'SAMPLE';
-    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+    try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
     return;
   }
-  // まだ録音がない → 取り込みフローへ
-  const sb = document.getElementById('sampleBtn');
-  if(sb){ sb.click(); }
-  if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+
+  // 録音がない場合：勝手に録音モードへ入らない（誤操作防止）
+  try{
+    const go = confirm('録音したウクレレ音がまだありません。録音しますか？');
+    if(go){
+      const sb = document.getElementById('sampleBtn');
+      if(sb){ sb.click(); }
+    }
+  }catch(e){}
+  try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
 };
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
@@ -3791,7 +3808,7 @@ window.addEventListener('pageshow', ()=>{
 
       // Volume Scaling to prevent clipping before compressor
       // 弦の数が多いほどゲインを下げる
-      const baseGain = 0.4 / Math.sqrt(N);
+      const baseGain = 0.52 / Math.sqrt(N);
       // Warm Tone Filter (Simulate wood body resonance around 400Hz)
       freqs.forEach((f0, i) => {
         const bodyFilter = tapAudioCtx.createBiquadFilter();
@@ -3938,7 +3955,7 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので控えめに（マスターは既存のtapVol＋コンプ）
-      const baseGain = 0.78 / Math.sqrt(N);
+      const baseGain = 0.92 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
@@ -4768,7 +4785,7 @@ candidates[key] = b;
       // accept
       window.UKE_SAMPLE.buffers = { A:candidates.A, E:candidates.E, C:candidates.C, G:candidates.G };
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
-      window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
+      window.UKE_SAMPLE.ready = !!(candidates.A || candidates.E || candidates.C || candidates.G); // allow partial (fallback per-string)
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
       try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
       endFlow(true);

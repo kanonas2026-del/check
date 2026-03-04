@@ -1425,7 +1425,7 @@ body.menuOpen #back-btn{ display:none !important; }
 <div class="menu-card">
 
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
-<div id="verTag">v0.39</div>
+<div id="verTag">v0.41</div>
 
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
@@ -1489,7 +1489,7 @@ body.menuOpen #back-btn{ display:none !important; }
       <!-- ウクレレのおと: ボタン右側余白に収納（右スペース） -->
       <div class="menu-extra" onclick="event.stopPropagation();">
         <div class="mode-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
-          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
+          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this,event)" aria-pressed="false">ウクレレのおと</div>
         </div>
 
         <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
@@ -2068,7 +2068,7 @@ function ensureTapAudio(){
       (function(){
         const n = 2048;
         const curve = new Float32Array(n);
-        const drive = 1.6; // 1.3〜2.0
+        const drive = 1.75; // 1.3〜2.0
         for(let i=0;i<n;i++){
           const x = (i/(n-1))*2-1;
           curve[i] = Math.tanh(drive*x) / Math.tanh(drive);
@@ -2080,14 +2080,14 @@ function ensureTapAudio(){
       // Body EQ: add depth (low shelf), tame "pein" (mid cut), soften highs a bit
       const eqLow = tapAudioCtx.createBiquadFilter();
       eqLow.type = 'lowshelf';
-      eqLow.frequency.setValueAtTime(220, tapAudioCtx.currentTime);
-      eqLow.gain.setValueAtTime(3.0, tapAudioCtx.currentTime);
+      eqLow.frequency.setValueAtTime(200, tapAudioCtx.currentTime);
+      eqLow.gain.setValueAtTime(4.0, tapAudioCtx.currentTime);
 
       const eqMid = tapAudioCtx.createBiquadFilter();
       eqMid.type = 'peaking';
-      eqMid.frequency.setValueAtTime(3200, tapAudioCtx.currentTime);
+      eqMid.frequency.setValueAtTime(3300, tapAudioCtx.currentTime);
       eqMid.Q.setValueAtTime(1.05, tapAudioCtx.currentTime);
-      eqMid.gain.setValueAtTime(-3.2, tapAudioCtx.currentTime);
+      eqMid.gain.setValueAtTime(-3.8, tapAudioCtx.currentTime);
 
       const eqHigh = tapAudioCtx.createBiquadFilter();
       eqHigh.type = 'highshelf';
@@ -2697,7 +2697,9 @@ window.applyUkeSoundUi = function(){
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
-window.toggleUkeSound = function(){
+window.toggleUkeSound = function(el, ev){
+  try{ if(ev){ ev.preventDefault(); ev.stopPropagation(); } }catch(e){}
+
   try{ ensureTapAudio(); }catch(e){}
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
@@ -4355,7 +4357,7 @@ window.addEventListener('pageshow', ()=>{
       recActive = true;
 
       // pre-roll + recordTime
-      const recordTime = 1.35;
+      const recordTime = 1.60;
       recNeed = preLen + Math.floor(tapAudioCtx.sampleRate * recordTime);
       recBuf = new Float32Array(recNeed);
 
@@ -4410,7 +4412,7 @@ window.addEventListener('pageshow', ()=>{
         const skip = Math.floor(sr * skipSec);
         if((recBuf.length - st) > (skip + Math.floor(sr * 0.55))){ st += skip; }
 
-        const maxLen = Math.min(recBuf.length - st, Math.floor(sr * 3.80));
+        const maxLen = Math.min(recBuf.length - st, Math.floor(sr * 4.20));
         let data = recBuf.subarray(st, st + maxLen);
 
         // onset trim: 先頭の“ペチン/指ノイズ”や無音をなるべく避ける（音色は維持）
@@ -4449,7 +4451,10 @@ window.addEventListener('pageshow', ()=>{
         let ly = 0;
 
         // soft noise gate threshold (avoid boosting room noise)
-        const gate = Math.max(0.0012, (noiseRms||0) * 1.8, (minRms||0) * 0.22);
+        let gate = Math.max(0.0007, (noiseRms||0) * 1.30, (minRms||0) * 0.14);
+        // 1弦(A)は余韻が細いので、ゲートをさらに弱めて伸びを残す
+        try{ if(key === 'A') gate = Math.max(0.0005, gate * 0.70); }catch(e){}
+
 
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
@@ -4765,6 +4770,7 @@ candidates[key] = b;
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
       window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
+      try{ if(window.applyUkeSoundUi) window.applyUkeSoundUi(); }catch(e){}
       endFlow(true);
     });
 
@@ -5133,11 +5139,11 @@ candidates[key] = b;
 
   applySoon();
 })();
-// 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
+// 「オリジナル譜面」ボタンを押したときの処理（テスト用）
 // ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
     document.addEventListener('click', function(e) {
       
-      // 📥「先生のオリジナル譜面」を開く
+      // 📥「オリジナル譜面」を開く
       if (e.target.closest('#import-json-btn')) {
         document.getElementById('task-modal').style.display = 'flex';
       }

@@ -1503,7 +1503,7 @@ body.menuOpen #back-btn{ display:none !important; }
     <button class="menu-btn mode6" id="import-json-btn">
       <div class="badge" style="background:#ff3d3d;">📥</div>
       <div class="menu-text">
-        <div class="title">先生のオリジナル譜面</div>
+        <div class="title">オリジナル譜面</div>
         <small>JSONデータをよみこんでれんしゅう</small>
       </div>
     </button>
@@ -5003,11 +5003,11 @@ candidates[key] = b;
 
   applySoon();
 })();
-// 「先生のオリジナル譜面」ボタンを押したときの処理（テスト用）
+// 「オリジナル譜面」ボタンを押したときの処理（テスト用）
 // ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
     document.addEventListener('click', function(e) {
       
-      // 📥「先生のオリジナル譜面」を開く
+      // 📥「オリジナル譜面」を開く
       if (e.target.closest('#import-json-btn')) {
         document.getElementById('task-modal').style.display = 'flex';
       }

@@ -85,6 +85,7 @@
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
 <title>ウクレレ・ゲーム</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>/* iphone-viewport-fix */
 
     :root{
@@ -1504,7 +1505,7 @@ body.menuOpen #back-btn{ display:none !important; }
       <div class="badge" style="background:#ff3d3d;">📥</div>
       <div class="menu-text">
         <div class="title">オリジナル譜面</div>
-        <small>JSONデータをよみこんでれんしゅう</small>
+        <small>Excel/JSONをよみこんでれんしゅう</small>
       </div>
     </button>
 
@@ -2542,7 +2543,28 @@ function buildKirakiraFromTabBlocks(blocks){
 
 const SONG_DATA = buildKirakiraFromTabBlocks(KIRAKIRA_TAB_BLOCKS);
 
-
+window.CUSTOM_SONG_DATA = null;
+window.CUSTOM_SONG_TITLE = '';
+window.CUSTOM_SONG_NAV = [];
+window.CUSTOM_SONG_SPEED_ID = 'NORMAL';
+window.CUSTOM_SONG_SOURCE_NAME = '';
+function getCurrentSongData(){
+  return (Array.isArray(window.CUSTOM_SONG_DATA) && window.CUSTOM_SONG_DATA.length) ? window.CUSTOM_SONG_DATA : SONG_DATA;
+}
+function isCustomSongMode(){
+  return !!(Array.isArray(window.CUSTOM_SONG_DATA) && window.CUSTOM_SONG_DATA.length);
+}
+function getCustomSongSlotMs(){
+  const sid = String(window.CUSTOM_SONG_SPEED_ID || 'NORMAL').toUpperCase();
+  return (sid === 'SLOW') ? 550 : (sid === 'FAST') ? 138 : 275;
+}
+function clearCustomSong(){
+  window.CUSTOM_SONG_DATA = null;
+  window.CUSTOM_SONG_TITLE = '';
+  window.CUSTOM_SONG_NAV = [];
+  window.CUSTOM_SONG_SOURCE_NAME = '';
+  window.CUSTOM_SONG_SPEED_ID = 'NORMAL';
+}
 
 
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
@@ -2819,9 +2841,13 @@ function initGame(mode, levelData, opts){
   practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
   spawnInterval = 2800; // デフォルト
   if(isSongMode){
-    // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
-    const sid = getSongSpeedId();
-    spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; // Ver0.1: tempo mapping (SLOW x0.5, FAST x2) // v28: tighter arpeggio timing
+    if(isCustomSongMode()) {
+      spawnInterval = getCustomSongSlotMs();
+    } else {
+      // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
+      const sid = getSongSpeedId();
+      spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; // Ver0.1: tempo mapping (SLOW x0.5, FAST x2) // v28: tighter arpeggio timing
+    }
   }
 
   document.getElementById('score').innerText="0";
@@ -2868,11 +2894,12 @@ function gameLoop(time){
     
     if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
       if(isSongMode){
-        if(songIndex < SONG_DATA.length){
-          const d = SONG_DATA[songIndex];
+        const __songData = getCurrentSongData();
+        if(songIndex < __songData.length){
+          const d = __songData[songIndex];
           groups.push(new ChordGroup(d.chord ? d.chord : (d.lib[d.key]), d.lyrics));
           songIndex++;
-          if(songIndex >= SONG_DATA.length){ songFinished = true; songFinishedAt = performance.now(); }
+          if(songIndex >= __songData.length){ songFinished = true; songFinishedAt = performance.now(); }
         } else {
           // no more notes to spawn
           if(!songFinished){ songFinished = true; songFinishedAt = performance.now(); }
@@ -2939,7 +2966,8 @@ function gameLoop(time){
 
   // 曲モード：最後まで流れ切ったら終了
   if(isSongMode){
-    const done = (songFinished || songIndex >= SONG_DATA.length);
+    const __songData = getCurrentSongData();
+    const done = (songFinished || songIndex >= __songData.length);
     if(done && groups.length===0){
       endGame();
       return;
@@ -5003,62 +5031,383 @@ candidates[key] = b;
 
   applySoon();
 })();
-// 「オリジナル譜面」ボタンを押したときの処理（テスト用）
-// ▼▼ モーダル画面のボタン反応（絶対に空振りしない仕組み） ▼▼
-    document.addEventListener('click', function(e) {
-      
-      // 📥「オリジナル譜面」を開く
-      if (e.target.closest('#import-json-btn')) {
-        document.getElementById('task-modal').style.display = 'flex';
-      }
-      
-      // ①「お手本をきく」ボタン
-      if (e.target.closest('.play-sample')) {
-        const checked = document.querySelector('input[name="sound-type"]:checked');
-        const soundName = checked ? checked.parentNode.textContent.trim() : 'でんし音';
-        alert('【テスト】' + soundName + ' でお手本を再生！');
-      }
-      
-      // ②「れんしゅうスタート！」ボタン
-      if (e.target.closest('.start-game')) {
-        alert('【テスト】ゲーム画面へ切り替わります！');
-        document.getElementById('task-modal').style.display = 'none';
-      }
-      
-      // ③「とうろく」ボタン
-      if (e.target.closest('.record-uke')) {
-        alert('【テスト】録音（ウクレレ登録）画面を開きます！');
-      }
-    });
 
-    const importBtn = document.getElementById('import-json-btn');
-    if(importBtn) {
-      importBtn.addEventListener('click', () => {
-        // ポップアップ画面を表示する（flexにして中央揃え）
-        document.getElementById('task-modal').style.display = 'flex';
+
+// ===== オリジナル譜面（Excel/JSON）読み込み =====
+(function(){
+  const importBtn = document.getElementById('import-json-btn');
+  const fileInput = document.getElementById('origScoreFile');
+  const modal = document.getElementById('task-modal');
+  const closeBtn = document.getElementById('taskModalClose');
+  const titleEl = document.getElementById('task-song-name');
+  const statusEl = document.getElementById('task-import-status');
+  const metaEl = document.getElementById('task-import-meta');
+  const navEl = document.getElementById('task-nav-meta');
+  const listenBtn = document.getElementById('taskListenBtn');
+  const startBtn = document.getElementById('taskStartBtn');
+  const recordBtn = document.getElementById('taskRecordBtn');
+  const speedPills = Array.from(document.querySelectorAll('#task-speed-pills .mode-pill'));
+  let importedScore = null;
+  let sampleTimers = [];
+  let samplePlaying = false;
+
+  function hideModal(){ if(modal) modal.style.display='none'; }
+  function showModal(){ if(modal) modal.style.display='flex'; }
+  function stopSamplePlayback(){
+    try{ sampleTimers.forEach(id=>clearTimeout(id)); }catch(e){}
+    sampleTimers = [];
+    samplePlaying = false;
+    if(listenBtn) listenBtn.textContent = '▶️ お手本をきく';
+  }
+  function setSpeed(id){
+    window.CUSTOM_SONG_SPEED_ID = id;
+    speedPills.forEach(el=>el.classList.toggle('active', (el.dataset.ospeed||'').toUpperCase()===id));
+  }
+  function getSpeed(){ return String(window.CUSTOM_SONG_SPEED_ID || 'NORMAL').toUpperCase(); }
+  function stem(name){ return String(name||'').replace(/\.[^.]+$/, ''); }
+  function cell(sheet, addr){ return sheet ? sheet[addr] : null; }
+  function cellVal(sheet, addr){ const c = cell(sheet, addr); return c ? c.v : null; }
+  function parseIntCell(v){
+    if(v === null || v === undefined || v === '') return null;
+    if(typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v);
+    const s = String(v).trim();
+    if(/^[-+]?\d+$/.test(s)) return parseInt(s, 10);
+    return null;
+  }
+  function hasAnyRowData(sheet, row){
+    for(let c=1;c<=18;c++){
+      const a = XLSX.utils.encode_cell({r:row-1,c:c-1});
+      const v = cellVal(sheet, a);
+      if(v !== null && v !== undefined && v !== '') return true;
+    }
+    return false;
+  }
+  function parseTabBars(tabSheet){
+    const bars = [];
+    let emptyRuns = 0;
+    for(let row=5; row<=Math.max(260, (tabSheet['!ref'] ? XLSX.utils.decode_range(tabSheet['!ref']).e.r+1 : 260)); row += 8){
+      const aVal = cellVal(tabSheet, `A${row}`);
+      const blockHasData = hasAnyRowData(tabSheet, row) || hasAnyRowData(tabSheet, row+1) || hasAnyRowData(tabSheet, row+2);
+      if(!blockHasData){
+        emptyRuns++;
+        if(emptyRuns >= 4) break;
+        continue;
+      }
+      emptyRuns = 0;
+      const m = String(aVal || '').match(/Bar\s*(\d+)/i);
+      const barNo = m ? parseInt(m[1],10) : bars.length + 1;
+      const chordMap = {};
+      const strumMap = {};
+      const fretRows = {A:{},E:{},C:{},G:{}};
+      for(let i=0;i<16;i++){
+        const col = XLSX.utils.encode_col(i+1); // B..Q
+        const ch = cellVal(tabSheet, `${col}${row+1}`);
+        const st = cellVal(tabSheet, `${col}${row+2}`);
+        const av = parseIntCell(cellVal(tabSheet, `${col}${row+3}`));
+        const ev = parseIntCell(cellVal(tabSheet, `${col}${row+4}`));
+        const cv = parseIntCell(cellVal(tabSheet, `${col}${row+5}`));
+        const gv = parseIntCell(cellVal(tabSheet, `${col}${row+6}`));
+        if(ch !== null && ch !== undefined && String(ch).trim() !== '') chordMap[i] = String(ch).trim();
+        if(st !== null && st !== undefined && String(st).trim() !== '') strumMap[i] = String(st).trim();
+        if(av !== null) fretRows.A[i] = av;
+        if(ev !== null) fretRows.E[i] = ev;
+        if(cv !== null) fretRows.C[i] = cv;
+        if(gv !== null) fretRows.G[i] = gv;
+      }
+      const tag = cellVal(tabSheet, `A${row+7}`);
+      bars.push({ barNo, chordMap, strumMap, fretRows, tag: String(tag||'').trim() });
+    }
+    return bars;
+  }
+  function parseNavEvents(wb, tabBars){
+    const out = [];
+    const navSheet = wb.Sheets['NAV'];
+    if(navSheet && navSheet['!ref']){
+      const rows = XLSX.utils.sheet_to_json(navSheet, {defval:''});
+      rows.forEach(r=>{
+        const type = String(r.type || r.TYPE || '').trim();
+        if(!type) return;
+        const atBar = parseIntCell(r.at_bar || r.atBar || r.BAR || '');
+        const targetBar = parseIntCell(r.target_bar || r.targetBar || '');
+        const passRule = String(r.pass_rule || r.passRule || '').trim();
+        const text = String(r.text || '').trim();
+        out.push({type, atBar, targetBar, passRule, text});
       });
     }
+    if(out.length) return out;
+    // fallback: parse visible NAV tags from TAB row A (empty row after block)
+    (tabBars||[]).forEach(b=>{
+      const tag = String(b.tag||'');
+      if(!tag || !/^NAV:/i.test(tag)) return;
+      const pieces = tag.split(/\s{2,}|\sNAV:/).map(s=>s.trim()).filter(Boolean);
+      pieces.forEach(piece=>{
+        const p = piece.replace(/^NAV:/i,'').trim();
+        if(/^SEGNO/i.test(p)) out.push({type:'SEGNO', atBar:b.barNo, targetBar:null, passRule:'', text:'visible_tag'});
+        else if(/^CODA$/i.test(p)) out.push({type:'CODA', atBar:b.barNo, targetBar:null, passRule:'', text:'visible_tag'});
+        else if(/^TO_CODA/i.test(p)) out.push({type:'TO_CODA', atBar:b.barNo, targetBar:null, passRule:/AFTER_DS/i.test(p)?'AFTER_DS':'', text:'visible_tag'});
+        else if(/^DS/i.test(p)) out.push({type:'DS', atBar:b.barNo, targetBar:null, passRule:/ONCE/i.test(p)?'ONCE':'', text:'visible_tag'});
+        else if(/^SIMILE/i.test(p)){
+          const m = p.match(/BAR\s*(\d+)/i);
+          out.push({type:'SIMILE_PREV_BAR', atBar:b.barNo, targetBar:m?parseInt(m[1],10):b.barNo-1, passRule:'', text:'visible_tag'});
+        } else if(/^VIDE/i.test(p)){
+          const m = p.match(/BAR\s*(\d+)/i);
+          out.push({type:'VIDE_PREV_BAR', atBar:b.barNo, targetBar:m?parseInt(m[1],10):b.barNo-1, passRule:'', text:'visible_tag'});
+        }
+      });
+    });
+    return out;
+  }
+  function chordLabelAt(bar, i){
+    let cur = '';
+    Object.keys(bar.chordMap).map(n=>parseInt(n,10)).sort((a,b)=>a-b).forEach(pos=>{ if(pos <= i) cur = bar.chordMap[pos]; });
+    return cur;
+  }
+  function cloneBarData(src, dst){
+    if(!src || !dst) return;
+    if(Object.keys(dst.strumMap||{}).length === 0) dst.strumMap = Object.assign({}, src.strumMap);
+    ['A','E','C','G'].forEach(k=>{
+      if(!dst.fretRows[k]) dst.fretRows[k] = {};
+      const srcMap = src.fretRows[k] || {};
+      const dstMap = dst.fretRows[k] || {};
+      Object.keys(srcMap).forEach(pos=>{ if(dstMap[pos] === undefined || dstMap[pos] === null || dstMap[pos] === '') dstMap[pos] = srcMap[pos]; });
+      dst.fretRows[k] = dstMap;
+    });
+    if(Object.keys(dst.chordMap||{}).length === 0) dst.chordMap = Object.assign({}, src.chordMap);
+  }
+  function resolveNavAndCopies(bars, nav){
+    const byBar = {};
+    bars.forEach(b=>byBar[b.barNo]=b);
+    (nav||[]).forEach(ev=>{
+      const t = String(ev.type||'').toUpperCase();
+      if((t==='SIMILE_PREV_BAR' || t==='VIDE_PREV_BAR') && ev.atBar && ev.targetBar && byBar[ev.atBar] && byBar[ev.targetBar]){
+        cloneBarData(byBar[ev.targetBar], byBar[ev.atBar]);
+      }
+    });
+    return byBar;
+  }
+  function buildPlaybackOrder(bars, nav){
+    const barNums = bars.map(b=>b.barNo).sort((a,b)=>a-b);
+    if(!barNums.length) return [];
+    const maxBar = Math.max(...barNums);
+    const evByBar = {};
+    (nav||[]).forEach(ev=>{ if(ev.atBar!=null) (evByBar[ev.atBar] ||= []).push(ev); });
+    const segnoBar = ((nav||[]).find(ev=>String(ev.type||'').toUpperCase()==='SEGNO')||{}).atBar || null;
+    const codaBar  = ((nav||[]).find(ev=>String(ev.type||'').toUpperCase()==='CODA')||{}).atBar || null;
+    const order = [];
+    let cur = barNums[0], dsUsed = false, guard = 0;
+    while(cur >= barNums[0] && cur <= maxBar && guard < 1200){
+      guard++;
+      order.push(cur);
+      const evs = evByBar[cur] || [];
+      const hasFine = evs.some(ev=>String(ev.type||'').toUpperCase()==='FINE');
+      if(dsUsed && hasFine) break;
+      const dsEv = evs.find(ev=>['DS','DS_AL_CODA','DS_AL_FINE'].includes(String(ev.type||'').toUpperCase()));
+      if(dsEv && !dsUsed){
+        dsUsed = true;
+        cur = dsEv.targetBar || segnoBar || barNums[0];
+        continue;
+      }
+      const toCodaEv = evs.find(ev=>String(ev.type||'').toUpperCase()==='TO_CODA');
+      if(toCodaEv && dsUsed && (String(toCodaEv.passRule||'').toUpperCase()==='AFTER_DS' || true) && codaBar){
+        cur = toCodaEv.targetBar || codaBar;
+        continue;
+      }
+      cur += 1;
+    }
+    return order;
+  }
+  function makeChordObj(chordName, frets){
+    const map = [{k:'A',s:1},{k:'E',s:2},{k:'C',s:3},{k:'G',s:4}];
+    const fingers = [];
+    map.forEach(({k,s})=>{
+      const v = frets[k];
+      if(v === undefined || v === null || v === '') return;
+      const n = Number(v);
+      if(!Number.isFinite(n)) return;
+      fingers.push({s, f:n, txt:String(n)});
+    });
+    return { name: chordName || 'オリジナル', targetIdx: 0, fingers };
+  }
+  function buildSongDataFromBars(bars, order){
+    const byBar = {};
+    bars.forEach(b=>byBar[b.barNo]=b);
+    const data = [];
+    order.forEach(barNo=>{
+      const bar = byBar[barNo];
+      if(!bar) return;
+      for(let i=0;i<16;i++){
+        const st = bar.strumMap[i];
+        if(!st){ data.push({rest:true, barNo, grid:i}); continue; }
+        const frets = {};
+        ['A','E','C','G'].forEach(k=>{
+          const v = bar.fretRows[k] && bar.fretRows[k][i];
+          if(v !== undefined && v !== null && v !== '') frets[k] = Number(v);
+        });
+        const label = chordLabelAt(bar, i);
+        if(Object.keys(frets).length){
+          data.push({ chord: makeChordObj(label, frets), lyrics:'', barNo, grid:i, strum:st });
+        } else {
+          data.push({rest:true, barNo, grid:i, strum:st});
+        }
+      }
+    });
+    return data;
+  }
+  async function parseImportedFile(file){
+    const name = file.name || 'オリジナル譜面';
+    const lower = name.toLowerCase();
+    if(lower.endsWith('.json')){
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      if(parsed && Array.isArray(parsed.songData)){
+        return {
+          title: parsed.title || stem(name),
+          songData: parsed.songData,
+          nav: Array.isArray(parsed.nav) ? parsed.nav : [],
+          order: Array.isArray(parsed.order) ? parsed.order : [],
+          barsCount: parsed.barsCount || 0,
+          sourceName: name,
+        };
+      }
+      throw new Error('JSONの形式がちがいます');
+    }
+    if(typeof XLSX === 'undefined') throw new Error('Excelライブラリの読み込みに失敗しました');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const tab = wb.Sheets['TAB'] || wb.Sheets[wb.SheetNames[0]];
+    if(!tab) throw new Error('TABシートが見つかりません');
+    const bars = parseTabBars(tab);
+    if(!bars.length) throw new Error('Barデータが見つかりません');
+    const nav = parseNavEvents(wb, bars);
+    resolveNavAndCopies(bars, nav);
+    const order = buildPlaybackOrder(bars, nav);
+    const songData = buildSongDataFromBars(bars, order.length ? order : bars.map(b=>b.barNo));
+    return {
+      title: stem(name),
+      barsCount: bars.length,
+      nav,
+      order,
+      songData,
+      sourceName: name,
+    };
+  }
+  function updateModal(){
+    if(!importedScore){
+      titleEl.textContent = 'ファイルをえらんでね';
+      statusEl.textContent = 'Excel（TAB/NAV）またはJSONをよみこみます';
+      metaEl.textContent = '速度：モーダル下のボタンで変更できます';
+      navEl.textContent = '';
+      listenBtn.disabled = true;
+      startBtn.disabled = true;
+      return;
+    }
+    titleEl.textContent = `「${importedScore.title}」`;
+    statusEl.textContent = `読み込みOK：${importedScore.sourceName}`;
+    metaEl.textContent = `Bar数: ${importedScore.barsCount || 0} / 生成ステップ: ${importedScore.songData.length}`;
+    const navBits = [];
+    const nav = importedScore.nav || [];
+    if(nav.some(e=>String(e.type||'').toUpperCase()==='SEGNO')) navBits.push('Segno');
+    if(nav.some(e=>String(e.type||'').toUpperCase()==='TO_CODA')) navBits.push('To Coda');
+    if(nav.some(e=>String(e.type||'').toUpperCase()==='CODA')) navBits.push('Coda');
+    if(nav.some(e=>String(e.type||'').toUpperCase().startsWith('DS'))) navBits.push('D.S.');
+    if(nav.some(e=>String(e.type||'').toUpperCase()==='SIMILE_PREV_BAR')) navBits.push('Simile');
+    if(nav.some(e=>String(e.type||'').toUpperCase()==='VIDE_PREV_BAR')) navBits.push('Vidé');
+    navEl.textContent = navBits.length ? `順序制御: ${navBits.join(' / ')}` : '順序制御: なし';
+    listenBtn.disabled = false;
+    startBtn.disabled = false;
+  }
+  function openPicker(){
+    stopSamplePlayback();
+    if(fileInput){ fileInput.value = ''; fileInput.click(); }
+  }
+  async function handleFile(ev){
+    const file = ev.target && ev.target.files && ev.target.files[0];
+    if(!file) return;
+    statusEl.textContent = '読み込み中…';
+    listenBtn.disabled = true;
+    startBtn.disabled = true;
+    try{
+      importedScore = await parseImportedFile(file);
+      window.CUSTOM_SONG_SPEED_ID = getSpeed();
+      updateModal();
+      showModal();
+    }catch(err){
+      console.error(err);
+      importedScore = null;
+      updateModal();
+      alert('読み込みに失敗しました：' + (err && err.message ? err.message : err));
+    }
+  }
+  function freqsFromEvent(ev){
+    try{ return getFreqsFromTarget({ chord: ev.chord }); }catch(e){ return null; }
+  }
+  function playImportedSample(){
+    if(!importedScore || !Array.isArray(importedScore.songData) || !importedScore.songData.length) return;
+    if(samplePlaying){ stopSamplePlayback(); return; }
+    try{ ensureTapAudio(); }catch(e){}
+    samplePlaying = true;
+    listenBtn.textContent = '■ お手本をとめる';
+    const slotMs = getCustomSongSlotMs();
+    let t = 0;
+    importedScore.songData.forEach((ev)=>{
+      const delay = t;
+      sampleTimers.push(setTimeout(()=>{
+        if(!samplePlaying) return;
+        if(!ev || ev.rest || !ev.chord) return;
+        const freqs = freqsFromEvent(ev);
+        if(freqs && freqs.length){
+          try{ playFreqs(freqs, freqs.length >= 3 ? 0.22 : 0.18); }catch(e){ console.error(e); }
+        }
+      }, delay));
+      t += slotMs;
+    });
+    sampleTimers.push(setTimeout(()=>{ stopSamplePlayback(); }, t + 600));
+  }
+  function startImportedPractice(){
+    if(!importedScore || !Array.isArray(importedScore.songData) || !importedScore.songData.length) return;
+    stopSamplePlayback();
+    window.CUSTOM_SONG_DATA = importedScore.songData;
+    window.CUSTOM_SONG_TITLE = importedScore.title;
+    window.CUSTOM_SONG_NAV = importedScore.nav || [];
+    window.CUSTOM_SONG_SOURCE_NAME = importedScore.sourceName || importedScore.title;
+    hideModal();
+    prepGame('song');
+  }
+  if(importBtn) importBtn.addEventListener('click', openPicker);
+  if(fileInput) fileInput.addEventListener('change', handleFile);
+  if(closeBtn) closeBtn.addEventListener('click', ()=>{ stopSamplePlayback(); hideModal(); });
+  if(listenBtn) listenBtn.addEventListener('click', playImportedSample);
+  if(startBtn) startBtn.addEventListener('click', startImportedPractice);
+  if(recordBtn) recordBtn.addEventListener('click', ()=>{ const sb = document.getElementById('sampleBtn'); if(sb) sb.click(); });
+  speedPills.forEach(el=>el.addEventListener('click', ()=>setSpeed(String(el.dataset.ospeed||'NORMAL').toUpperCase())));
+  setSpeed('NORMAL');
+  updateModal();
+})();
 </script>
-<div class="modal-overlay" id="task-modal">
+<div class="modal-overlay" id="task-modal" style="display:none;">
   <div class="modal-content">
-    <button class="modal-close" onclick="document.getElementById('task-modal').style.display='none'">×</button>
-    
-    <h2 style="color: #111;">🎵 せんせいの かだい曲</h2>
-    <p id="task-song-name">「ドレミのれんしゅう」</p>
-    
+    <button class="modal-close" id="taskModalClose" type="button">×</button>
+    <h2 style="color:#111;">🎼 オリジナル譜面</h2>
+    <p id="task-song-name">ファイルをえらんでね</p>
     <div class="sound-select-box">
-      <p>きく時の オトをえらぶ</p>
-      <div class="sound-radios">
-        <label><input type="radio" name="sound-type" checked> 🤖 でんし音</label>
-        <label><input type="radio" name="sound-type"> 🎸 ウクレレ1号</label>
+      <p id="task-import-status">Excel（TAB/NAV）またはJSONをよみこみます</p>
+      <p id="task-import-meta" style="margin:4px 0 0; font-size:13px; opacity:.85;">速度：下のボタンで変更できます</p>
+      <p id="task-nav-meta" style="margin:4px 0 0; font-size:13px; opacity:.85;"></p>
+      <div class="mode-pills" id="task-speed-pills" style="justify-content:center; gap:6px; margin:8px 0 10px;">
+        <div class="mode-pill" data-ospeed="SLOW">ゆっくり</div>
+        <div class="mode-pill active" data-ospeed="NORMAL">ふつう</div>
+        <div class="mode-pill" data-ospeed="FAST">はやい</div>
       </div>
-      <button class="action-btn record-uke">🎙️ じぶんのウクレレを とうろく</button>
+      <div class="mode-pills" style="justify-content:center; gap:6px; margin:0 0 10px;">
+        <button class="action-btn btn-secondary" id="taskPickFileBtn" type="button" onclick="document.getElementById('origScoreFile').click()">📂 ファイルをえらぶ</button>
+      </div>
+      <button class="action-btn record-uke" id="taskRecordBtn" type="button">🎙️ じぶんのウクレレを とうろく</button>
     </div>
-
-    <button class="action-btn play-sample">▶️ お手本をきく</button>
-    <button class="action-btn start-game">🎮 れんしゅうスタート！</button>
+    <button class="action-btn play-sample" id="taskListenBtn" type="button">▶️ お手本をきく</button>
+    <button class="action-btn start-game" id="taskStartBtn" type="button">🎮 れんしゅうスタート！</button>
   </div>
 </div>
+<input id="origScoreFile" type="file" accept=".xlsx,.xls,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" style="display:none" />
 
 </body>
 </html>

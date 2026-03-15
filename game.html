@@ -1802,6 +1802,13 @@ body.menuOpen #back-btn{ display:none !important; }
 <h1 id="menuTitle" style="margin-bottom: 2px;">🪕 ウクレレであそぶ</h1>
 <div id="verTag">v0.38</div>
 
+<div id="entryKindWrap" style="margin:6px 0 4px; display:flex; justify-content:center;">
+  <div class="mode-pills" id="entry-kind-pills" style="gap:8px; flex-wrap:nowrap;">
+    <div class="mode-pill active" data-entry="UKE" onclick="setEntryKind('uke', this)">🪕 ウクレレ</div>
+    <div class="mode-pill" data-entry="TAP" onclick="setEntryKind('tap', this)">👆 タップ</div>
+  </div>
+</div>
+
 <div class="menu-list" style="display:flex; flex-direction:column; gap:8px;">
   <div class="menu-main menu-grid-3x2">
 
@@ -1875,7 +1882,7 @@ body.menuOpen #back-btn{ display:none !important; }
       </div>
     </button>
 
-    <button class="menu-btn mode6" id="import-json-btn">
+    <button class="menu-btn mode6" id="import-json-btn" onclick="window.openOriginalScoreMenu && window.openOriginalScoreMenu()">
       <div class="badge" style="background:#ff3d3d;">📥</div>
       <div class="menu-text">
         <div class="title">オリジナル譜面</div>
@@ -3242,6 +3249,10 @@ function applyUiMode(mode){
   if(mt){
     mt.textContent = (entryKind === 'tap') ? '👆 タップであそぶ' : '🪕 ウクレレであそぶ';
   }
+  document.querySelectorAll('.mode-pill[data-entry]').forEach(b => {
+    const v = (b.getAttribute('data-entry')||'').toUpperCase();
+    b.classList.toggle('active', (entryKind === 'tap' ? 'TAP' : 'UKE') === v);
+  });
 
 
   // UI: TOPへ戻るボタン（タップ入口のみ）
@@ -3253,6 +3264,15 @@ function applyUiMode(mode){
   if(backBtn){
     backBtn.textContent = (entryKind === 'tap') ? '🏝️ TOPへもどる' : '🪕 ウクレレへもどる';
   }
+}
+
+function setEntryKind(kind, el){
+  entryKind = (String(kind||'').toLowerCase() === 'tap') ? 'tap' : 'uke';
+  document.querySelectorAll('.mode-pill[data-entry]').forEach(b => {
+    const v = (b.getAttribute('data-entry')||'').toUpperCase();
+    b.classList.toggle('active', (entryKind === 'tap' ? 'TAP' : 'UKE') === v);
+  });
+  applyUiMode(uiMode || 'WAIT');
 }
 
 function setMode(el, mode){
@@ -5958,6 +5978,9 @@ document.addEventListener('DOMContentLoaded', function(){
     modal.setAttribute('aria-hidden', 'false');
     syncButtons();
   }
+  window.openOriginalScoreMenu = function(){
+    try{ openModal(); }catch(e){ console.error('[orig-menu] open failed', e); }
+  };
 
   function closeModal(){
     modal.style.display = 'none';
@@ -6313,7 +6336,7 @@ document.addEventListener('DOMContentLoaded', function(){
   importBtn.addEventListener('click', function(e){
     e.preventDefault();
     e.stopPropagation();
-    openModal();
+    if(window.openOriginalScoreMenu){ window.openOriginalScoreMenu(); }
   });
 
   closeBtn.addEventListener('click', function(e){

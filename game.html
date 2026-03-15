@@ -85,7 +85,6 @@
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="#88cfd3" name="theme-color"/>
 <title>ウクレレ・ゲーム</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>/* iphone-viewport-fix */
 
     :root{
@@ -1062,66 +1061,308 @@ body.is-uke .vol-inline{ display:none !important; }
 }
 
 /* =========================================
-       課題曲ポップアップ（1画面完全フィット版）
+       オリジナル譜面メニュー（専用メニュー）
        ========================================= */
     .modal-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7); display: none;
-      justify-content: center; align-items: center; z-index: 10000;
-      /* スクロール禁止令はそのまま維持！ */
-    }
-
-    .modal-content {
-      background: #fff;
-      width: 90%; max-width: 420px;
-      height: 92vh; /* 画面の高さの92%に固定 */
-      max-height: 380px; /* PC等で大きくなりすぎないように */
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.62);
+      display: none;
+      justify-content: center; align-items: center;
+      z-index: 10000;
+      padding: 16px;
       box-sizing: border-box;
-      border: 3px solid #111; border-radius: 16px;
-      box-shadow: 4px 6px 0 #111;
-      padding: 2vh 2vw; /* 余白も画面の高さに合わせて縮む */
-      text-align: center; position: relative;
-      /* ▼重要：中身を縦に均等に並べて、絶対にはみ出させない */
-      display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
     }
 
-    /* 閉じるボタン（絶対に被らないよう内側の右上に固定） */
+    .orig-modal {
+      background: linear-gradient(180deg, #fffef8 0%, #ffffff 100%);
+      width: min(92vw, 460px);
+      max-width: 460px;
+      border: 3px solid #111;
+      border-radius: 22px;
+      box-shadow: 6px 8px 0 #111;
+      padding: 18px 16px 16px;
+      box-sizing: border-box;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
     .modal-close {
-      position: absolute; top: 4px; right: 4px;
-      background: #ff3d3d; color: #fff; border: 3px solid #111; border-radius: 50%;
-      width: 32px; height: 32px; font-size: 18px; font-weight: 900;
+      position: absolute; top: 8px; right: 8px;
+      background: #ff5a5a; color: #fff; border: 3px solid #111; border-radius: 999px;
+      width: 34px; height: 34px; font-size: 18px; font-weight: 900;
       cursor: pointer; box-shadow: 2px 2px 0 #111;
       display: flex; justify-content: center; align-items: center; padding: 0; z-index: 10;
     }
     .modal-close:active { transform: translate(2px, 2px); box-shadow: none; }
 
-    /* 文字サイズも画面の高さ(vh)に合わせて自動で縮むように設定 */
-    .modal-content h2 { margin: 0; color: #111; font-size: clamp(14px, 4.5vh, 22px); line-height: 1.1; }
-    #task-song-name { font-weight: 900; margin: 0; font-size: clamp(12px, 4vh, 18px); }
+    .orig-head{ padding: 2px 30px 0 4px; text-align: left; }
+    .orig-title{
+      margin: 0 0 4px; color:#111; font-size: 24px; line-height: 1.1; font-weight: 900;
+      letter-spacing: .02em;
+    }
+    .orig-subtitle{
+      margin: 0; color:#444; font-size: 13px; line-height: 1.45; font-weight: 700;
+    }
 
-    .sound-select-box {
-      background: #ffde59; border: 3px solid #111; border-radius: 12px;
-      width: 95%; padding: 1vh; box-sizing: border-box;
-      display: flex; flex-direction: column; justify-content: center; gap: 0.5vh;
+    .orig-card{
+      background:#fff7cc;
+      border:3px solid #111;
+      border-radius:18px;
+      padding:12px;
+      box-sizing:border-box;
+      text-align:left;
     }
-    .sound-select-box p { margin: 0; font-weight: 900; font-size: clamp(10px, 3vh, 14px); }
-    .sound-radios { display: flex; justify-content: center; gap: 10px; margin-bottom: 0.5vh; }
-    .sound-select-box label { font-weight: 900; font-size: clamp(11px, 3.5vh, 15px); cursor: pointer; margin:0;}
+    .orig-card.file-card{ background:#fff0d8; }
+    .orig-file-drop.dragover{ background:#ffe3b3; transform: translateY(-1px); }
+    .orig-card h3{
+      margin:0 0 8px; font-size:16px; font-weight:900; color:#111;
+    }
+    .orig-file-btn{
+      width:100%;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      background:#5ce1e6; color:#111;
+      border:3px solid #111; border-radius:14px;
+      padding:12px 10px; font-size:16px; font-weight:900;
+      box-shadow: 2px 4px 0 #111; cursor:pointer;
+    }
+    .orig-file-btn:active{ transform: translate(2px, 3px); box-shadow:none; }
+    .orig-file-meta{
+      margin-top:8px;
+      background:#fff;
+      border:2px dashed #111;
+      border-radius:12px;
+      padding:8px 10px;
+      min-height:44px;
+      display:flex; flex-direction:column; justify-content:center; gap:2px;
+    }
+    .orig-file-name{
+      font-size:14px; font-weight:900; color:#111; word-break:break-all;
+    }
+    .orig-file-hint{
+      font-size:12px; color:#555; font-weight:700;
+    }
 
-    .action-btn {
-      width: 95%; background: #5ce1e6; color: #111;
-      border: 3px solid #111; border-radius: 12px;
-      padding: clamp(6px, 2vh, 14px);
-      font-size: clamp(13px, 4vh, 18px); font-weight: 900;
-      box-shadow: 2px 4px 0 #111; cursor: pointer; transition: transform 0.1s; margin: 0;
+    .orig-status{
+      margin-top:8px;
+      background:#fff;
+      border:2px solid #111;
+      border-radius:12px;
+      padding:8px 10px;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
     }
-    .action-btn.play-sample { background: #ffaa00; }
-    .action-btn.start-game { background: #ff3d3d; color: #fff; font-size: clamp(14px, 4.5vh, 20px); }
-    .action-btn.record-uke {
-      background: #fff; font-size: clamp(10px, 2.5vh, 13px);
-      padding: clamp(4px, 1vh, 8px); width: 85%; margin: 0 auto; box-shadow: 2px 2px 0 #111;
+    .orig-status-line{
+      font-size:12px;
+      font-weight:800;
+      color:#222;
+      line-height:1.25;
     }
-    .action-btn:active { transform: translate(2px, 3px); box-shadow: 0px 0px 0 #111; }
+    .orig-status-line.dim{
+      color:#666;
+    }
+
+    .orig-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+
+    .orig-group{
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .orig-label{
+      font-size:14px; font-weight:900; color:#111;
+      margin:0;
+    }
+    .orig-pills{
+      display:flex; flex-wrap:wrap; gap:8px;
+    }
+    .orig-pill{
+      flex:1 1 calc(50% - 8px);
+      min-width:88px;
+      text-align:center;
+      background:#fff;
+      border:3px solid #111;
+      border-radius:999px;
+      padding:9px 8px;
+      font-size:13px;
+      font-weight:900;
+      color:#111;
+      cursor:pointer;
+      box-shadow: 2px 2px 0 #111;
+      user-select:none;
+    }
+    .orig-pill.active{
+      background:#ffde59;
+    }
+    .orig-pill:active{ transform: translate(1px, 2px); box-shadow:none; }
+
+    .orig-pills-2 .orig-pill{
+      flex: 1 1 calc(50% - 8px);
+      min-width: 0;
+    }
+    .orig-display-card .orig-pills{
+      flex-wrap: nowrap;
+    }
+
+    .orig-actions{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+      padding-top:2px;
+    }
+    .orig-action{
+      width:100%;
+      border:3px solid #111;
+      border-radius:16px;
+      padding:14px 12px;
+      font-size:18px;
+      font-weight:900;
+      cursor:pointer;
+      box-shadow: 2px 4px 0 #111;
+    }
+    .orig-action.preview{
+      background:#ffaa00; color:#111;
+    }
+    .orig-action.start{
+      background:#ff3d3d; color:#fff;
+    }
+    .orig-action:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+    .orig-action:active:not(:disabled){ transform: translate(2px, 3px); box-shadow:none; }
+
+    .orig-note{
+      text-align:center;
+      font-size:12px;
+      font-weight:700;
+      color:#555;
+      margin:0;
+    }
+
+    @media (max-width: 420px){
+      .orig-modal{ padding: 12px 10px 10px; gap: 8px; width: min(94vw, 420px); }
+      .orig-title{ font-size: 19px; }
+      .orig-subtitle{ font-size: 11px; line-height: 1.2; }
+      .orig-grid{ grid-template-columns: 1fr; gap: 8px; }
+      .orig-card{ padding: 8px; border-radius: 14px; }
+      .orig-card h3{ margin: 0 0 6px; font-size: 14px; }
+      .orig-file-btn{ padding: 10px 8px; font-size: 14px; border-radius: 12px; }
+      .orig-file-meta{ margin-top: 6px; padding: 6px 8px; min-height: 38px; }
+      .orig-file-name{ font-size: 12px; }
+      .orig-file-hint{ font-size: 10px; line-height: 1.15; }
+      .orig-status{ margin-top:6px; padding:6px 8px; gap:3px; border-width:2px; border-radius:10px; }
+      .orig-status-line{ font-size:10px; line-height:1.15; }
+      .orig-label{ font-size: 12px; }
+      .orig-pills{ gap: 6px; }
+      .orig-pill{ padding: 7px 6px; font-size: 12px; min-width: 72px; }
+      .orig-actions{ grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 0; }
+      .orig-action{ font-size:14px; padding:10px 6px; border-radius:12px; }
+      .orig-note{ font-size:10px; line-height:1.15; }
+    }
+
+    @media (orientation: landscape) and (max-height: 520px){
+      .modal-overlay{ align-items:center; padding:8px; }
+      .orig-modal{
+        width:min(96vw, 760px);
+        max-width:760px;
+        max-height:92vh;
+        overflow:hidden;
+        padding:12px 12px 10px;
+        gap:8px;
+      }
+      .modal-close{ top:6px; right:6px; width:30px; height:30px; font-size:16px; }
+      .orig-head{ padding:0 30px 0 2px; }
+      .orig-title{ font-size:20px; margin:0 0 2px; }
+      .orig-subtitle{ font-size:11px; line-height:1.25; }
+      .orig-card{ padding:8px 10px; border-radius:14px; }
+      .orig-card h3, .orig-label{ font-size:13px; margin:0 0 4px; }
+      .orig-file-btn{ padding:9px 8px; font-size:14px; border-radius:12px; }
+      .orig-file-meta{ margin-top:6px; min-height:32px; padding:6px 8px; }
+      .orig-file-name{ font-size:12px; line-height:1.15; }
+      .orig-file-hint{ font-size:10px; line-height:1.15; }
+      .orig-status{ margin-top:6px; padding:6px 8px; gap:3px; border-width:2px; border-radius:10px; }
+      .orig-status-line{ font-size:10px; line-height:1.15; }
+      .orig-grid{ grid-template-columns: 1fr 1fr; gap:8px; }
+      .orig-group{ gap:6px; }
+      .orig-pills{ gap:6px; }
+      .orig-pill{ min-width:0; padding:7px 6px; font-size:11px; border-width:2px; }
+      .orig-actions{ grid-template-columns: 1fr 1fr; gap:8px; padding-top:0; }
+      .orig-action{ font-size:15px; padding:10px 8px; border-radius:13px; }
+      .orig-note{ font-size:10px; line-height:1.15; }
+    }
+
+
+
+    @media (orientation: landscape) and (max-height: 460px){
+      .modal-overlay{
+        padding: 8px;
+        align-items: center;
+      }
+      .orig-modal{
+        width: min(96vw, 760px);
+        max-width: 760px;
+        max-height: 94vh;
+        overflow: hidden;
+        padding: 10px 10px 8px;
+        gap: 6px;
+        border-radius: 16px;
+      }
+      .orig-head{ padding: 0 28px 0 2px; }
+      .orig-title{ font-size: 18px; margin: 0 0 2px; }
+      .orig-subtitle{ font-size: 10px; line-height: 1.1; }
+      .modal-close{ width: 28px; height: 28px; font-size: 16px; top: 6px; right: 6px; }
+      .orig-card{ padding: 7px 8px; border-radius: 12px; }
+      .orig-card h3{ margin:0 0 5px; font-size: 13px; }
+      .orig-file-btn{ padding: 8px 8px; font-size: 13px; border-radius: 10px; }
+      .orig-file-meta{ margin-top:5px; padding:5px 7px; min-height: 30px; }
+      .orig-file-name{ font-size: 11px; line-height:1.1; }
+      .orig-file-hint{ font-size: 9px; line-height:1.05; }
+      .orig-status{ margin-top:5px; padding:5px 7px; gap:2px; border-radius:8px; }
+      .orig-status-line{ font-size: 9px; line-height:1.05; }
+      .orig-grid{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-label{ font-size: 11px; }
+      .orig-pills{ gap: 5px; }
+      .orig-pill{ padding: 6px 4px; font-size: 11px; min-width: 0; }
+      .orig-display-card .orig-pills{ flex-wrap: nowrap; }
+      .orig-actions{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-action{ padding: 9px 6px; font-size: 13px; border-radius: 10px; }
+      .orig-note{ font-size: 9px; line-height:1.05; margin:0; }
+    }
+
+
+#imported-panel{
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  z-index: 12000;
+  display: none;
+  background: rgba(255,255,255,0.96);
+  border: 3px solid #111;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 #111;
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: min(70vw, 320px);
+  font: 800 12px/1.25 sans-serif;
+  color: #111;
+}
+#imported-panel .t1{ font-size: 13px; font-weight: 900; margin-bottom: 2px; }
+#imported-panel .t2, #imported-panel .t3{ font-size: 11px; color: #333; }
+@media (orientation: landscape) and (max-height: 460px){
+  #imported-panel{
+    top: 8px; left: 8px; padding: 6px 8px; border-radius: 12px;
+    min-width: 150px; max-width: min(62vw, 260px);
+    font-size: 10px;
+  }
+  #imported-panel .t1{ font-size: 11px; }
+  #imported-panel .t2, #imported-panel .t3{ font-size: 10px; line-height: 1.1; }
+}
 
 </style>
 
@@ -1261,6 +1502,72 @@ body.is-uke .vol-inline{ display:none !important; }
 
 /* v0.14 fix: hide in-game menu button while menu overlay open */
 body.menuOpen #back-btn{ display:none !important; }
+
+    @media (orientation: landscape) and (max-height: 460px){
+      .modal-overlay{
+        padding: 8px;
+        align-items: center;
+      }
+      .orig-modal{
+        width: min(96vw, 760px);
+        max-width: 760px;
+        max-height: 94vh;
+        overflow: hidden;
+        padding: 10px 10px 8px;
+        gap: 6px;
+        border-radius: 16px;
+      }
+      .orig-head{ padding: 0 28px 0 2px; }
+      .orig-title{ font-size: 18px; margin: 0 0 2px; }
+      .orig-subtitle{ font-size: 10px; line-height: 1.1; }
+      .modal-close{ width: 28px; height: 28px; font-size: 16px; top: 6px; right: 6px; }
+      .orig-card{ padding: 7px 8px; border-radius: 12px; }
+      .orig-card h3{ margin:0 0 5px; font-size: 13px; }
+      .orig-file-btn{ padding: 8px 8px; font-size: 13px; border-radius: 10px; }
+      .orig-file-meta{ margin-top:5px; padding:5px 7px; min-height: 30px; }
+      .orig-file-name{ font-size: 11px; line-height:1.1; }
+      .orig-file-hint{ font-size: 9px; line-height:1.05; }
+      .orig-status{ margin-top:5px; padding:5px 7px; gap:2px; border-radius:8px; }
+      .orig-status-line{ font-size: 9px; line-height:1.05; }
+      .orig-grid{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-label{ font-size: 11px; }
+      .orig-pills{ gap: 5px; }
+      .orig-pill{ padding: 6px 4px; font-size: 11px; min-width: 0; }
+      .orig-display-card .orig-pills{ flex-wrap: nowrap; }
+      .orig-actions{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-action{ padding: 9px 6px; font-size: 13px; border-radius: 10px; }
+      .orig-note{ font-size: 9px; line-height:1.05; margin:0; }
+    }
+
+
+#imported-panel{
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  z-index: 12000;
+  display: none;
+  background: rgba(255,255,255,0.96);
+  border: 3px solid #111;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 #111;
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: min(70vw, 320px);
+  font: 800 12px/1.25 sans-serif;
+  color: #111;
+}
+#imported-panel .t1{ font-size: 13px; font-weight: 900; margin-bottom: 2px; }
+#imported-panel .t2, #imported-panel .t3{ font-size: 11px; color: #333; }
+@media (orientation: landscape) and (max-height: 460px){
+  #imported-panel{
+    top: 8px; left: 8px; padding: 6px 8px; border-radius: 12px;
+    min-width: 150px; max-width: min(62vw, 260px);
+    font-size: 10px;
+  }
+  #imported-panel .t1{ font-size: 11px; }
+  #imported-panel .t2, #imported-panel .t3{ font-size: 10px; line-height: 1.1; }
+}
+
 </style>
 
 
@@ -1417,8 +1724,75 @@ body.menuOpen #back-btn{ display:none !important; }
   }
   .menu-btn.has-extra #mode-desc{ display:none !important; } /* 低い時は説明を隠して1画面優先 */
 }
+
+    @media (orientation: landscape) and (max-height: 460px){
+      .modal-overlay{
+        padding: 8px;
+        align-items: center;
+      }
+      .orig-modal{
+        width: min(96vw, 760px);
+        max-width: 760px;
+        max-height: 94vh;
+        overflow: hidden;
+        padding: 10px 10px 8px;
+        gap: 6px;
+        border-radius: 16px;
+      }
+      .orig-head{ padding: 0 28px 0 2px; }
+      .orig-title{ font-size: 18px; margin: 0 0 2px; }
+      .orig-subtitle{ font-size: 10px; line-height: 1.1; }
+      .modal-close{ width: 28px; height: 28px; font-size: 16px; top: 6px; right: 6px; }
+      .orig-card{ padding: 7px 8px; border-radius: 12px; }
+      .orig-card h3{ margin:0 0 5px; font-size: 13px; }
+      .orig-file-btn{ padding: 8px 8px; font-size: 13px; border-radius: 10px; }
+      .orig-file-meta{ margin-top:5px; padding:5px 7px; min-height: 30px; }
+      .orig-file-name{ font-size: 11px; line-height:1.1; }
+      .orig-file-hint{ font-size: 9px; line-height:1.05; }
+      .orig-status{ margin-top:5px; padding:5px 7px; gap:2px; border-radius:8px; }
+      .orig-status-line{ font-size: 9px; line-height:1.05; }
+      .orig-grid{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-label{ font-size: 11px; }
+      .orig-pills{ gap: 5px; }
+      .orig-pill{ padding: 6px 4px; font-size: 11px; min-width: 0; }
+      .orig-display-card .orig-pills{ flex-wrap: nowrap; }
+      .orig-actions{ grid-template-columns: 1fr 1fr; gap: 6px; }
+      .orig-action{ padding: 9px 6px; font-size: 13px; border-radius: 10px; }
+      .orig-note{ font-size: 9px; line-height:1.05; margin:0; }
+    }
+
+
+#imported-panel{
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  z-index: 12000;
+  display: none;
+  background: rgba(255,255,255,0.96);
+  border: 3px solid #111;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 #111;
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: min(70vw, 320px);
+  font: 800 12px/1.25 sans-serif;
+  color: #111;
+}
+#imported-panel .t1{ font-size: 13px; font-weight: 900; margin-bottom: 2px; }
+#imported-panel .t2, #imported-panel .t3{ font-size: 11px; color: #333; }
+@media (orientation: landscape) and (max-height: 460px){
+  #imported-panel{
+    top: 8px; left: 8px; padding: 6px 8px; border-radius: 12px;
+    min-width: 150px; max-width: min(62vw, 260px);
+    font-size: 10px;
+  }
+  #imported-panel .t1{ font-size: 11px; }
+  #imported-panel .t2, #imported-panel .t3{ font-size: 10px; line-height: 1.1; }
+}
+
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body class="menuOpen">
 <div id="app">
@@ -1505,7 +1879,7 @@ body.menuOpen #back-btn{ display:none !important; }
       <div class="badge" style="background:#ff3d3d;">📥</div>
       <div class="menu-text">
         <div class="title">オリジナル譜面</div>
-        <small>Excel/JSONをよみこんでれんしゅう</small>
+        <small>Excel / JSON をひらく</small>
       </div>
     </button>
 
@@ -1541,6 +1915,8 @@ body.menuOpen #back-btn{ display:none !important; }
 <div id="score-panel">⭐ <span id="score">0</span></div>
 <div id="timer-panel">のこり <span id="timer">60</span> 秒</div>
 <div aria-hidden="true" id="chordHud"></div>
+<div id="imported-panel" aria-hidden="true"><div class="t1" id="imported-title">オリジナル譜面</div><div class="t2" id="imported-meta">BPM 120 / ふつう / 両方</div><div class="t3" id="imported-bar">Bar 1</div></div>
+
 <div id="back-btn"><button onclick="goMenu()">🏝️ メニュー</button></div>
 <button id="stopBtn" type="button">ストップ</button>
 <div class="overlay-card" id="loading-overlay">
@@ -2541,30 +2917,277 @@ function buildKirakiraFromTabBlocks(blocks){
   return out;
 }
 
+
 const SONG_DATA = buildKirakiraFromTabBlocks(KIRAKIRA_TAB_BLOCKS);
 
-window.CUSTOM_SONG_DATA = null;
-window.CUSTOM_SONG_TITLE = '';
-window.CUSTOM_SONG_NAV = [];
-window.CUSTOM_SONG_SPEED_ID = 'NORMAL';
-window.CUSTOM_SONG_SOURCE_NAME = '';
-function getCurrentSongData(){
-  return (Array.isArray(window.CUSTOM_SONG_DATA) && window.CUSTOM_SONG_DATA.length) ? window.CUSTOM_SONG_DATA : SONG_DATA;
+// ===== Custom Imported Score Support =====
+window.CUSTOM_IMPORTED_ACTIVE = null;
+window.CUSTOM_PREVIEW_ONLY = false;
+window.CUSTOM_GUIDE_TIMERS = [];
+window.CUSTOM_SONG_START_AT = 0;
+window.CUSTOM_SONG_TIMED = false;
+
+function importedDisplayLabel(mode){
+  const m = String(mode || 'BOTH').toUpperCase();
+  if(m === 'FINGER') return '指';
+  if(m === 'BOTH') return '両方';
+  return 'フレット';
 }
-function isCustomSongMode(){
-  return !!(Array.isArray(window.CUSTOM_SONG_DATA) && window.CUSTOM_SONG_DATA.length);
+function importedSpeedLabel(mode){
+  const m = String(mode || 'NORMAL').toUpperCase();
+  if(m === 'SLOW') return 'ゆっくり';
+  if(m === 'FAST') return 'はやい';
+  return 'ふつう';
 }
-function getCustomSongSlotMs(){
-  const sid = String(window.CUSTOM_SONG_SPEED_ID || 'NORMAL').toUpperCase();
-  return (sid === 'SLOW') ? 550 : (sid === 'FAST') ? 138 : 275;
+function setImportedPanelVisible(show){
+  const el = document.getElementById('imported-panel');
+  if(!el) return;
+  el.style.display = show ? 'block' : 'none';
+  el.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
-function clearCustomSong(){
-  window.CUSTOM_SONG_DATA = null;
-  window.CUSTOM_SONG_TITLE = '';
-  window.CUSTOM_SONG_NAV = [];
-  window.CUSTOM_SONG_SOURCE_NAME = '';
-  window.CUSTOM_SONG_SPEED_ID = 'NORMAL';
+function updateImportedPanel(){
+  const active = window.CUSTOM_IMPORTED_ACTIVE;
+  const elTitle = document.getElementById('imported-title');
+  const elMeta = document.getElementById('imported-meta');
+  const elBar = document.getElementById('imported-bar');
+  if(!elTitle || !elMeta || !elBar) return;
+  if(!active){
+    setImportedPanelVisible(false);
+    return;
+  }
+  const title = active.title || 'オリジナル譜面';
+  const bpm = Number(active.bpm || 120);
+  const speed = importedSpeedLabel(active.selectedSpeed);
+  const disp = importedDisplayLabel(active.displayMode);
+  let curBar = 1;
+  try{
+    const activeBars = (groups || []).filter(g => g && g._songEvent && g.active).map(g => Number(g._songEvent.bar || 1));
+    if(activeBars.length){
+      curBar = Math.min(...activeBars);
+    }else if(Array.isArray(active.songData) && active.songData.length){
+      const idx = Math.max(0, Math.min((songIndex||1)-1, active.songData.length-1));
+      curBar = Number((active.songData[idx] && active.songData[idx].bar) || 1);
+    }
+  }catch(e){}
+  elTitle.textContent = title;
+  elMeta.textContent = `BPM ${bpm} / ${speed} / ${disp}`;
+  elBar.textContent = `Bar ${curBar}`;
+  setImportedPanelVisible(true);
 }
+
+function importedBaseFreqByKey(k){
+  const map = {A:440.00, E:329.63, C:261.63, G:392.00};
+  return map[k] || 261.63;
+}
+function importedPickToFreqs(pick){
+  const out = [];
+  if(!pick) return out;
+  for(const k of ['A','E','C','G']){
+    if(pick[k] === undefined || pick[k] === null || pick[k] === '') continue;
+    const f = Number(pick[k]);
+    if(!Number.isFinite(f)) continue;
+    out.push(importedBaseFreqByKey(k) * Math.pow(2, f / 12));
+  }
+  return out;
+}
+function importedChordObjForPick(chordName, pick, pickTexts){
+  const shape = CHORD_SHAPES_AECG[chordName];
+  const sidx = {A:1, E:2, C:3, G:4};
+  const fingers = [];
+  if(!pick) pick = {};
+  if(!pickTexts) pickTexts = {};
+  for(const k of ['A','E','C','G']){
+    if(pick[k] === undefined) continue;
+    const f = Number(pick[k]);
+    if(!Number.isFinite(f)) continue;
+    const explicitTxt = (pickTexts && pickTexts[k]) ? String(pickTexts[k]) : '';
+    if(f === 0){
+      fingers.push({s: sidx[k], f: 0, txt: explicitTxt || '0'});
+    }else{
+      const ft = (shape && shape.fingers && shape.fingers[k]) ? shape.fingers[k] : '';
+      fingers.push({s: sidx[k], f: f, txt: explicitTxt || ft || String(f)});
+    }
+  }
+  let nm = chordName;
+  if (fingers.length === 1) {
+    try { nm = noteNameForFinger({s: fingers[0].s, f: fingers[0].f}); } catch(e) { nm = chordName; }
+  }
+  return { name: nm, targetIdx: 0, fingers };
+}
+function getActiveSongData(){
+  return (window.CUSTOM_IMPORTED_ACTIVE && Array.isArray(window.CUSTOM_IMPORTED_ACTIVE.songData))
+    ? window.CUSTOM_IMPORTED_ACTIVE.songData
+    : SONG_DATA;
+}
+
+function getImportedPreviewLeadMs(){
+  if(!window.CUSTOM_IMPORTED_ACTIVE) return 1450;
+  const sp = String((window.CUSTOM_IMPORTED_ACTIVE.selectedSpeed || '')).toUpperCase();
+  if(sp === 'SLOW') return 7200;   // さらに遅く
+  if(sp === 'FAST') return 700;    // はやい
+  return 1450;                     // ふつうは据え置き
+}
+function applyImportedTimedScrollSpeed(){
+  try{
+    if(!window.CUSTOM_IMPORTED_ACTIVE) return;
+    const leadMs = getImportedPreviewLeadMs();
+    const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+    const fretCenter = (NUT_X + fw * 0.5); // representative near 1F
+    const travelPx = Math.max(0, canvas.width + 120 - fretCenter);
+    const pxPerSec = travelPx / Math.max(0.2, leadMs / 1000);
+    const speed = pxPerSec / 60;
+    baseScrollSpeed = speed;
+    currentScrollSpeed = speed;
+    scrollSpeed = speed;
+  }catch(e){}
+}
+
+function getImportedTravelMsFromChord(chord){
+  try{
+    if(!chord || !Array.isArray(chord.fingers) || !chord.fingers.length) return 0;
+    const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+    const fretsAll = chord.fingers.map(f=>f.f);
+    const maxF = Math.max(...fretsAll);
+    const minF = Math.min(...fretsAll);
+    const hasOpen = (minF === 0);
+    const hasPressed = (maxF > 0);
+    const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
+    const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
+    const fretCenter = shiftOpenToLeftMostPressed
+      ? (NUT_X + fw * (minPressed - 0.5))
+      : (NUT_X + fw * (Math.max(1, maxF) - 0.5));
+    const travelPx = Math.max(0, canvas.width + 120 - fretCenter);
+    const speed = Math.max(0.001, Number(currentScrollSpeed || scrollSpeed || baseScrollSpeed || 3.35));
+    const speedPxPerSec = speed * 60;
+    return (travelPx / speedPxPerSec) * 1000;
+  }catch(e){
+    return 0;
+  }
+}
+function stopCustomGuidePlayback(){
+  try{
+    (window.CUSTOM_GUIDE_TIMERS || []).forEach(id => clearTimeout(id));
+  }catch(e){}
+  window.CUSTOM_GUIDE_TIMERS = [];
+window.CUSTOM_SONG_START_AT = 0;
+window.CUSTOM_SONG_TIMED = false;
+
+function importedDisplayLabel(mode){
+  const m = String(mode || 'BOTH').toUpperCase();
+  if(m === 'FINGER') return '指';
+  if(m === 'BOTH') return '両方';
+  return 'フレット';
+}
+function importedSpeedLabel(mode){
+  const m = String(mode || 'NORMAL').toUpperCase();
+  if(m === 'SLOW') return 'ゆっくり';
+  if(m === 'FAST') return 'はやい';
+  return 'ふつう';
+}
+function setImportedPanelVisible(show){
+  const el = document.getElementById('imported-panel');
+  if(!el) return;
+  el.style.display = show ? 'block' : 'none';
+  el.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+function updateImportedPanel(){
+  const active = window.CUSTOM_IMPORTED_ACTIVE;
+  const elTitle = document.getElementById('imported-title');
+  const elMeta = document.getElementById('imported-meta');
+  const elBar = document.getElementById('imported-bar');
+  if(!elTitle || !elMeta || !elBar) return;
+  if(!active){
+    setImportedPanelVisible(false);
+    return;
+  }
+  const title = active.title || 'オリジナル譜面';
+  const bpm = Number(active.bpm || 120);
+  const speed = importedSpeedLabel(active.selectedSpeed);
+  const disp = importedDisplayLabel(active.displayMode);
+  let curBar = 1;
+  try{
+    const activeBars = (groups || []).filter(g => g && g._songEvent && g.active).map(g => Number(g._songEvent.bar || 1));
+    if(activeBars.length){
+      curBar = Math.min(...activeBars);
+    }else if(Array.isArray(active.songData) && active.songData.length){
+      const idx = Math.max(0, Math.min((songIndex||1)-1, active.songData.length-1));
+      curBar = Number((active.songData[idx] && active.songData[idx].bar) || 1);
+    }
+  }catch(e){}
+  elTitle.textContent = title;
+  elMeta.textContent = `BPM ${bpm} / ${speed} / ${disp}`;
+  elBar.textContent = `Bar ${curBar}`;
+  setImportedPanelVisible(true);
+}
+}
+function startCustomGuidePlayback(){
+  stopCustomGuidePlayback();
+  if(!window.CUSTOM_IMPORTED_ACTIVE || !window.CUSTOM_IMPORTED_ACTIVE.songData) return;
+  if(typeof ensureTapAudio === 'function') try{ ensureTapAudio(); }catch(e){}
+  const data = getActiveSongData();
+  const interval = Number(spawnInterval || 550);
+
+  function getTravelMs(ev){
+    try{
+      const chord = ev && ev.chord;
+      if(!chord || !Array.isArray(chord.fingers) || !chord.fingers.length) return 0;
+      const fw = (canvas.width - NUT_X - STAGE.FRET_RIGHT_PAD) / STAGE.FRET_COUNT;
+      const fretsAll = chord.fingers.map(f=>f.f);
+      const maxF = Math.max(...fretsAll);
+      const minF = Math.min(...fretsAll);
+      const hasOpen = (minF === 0);
+      const hasPressed = (maxF > 0);
+      const minPressed = hasPressed ? Math.min(...fretsAll.filter(f=>f>0)) : 0;
+      const shiftOpenToLeftMostPressed = (hasOpen && hasPressed);
+      const fretCenterX = (baseX, fret)=>{
+        if(fret > 0) return baseX + (fret*fw) - (fw/2);
+        if(shiftOpenToLeftMostPressed && fret === 0){
+          return baseX + (minPressed*fw) - (fw/2);
+        }
+        return baseX;
+      };
+      let spawnMinX = Infinity;
+      let hitMinX = Infinity;
+      for(const fg of chord.fingers){
+        const sx = fretCenterX(canvas.width + 120, fg.f);
+        const hx = fretCenterX(NUT_X, fg.f);
+        if(sx < spawnMinX) spawnMinX = sx;
+        if(hx < hitMinX) hitMinX = hx;
+      }
+      const px = Math.max(0, spawnMinX - hitMinX);
+      const speed = Math.max(0.001, Number(scrollSpeed || currentScrollSpeed || baseScrollSpeed || 3.35));
+      return Math.round((px / speed) * (1000/60));
+    }catch(e){ return 0; }
+  }
+
+  const firstTravelMs = data.length ? getTravelMs(data[0]) : 0;
+  data.forEach((ev, idx) => {
+    const delay = Math.max(0, idx * interval + firstTravelMs);
+    const id = setTimeout(() => {
+      try{
+        if(gameState !== 'PLAY' || !isSongMode) return;
+        if(!window.CUSTOM_PREVIEW_ONLY) return;
+        const freqs = Array.isArray(ev && ev.freqs) ? ev.freqs : [];
+        if(freqs.length && typeof window.playFreqs === 'function'){
+          window.playFreqs(freqs, 0.9);
+        }
+      }catch(err){ console.error(err); }
+    }, delay);
+    window.CUSTOM_GUIDE_TIMERS.push(id);
+  });
+}
+function clearCustomImportedState(opts){
+  opts = opts || {};
+  stopCustomGuidePlayback();
+  window.CUSTOM_PREVIEW_ONLY = false;
+  window.CUSTOM_IMPORTED_FIRST_PRIMED = false;
+  window.CUSTOM_IMPORTED_FIRST_PRIME_KEY = '';
+  if(!opts.keepData){
+    window.CUSTOM_IMPORTED_ACTIVE = null;
+  }
+}
+
+
 
 
 let songIndex=0; let practiceIndex=0; let scaleIndex=0;
@@ -2679,7 +3302,7 @@ window.toggleUkeSound = function(){
 
     if(m === 'TAP'){
       entryKind = 'tap';
-      applyUiMode('WAIT'); // 初期はサポート付き
+      applyUiMode('NORMAL'); // 初期はサポート付き
       return;
     }
     if(m === 'NORMAL' || m === 'WAIT'){
@@ -2841,13 +3464,9 @@ function initGame(mode, levelData, opts){
   practiceIndex=0; scaleIndex=0; songIndex=0; songFinished=false; songFinishedAt=0;
   spawnInterval = 2800; // デフォルト
   if(isSongMode){
-    if(isCustomSongMode()) {
-      spawnInterval = getCustomSongSlotMs();
-    } else {
-      // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
-      const sid = getSongSpeedId();
-      spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; // Ver0.1: tempo mapping (SLOW x0.5, FAST x2) // v28: tighter arpeggio timing
-    }
+    // 曲モードはアルペジオで細かく出す（先生タブ譜の雰囲気に寄せる）
+    const sid = getSongSpeedId();
+    spawnInterval = (sid==='SLOW') ? 1100 : (sid==='FAST') ? 275 : 550; // Ver0.1: tempo mapping (SLOW x0.5, FAST x2) // v28: tighter arpeggio timing
   }
 
   document.getElementById('score').innerText="0";
@@ -2864,6 +3483,66 @@ function initGame(mode, levelData, opts){
   // 感度リセット
   prevRms = NOISE_RMS;
   pluckHoldCount=0; ignorePluckUntil=Date.now()+500;
+
+  if(isSongMode && window.CUSTOM_IMPORTED_ACTIVE && Array.isArray(window.CUSTOM_IMPORTED_ACTIVE.songData)){
+    window.CUSTOM_SONG_START_AT = performance.now();
+    window.CUSTOM_SONG_TIMED = window.CUSTOM_IMPORTED_ACTIVE.songData.some(ev => Number.isFinite(ev && ev.atMs));
+    if(window.CUSTOM_SONG_TIMED){
+      applyImportedTimedScrollSpeed();
+      spawnInterval = 0;
+    }
+  } else {
+    window.CUSTOM_SONG_START_AT = 0;
+    window.CUSTOM_SONG_TIMED = false;
+
+function importedDisplayLabel(mode){
+  const m = String(mode || 'BOTH').toUpperCase();
+  if(m === 'FINGER') return '指';
+  if(m === 'BOTH') return '両方';
+  return 'フレット';
+}
+function importedSpeedLabel(mode){
+  const m = String(mode || 'NORMAL').toUpperCase();
+  if(m === 'SLOW') return 'ゆっくり';
+  if(m === 'FAST') return 'はやい';
+  return 'ふつう';
+}
+function setImportedPanelVisible(show){
+  const el = document.getElementById('imported-panel');
+  if(!el) return;
+  el.style.display = show ? 'block' : 'none';
+  el.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+function updateImportedPanel(){
+  const active = window.CUSTOM_IMPORTED_ACTIVE;
+  const elTitle = document.getElementById('imported-title');
+  const elMeta = document.getElementById('imported-meta');
+  const elBar = document.getElementById('imported-bar');
+  if(!elTitle || !elMeta || !elBar) return;
+  if(!active){
+    setImportedPanelVisible(false);
+    return;
+  }
+  const title = active.title || 'オリジナル譜面';
+  const bpm = Number(active.bpm || 120);
+  const speed = importedSpeedLabel(active.selectedSpeed);
+  const disp = importedDisplayLabel(active.displayMode);
+  let curBar = 1;
+  try{
+    const activeBars = (groups || []).filter(g => g && g._songEvent && g.active).map(g => Number(g._songEvent.bar || 1));
+    if(activeBars.length){
+      curBar = Math.min(...activeBars);
+    }else if(Array.isArray(active.songData) && active.songData.length){
+      const idx = Math.max(0, Math.min((songIndex||1)-1, active.songData.length-1));
+      curBar = Number((active.songData[idx] && active.songData[idx].bar) || 1);
+    }
+  }catch(e){}
+  elTitle.textContent = title;
+  elMeta.textContent = `BPM ${bpm} / ${speed} / ${disp}`;
+  elBar.textContent = `Bar ${curBar}`;
+  setImportedPanelVisible(true);
+}
+  }
 
   rafId = requestAnimationFrame(gameLoop);
 }
@@ -2885,38 +3564,72 @@ function gameLoop(time){
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawFretboard();
+  try{ updateImportedPanel(); }catch(e){}
 
   // スポーン
-  if(!waitHold && (time - lastSpawn > spawnInterval)){
-    // 画面が詰まらないようにチェック
-    let cnt=0, maxX=-9999;
-    for(let g of groups) { if(g.active){ cnt++; if(g.x>maxX) maxX=g.x; } }
-    
-    if(cnt<3 && (maxX < canvas.width+120 - 760)){ // ← 体感で“間隔が広い”ように spacing を強化
-      if(isSongMode){
-        const __songData = getCurrentSongData();
-        if(songIndex < __songData.length){
-          const d = __songData[songIndex];
-          groups.push(new ChordGroup(d.chord ? d.chord : (d.lib[d.key]), d.lyrics));
-          songIndex++;
-          if(songIndex >= __songData.length){ songFinished = true; songFinishedAt = performance.now(); }
-        } else {
-          // no more notes to spawn
-          if(!songFinished){ songFinished = true; songFinishedAt = performance.now(); }
-        }
+  if(!waitHold){
+    const __songData = getActiveSongData();
+    const __timedImported = !!(isSongMode && window.CUSTOM_IMPORTED_ACTIVE && window.CUSTOM_SONG_TIMED);
 
-      } else if(gameMode==='scale'){
-        const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
-        const g = new ChordGroup(SOLO_LIB[k], "");
-        g.noteKey = k;
-        groups.push(g);
-        scaleIndex++;
-      } else {
-        const k = currentLevelChords[practiceIndex % currentLevelChords.length];
-        groups.push(new ChordGroup(CHORD_LIB[k], ""));
-        practiceIndex++;
+    if(__timedImported){
+      const __elapsed = Math.max(0, performance.now() - (window.CUSTOM_SONG_START_AT || performance.now()));
+      const __leadMs = getImportedPreviewLeadMs();
+
+      while(songIndex < __songData.length){
+        const d = __songData[songIndex];
+        const dueAt = Math.max(0, Number((d && d.atMs) || 0) - __leadMs);
+        if(__elapsed + 8 < dueAt) break;
+
+        const chordObj = d && d.chord ? d.chord : ((d && d.lib && d.key && d.lib[d.key]) ? d.lib[d.key] : null);
+        if(chordObj){
+          const __g = new ChordGroup(chordObj, d && d.lyrics ? d.lyrics : '');
+          __g._songEvent = d || null;
+          __g._previewPlayed = false;
+          groups.push(__g);
+        }
+        songIndex++;
       }
-      lastSpawn=time;
+
+      if(songIndex >= __songData.length && !songFinished){
+        songFinished = true;
+        songFinishedAt = performance.now();
+      }
+
+    } else if(time - lastSpawn > spawnInterval){
+      // 画面が詰まらないようにチェック
+      let cnt=0, maxX=-9999;
+      for(let g of groups) { if(g.active){ cnt++; if(g.x>maxX) maxX=g.x; } }
+
+      if(cnt<3 && (maxX < canvas.width+120 - 760)){
+        if(isSongMode){
+          if(songIndex < __songData.length){
+            const d = __songData[songIndex];
+            const chordObj = d && d.chord ? d.chord : ((d && d.lib && d.key && d.lib[d.key]) ? d.lib[d.key] : null);
+            if(chordObj){
+              const __g = new ChordGroup(chordObj, d && d.lyrics ? d.lyrics : '');
+              __g._songEvent = d || null;
+              __g._previewPlayed = false;
+              groups.push(__g);
+            }
+            songIndex++;
+            if(songIndex >= __songData.length){ songFinished = true; songFinishedAt = performance.now(); }
+          } else {
+            if(!songFinished){ songFinished = true; songFinishedAt = performance.now(); }
+          }
+
+        } else if(gameMode==='scale'){
+          const k = ['do','re','mi','fa','so','la','si','do2'][scaleIndex%8];
+          const g = new ChordGroup(SOLO_LIB[k], "");
+          g.noteKey = k;
+          groups.push(g);
+          scaleIndex++;
+        } else {
+          const k = currentLevelChords[practiceIndex % currentLevelChords.length];
+          groups.push(new ChordGroup(CHORD_LIB[k], ""));
+          practiceIndex++;
+        }
+        lastSpawn=time;
+      }
     }
   }
 
@@ -2940,8 +3653,22 @@ function gameLoop(time){
   }
 
   for(let i=groups.length-1; i>=0; i--){
-    groups[i].update(); groups[i].draw();
-    if(groups[i].x < -300) groups.splice(i,1);
+    const __prevX = groups[i].x;
+    groups[i].update();
+    if(window.CUSTOM_PREVIEW_ONLY && isSongMode && groups[i].active && !groups[i]._previewPlayed){
+      try{
+        if(__prevX > NUT_X && groups[i].x <= NUT_X){
+          const __freqs = Array.isArray(groups[i]._songEvent && groups[i]._songEvent.freqs) ? groups[i]._songEvent.freqs : [];
+          if(__freqs.length && typeof window.playFreqs === 'function'){
+            window.playFreqs(__freqs, 0.9);
+          }
+          groups[i]._previewPlayed = true;
+          groups[i].active = false;
+        }
+      }catch(e){ console.error(e); }
+    }
+    groups[i].draw();
+    if(groups[i].x < -300 || (window.CUSTOM_PREVIEW_ONLY && !groups[i].active)) groups.splice(i,1);
   }
 
   // --- NEW: Draw Current Chord Label (Fixed at Headstock) ---
@@ -2966,8 +3693,7 @@ function gameLoop(time){
 
   // 曲モード：最後まで流れ切ったら終了
   if(isSongMode){
-    const __songData = getCurrentSongData();
-    const done = (songFinished || songIndex >= __songData.length);
+    const done = (songFinished || songIndex >= getActiveSongData().length);
     if(done && groups.length===0){
       endGame();
       return;
@@ -3106,6 +3832,7 @@ function endGame(){
 
 // --- 入力判定 ---
 function processMicInput(){
+  if(window.CUSTOM_PREVIEW_ONLY) return;
   if(isTapMode() || !micAnalyser) return;
   const buf = new Float32Array(micAnalyser.fftSize);
   micAnalyser.getFloatTimeDomainData(buf);
@@ -3128,6 +3855,7 @@ function processMicInput(){
 }
 
 function handleAction(){
+  if(window.CUSTOM_PREVIEW_ONLY) return;
   if(gameState!=='PLAY') return;
   // ターゲット探索
   let target=null, best=Infinity;
@@ -3413,7 +4141,24 @@ const fretToX = (fret)=> fretCenterX(this.x, fret);
     this.chord.fingers.forEach(f=>{
       const fx = fretToX(f.f);
       const fy = cy + (f.s-2.5)*75;
-      drawCircle(fx, fy, f.txt, 40, 1.0, false, blink);
+      let showTxt = f.txt;
+      try{
+        const mode = String((window.CUSTOM_IMPORTED_ACTIVE && window.CUSTOM_IMPORTED_ACTIVE.displayMode) || 'FRET').toUpperCase();
+        if(this._songEvent && this._songEvent.pick){
+          const keyByS = {1:'A',2:'E',3:'C',4:'G'};
+          const kk = keyByS[f.s];
+          const fretVal = this._songEvent.pick ? this._songEvent.pick[kk] : null;
+          const fingerTxt = this._songEvent.pickTexts ? this._songEvent.pickTexts[kk] : '';
+          if(mode === 'FINGER'){
+            showTxt = fingerTxt || (fretVal === 0 ? '0' : f.txt);
+          }else if(mode === 'BOTH'){
+            showTxt = (fretVal === 0 ? '0' : String(fretVal)) + (fingerTxt ? ('\n' + fingerTxt) : '');
+          }else{
+            showTxt = (fretVal === 0 ? '0' : String(fretVal));
+          }
+        }
+      }catch(e){}
+      drawCircle(fx, fy, showTxt, 40, 1.0, false, blink);
     });
     
     // 表示：コード名・単音名のテキスト描画はここでは行わない（drawCurrentChordLabelで固定表示）
@@ -3425,10 +4170,19 @@ function drawCircle(x,y,txt,size,alpha,blur,scale=1){
   if(blur) ctx.filter="blur(2px)";
   ctx.translate(x,y); ctx.scale(scale,scale);
   ctx.beginPath(); ctx.arc(0,0,size,0,Math.PI*2);
-  ctx.fillStyle = (txt==='薬')?'#5271ff':(txt==='中'?'#ff66c4':(txt==='人'?'#ff914d':'#888'));
+  const plain = String(txt == null ? '' : txt).replace(/\n/g,'');
+  ctx.fillStyle = (plain.includes('薬'))?'#5271ff':(plain.includes('中')?'#ff66c4':(plain.includes('人')?'#ff914d':'#888'));
   ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
-  ctx.filter="none"; ctx.fillStyle="#fff"; ctx.font=`bold ${size*0.75}px sans-serif`;
-  ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,0,2);
+  ctx.filter="none"; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  const parts = String(txt == null ? '' : txt).split('\n');
+  if(parts.length > 1){
+    ctx.font=`bold ${size*0.42}px sans-serif`;
+    ctx.fillText(parts[0],0,-10);
+    ctx.fillText(parts[1],0,12);
+  }else{
+    ctx.font=`bold ${size*0.75}px sans-serif`;
+    ctx.fillText(parts[0],0,2);
+  }
   ctx.restore();
 }
 class Star {
@@ -5032,382 +5786,720 @@ candidates[key] = b;
   applySoon();
 })();
 
-
-// ===== オリジナル譜面（Excel/JSON）読み込み =====
+// ===== Imported Score Runtime Patches =====
 (function(){
-  const importBtn = document.getElementById('import-json-btn');
-  const fileInput = document.getElementById('origScoreFile');
-  const modal = document.getElementById('task-modal');
-  const closeBtn = document.getElementById('taskModalClose');
-  const titleEl = document.getElementById('task-song-name');
-  const statusEl = document.getElementById('task-import-status');
-  const metaEl = document.getElementById('task-import-meta');
-  const navEl = document.getElementById('task-nav-meta');
-  const listenBtn = document.getElementById('taskListenBtn');
-  const startBtn = document.getElementById('taskStartBtn');
-  const recordBtn = document.getElementById('taskRecordBtn');
-  const speedPills = Array.from(document.querySelectorAll('#task-speed-pills .mode-pill'));
-  let importedScore = null;
-  let sampleTimers = [];
-  let samplePlaying = false;
-
-  function hideModal(){ if(modal) modal.style.display='none'; }
-  function showModal(){ if(modal) modal.style.display='flex'; }
-  function stopSamplePlayback(){
-    try{ sampleTimers.forEach(id=>clearTimeout(id)); }catch(e){}
-    sampleTimers = [];
-    samplePlaying = false;
-    if(listenBtn) listenBtn.textContent = '▶️ お手本をきく';
-  }
-  function setSpeed(id){
-    window.CUSTOM_SONG_SPEED_ID = id;
-    speedPills.forEach(el=>el.classList.toggle('active', (el.dataset.ospeed||'').toUpperCase()===id));
-  }
-  function getSpeed(){ return String(window.CUSTOM_SONG_SPEED_ID || 'NORMAL').toUpperCase(); }
-  function stem(name){ return String(name||'').replace(/\.[^.]+$/, ''); }
-  function cell(sheet, addr){ return sheet ? sheet[addr] : null; }
-  function cellVal(sheet, addr){ const c = cell(sheet, addr); return c ? c.v : null; }
-  function parseIntCell(v){
-    if(v === null || v === undefined || v === '') return null;
-    if(typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v);
-    const s = String(v).trim();
-    if(/^[-+]?\d+$/.test(s)) return parseInt(s, 10);
-    return null;
-  }
-  function hasAnyRowData(sheet, row){
-    for(let c=1;c<=18;c++){
-      const a = XLSX.utils.encode_cell({r:row-1,c:c-1});
-      const v = cellVal(sheet, a);
-      if(v !== null && v !== undefined && v !== '') return true;
-    }
-    return false;
-  }
-  function parseTabBars(tabSheet){
-    const bars = [];
-    let emptyRuns = 0;
-    for(let row=5; row<=Math.max(260, (tabSheet['!ref'] ? XLSX.utils.decode_range(tabSheet['!ref']).e.r+1 : 260)); row += 8){
-      const aVal = cellVal(tabSheet, `A${row}`);
-      const blockHasData = hasAnyRowData(tabSheet, row) || hasAnyRowData(tabSheet, row+1) || hasAnyRowData(tabSheet, row+2);
-      if(!blockHasData){
-        emptyRuns++;
-        if(emptyRuns >= 4) break;
-        continue;
-      }
-      emptyRuns = 0;
-      const m = String(aVal || '').match(/Bar\s*(\d+)/i);
-      const barNo = m ? parseInt(m[1],10) : bars.length + 1;
-      const chordMap = {};
-      const strumMap = {};
-      const fretRows = {A:{},E:{},C:{},G:{}};
-      for(let i=0;i<16;i++){
-        const col = XLSX.utils.encode_col(i+1); // B..Q
-        const ch = cellVal(tabSheet, `${col}${row+1}`);
-        const st = cellVal(tabSheet, `${col}${row+2}`);
-        const av = parseIntCell(cellVal(tabSheet, `${col}${row+3}`));
-        const ev = parseIntCell(cellVal(tabSheet, `${col}${row+4}`));
-        const cv = parseIntCell(cellVal(tabSheet, `${col}${row+5}`));
-        const gv = parseIntCell(cellVal(tabSheet, `${col}${row+6}`));
-        if(ch !== null && ch !== undefined && String(ch).trim() !== '') chordMap[i] = String(ch).trim();
-        if(st !== null && st !== undefined && String(st).trim() !== '') strumMap[i] = String(st).trim();
-        if(av !== null) fretRows.A[i] = av;
-        if(ev !== null) fretRows.E[i] = ev;
-        if(cv !== null) fretRows.C[i] = cv;
-        if(gv !== null) fretRows.G[i] = gv;
-      }
-      const tag = cellVal(tabSheet, `A${row+7}`);
-      bars.push({ barNo, chordMap, strumMap, fretRows, tag: String(tag||'').trim() });
-    }
-    return bars;
-  }
-  function parseNavEvents(wb, tabBars){
-    const out = [];
-    const navSheet = wb.Sheets['NAV'];
-    if(navSheet && navSheet['!ref']){
-      const rows = XLSX.utils.sheet_to_json(navSheet, {defval:''});
-      rows.forEach(r=>{
-        const type = String(r.type || r.TYPE || '').trim();
-        if(!type) return;
-        const atBar = parseIntCell(r.at_bar || r.atBar || r.BAR || '');
-        const targetBar = parseIntCell(r.target_bar || r.targetBar || '');
-        const passRule = String(r.pass_rule || r.passRule || '').trim();
-        const text = String(r.text || '').trim();
-        out.push({type, atBar, targetBar, passRule, text});
-      });
-    }
-    if(out.length) return out;
-    // fallback: parse visible NAV tags from TAB row A (empty row after block)
-    (tabBars||[]).forEach(b=>{
-      const tag = String(b.tag||'');
-      if(!tag || !/^NAV:/i.test(tag)) return;
-      const pieces = tag.split(/\s{2,}|\sNAV:/).map(s=>s.trim()).filter(Boolean);
-      pieces.forEach(piece=>{
-        const p = piece.replace(/^NAV:/i,'').trim();
-        if(/^SEGNO/i.test(p)) out.push({type:'SEGNO', atBar:b.barNo, targetBar:null, passRule:'', text:'visible_tag'});
-        else if(/^CODA$/i.test(p)) out.push({type:'CODA', atBar:b.barNo, targetBar:null, passRule:'', text:'visible_tag'});
-        else if(/^TO_CODA/i.test(p)) out.push({type:'TO_CODA', atBar:b.barNo, targetBar:null, passRule:/AFTER_DS/i.test(p)?'AFTER_DS':'', text:'visible_tag'});
-        else if(/^DS/i.test(p)) out.push({type:'DS', atBar:b.barNo, targetBar:null, passRule:/ONCE/i.test(p)?'ONCE':'', text:'visible_tag'});
-        else if(/^SIMILE/i.test(p)){
-          const m = p.match(/BAR\s*(\d+)/i);
-          out.push({type:'SIMILE_PREV_BAR', atBar:b.barNo, targetBar:m?parseInt(m[1],10):b.barNo-1, passRule:'', text:'visible_tag'});
-        } else if(/^VIDE/i.test(p)){
-          const m = p.match(/BAR\s*(\d+)/i);
-          out.push({type:'VIDE_PREV_BAR', atBar:b.barNo, targetBar:m?parseInt(m[1],10):b.barNo-1, passRule:'', text:'visible_tag'});
-        }
-      });
-    });
-    return out;
-  }
-  function chordLabelAt(bar, i){
-    let cur = '';
-    Object.keys(bar.chordMap).map(n=>parseInt(n,10)).sort((a,b)=>a-b).forEach(pos=>{ if(pos <= i) cur = bar.chordMap[pos]; });
-    return cur;
-  }
-  function cloneBarData(src, dst){
-    if(!src || !dst) return;
-    if(Object.keys(dst.strumMap||{}).length === 0) dst.strumMap = Object.assign({}, src.strumMap);
-    ['A','E','C','G'].forEach(k=>{
-      if(!dst.fretRows[k]) dst.fretRows[k] = {};
-      const srcMap = src.fretRows[k] || {};
-      const dstMap = dst.fretRows[k] || {};
-      Object.keys(srcMap).forEach(pos=>{ if(dstMap[pos] === undefined || dstMap[pos] === null || dstMap[pos] === '') dstMap[pos] = srcMap[pos]; });
-      dst.fretRows[k] = dstMap;
-    });
-    if(Object.keys(dst.chordMap||{}).length === 0) dst.chordMap = Object.assign({}, src.chordMap);
-  }
-  function resolveNavAndCopies(bars, nav){
-    const byBar = {};
-    bars.forEach(b=>byBar[b.barNo]=b);
-    (nav||[]).forEach(ev=>{
-      const t = String(ev.type||'').toUpperCase();
-      if((t==='SIMILE_PREV_BAR' || t==='VIDE_PREV_BAR') && ev.atBar && ev.targetBar && byBar[ev.atBar] && byBar[ev.targetBar]){
-        cloneBarData(byBar[ev.targetBar], byBar[ev.atBar]);
-      }
-    });
-    return byBar;
-  }
-  function buildPlaybackOrder(bars, nav){
-    const barNums = bars.map(b=>b.barNo).sort((a,b)=>a-b);
-    if(!barNums.length) return [];
-    const maxBar = Math.max(...barNums);
-    const evByBar = {};
-    (nav||[]).forEach(ev=>{ if(ev.atBar!=null) (evByBar[ev.atBar] ||= []).push(ev); });
-    const segnoBar = ((nav||[]).find(ev=>String(ev.type||'').toUpperCase()==='SEGNO')||{}).atBar || null;
-    const codaBar  = ((nav||[]).find(ev=>String(ev.type||'').toUpperCase()==='CODA')||{}).atBar || null;
-    const order = [];
-    let cur = barNums[0], dsUsed = false, guard = 0;
-    while(cur >= barNums[0] && cur <= maxBar && guard < 1200){
-      guard++;
-      order.push(cur);
-      const evs = evByBar[cur] || [];
-      const hasFine = evs.some(ev=>String(ev.type||'').toUpperCase()==='FINE');
-      if(dsUsed && hasFine) break;
-      const dsEv = evs.find(ev=>['DS','DS_AL_CODA','DS_AL_FINE'].includes(String(ev.type||'').toUpperCase()));
-      if(dsEv && !dsUsed){
-        dsUsed = true;
-        cur = dsEv.targetBar || segnoBar || barNums[0];
-        continue;
-      }
-      const toCodaEv = evs.find(ev=>String(ev.type||'').toUpperCase()==='TO_CODA');
-      if(toCodaEv && dsUsed && (String(toCodaEv.passRule||'').toUpperCase()==='AFTER_DS' || true) && codaBar){
-        cur = toCodaEv.targetBar || codaBar;
-        continue;
-      }
-      cur += 1;
-    }
-    return order;
-  }
-  function makeChordObj(chordName, frets){
-    const map = [{k:'A',s:1},{k:'E',s:2},{k:'C',s:3},{k:'G',s:4}];
-    const fingers = [];
-    map.forEach(({k,s})=>{
-      const v = frets[k];
-      if(v === undefined || v === null || v === '') return;
-      const n = Number(v);
-      if(!Number.isFinite(n)) return;
-      fingers.push({s, f:n, txt:String(n)});
-    });
-    return { name: chordName || 'オリジナル', targetIdx: 0, fingers };
-  }
-  function buildSongDataFromBars(bars, order){
-    const byBar = {};
-    bars.forEach(b=>byBar[b.barNo]=b);
-    const data = [];
-    order.forEach(barNo=>{
-      const bar = byBar[barNo];
-      if(!bar) return;
-      for(let i=0;i<16;i++){
-        const st = bar.strumMap[i];
-        if(!st){ data.push({rest:true, barNo, grid:i}); continue; }
-        const frets = {};
-        ['A','E','C','G'].forEach(k=>{
-          const v = bar.fretRows[k] && bar.fretRows[k][i];
-          if(v !== undefined && v !== null && v !== '') frets[k] = Number(v);
-        });
-        const label = chordLabelAt(bar, i);
-        if(Object.keys(frets).length){
-          data.push({ chord: makeChordObj(label, frets), lyrics:'', barNo, grid:i, strum:st });
-        } else {
-          data.push({rest:true, barNo, grid:i, strum:st});
-        }
-      }
-    });
-    return data;
-  }
-  async function parseImportedFile(file){
-    const name = file.name || 'オリジナル譜面';
-    const lower = name.toLowerCase();
-    if(lower.endsWith('.json')){
-      const raw = await file.text();
-      const parsed = JSON.parse(raw);
-      if(parsed && Array.isArray(parsed.songData)){
-        return {
-          title: parsed.title || stem(name),
-          songData: parsed.songData,
-          nav: Array.isArray(parsed.nav) ? parsed.nav : [],
-          order: Array.isArray(parsed.order) ? parsed.order : [],
-          barsCount: parsed.barsCount || 0,
-          sourceName: name,
-        };
-      }
-      throw new Error('JSONの形式がちがいます');
-    }
-    if(typeof XLSX === 'undefined') throw new Error('Excelライブラリの読み込みに失敗しました');
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    const tab = wb.Sheets['TAB'] || wb.Sheets[wb.SheetNames[0]];
-    if(!tab) throw new Error('TABシートが見つかりません');
-    const bars = parseTabBars(tab);
-    if(!bars.length) throw new Error('Barデータが見つかりません');
-    const nav = parseNavEvents(wb, bars);
-    resolveNavAndCopies(bars, nav);
-    const order = buildPlaybackOrder(bars, nav);
-    const songData = buildSongDataFromBars(bars, order.length ? order : bars.map(b=>b.barNo));
-    return {
-      title: stem(name),
-      barsCount: bars.length,
-      nav,
-      order,
-      songData,
-      sourceName: name,
+  const _origHandleAction = window.handleAction;
+  if(typeof _origHandleAction === 'function'){
+    window.handleAction = function(){
+      if(window.CUSTOM_PREVIEW_ONLY && window.CUSTOM_IMPORTED_ACTIVE) return;
+      return _origHandleAction.apply(this, arguments);
     };
   }
-  function updateModal(){
-    if(!importedScore){
-      titleEl.textContent = 'ファイルをえらんでね';
-      statusEl.textContent = 'Excel（TAB/NAV）またはJSONをよみこみます';
-      metaEl.textContent = '速度：モーダル下のボタンで変更できます';
-      navEl.textContent = '';
-      listenBtn.disabled = true;
-      startBtn.disabled = true;
+  const _origGoMenu = window.goMenu;
+  if(typeof _origGoMenu === 'function'){
+    window.goMenu = function(){
+      const shouldReturn = !!(window.CUSTOM_IMPORTED_ACTIVE && window.CUSTOM_IMPORTED_ACTIVE.returnToOriginalMenu);
+      try{ stopCustomGuidePlayback(); }catch(e){}
+      const ret = _origGoMenu.apply(this, arguments);
+      if(shouldReturn){
+        setTimeout(() => {
+          try{ window.__openOriginalScoreMenu && window.__openOriginalScoreMenu(); }catch(e){}
+        }, 30);
+      }
+      return ret;
+    };
+  }
+  const _origEndGame = window.endGame;
+  if(typeof _origEndGame === 'function'){
+    window.endGame = function(){
+      const shouldReturn = !!(window.CUSTOM_IMPORTED_ACTIVE && window.CUSTOM_IMPORTED_ACTIVE.returnToOriginalMenu && window.CUSTOM_PREVIEW_ONLY);
+      try{ stopCustomGuidePlayback(); }catch(e){}
+      const ret = _origEndGame.apply(this, arguments);
+      try{ setImportedPanelVisible(false); }catch(e){}
+      if(shouldReturn){
+        setTimeout(() => {
+          try{ window.__openOriginalScoreMenu && window.__openOriginalScoreMenu(); }catch(e){}
+        }, 30);
+      }
+      return ret;
+    };
+  }
+  const _origStartGameByType = window.startGameByType;
+  if(typeof _origStartGameByType === 'function'){
+    window.startGameByType = function(type){
+      if(type === 'song' && window.CUSTOM_IMPORTED_ACTIVE){
+        const imported = window.CUSTOM_IMPORTED_ACTIVE;
+        if(imported.selectedMode === 'TAP'){
+          entryKind = 'tap';
+        }else if(imported.selectedMode === 'UKE'){
+          entryKind = 'uke';
+        }
+        applyUiMode('NORMAL');
+        return initGame('song', imported.title || 'オリジナル譜面', {
+          speedBase: imported.speedBase || getSongSpeedBase(),
+          disableSpeedUp: true
+        });
+      }
+      return _origStartGameByType.apply(this, arguments);
+    };
+  }
+})();
+
+// オリジナル譜面メニュー（読込 + お手本/練習接続版）
+document.addEventListener('DOMContentLoaded', function(){
+  const importBtn = document.getElementById('import-json-btn');
+  const modal = document.getElementById('task-modal');
+  const closeBtn = document.getElementById('taskModalClose');
+  const fileInput = document.getElementById('origScoreFile');
+  const chooseBtn = document.getElementById('origChooseFileBtn');
+  const fileName = document.getElementById('origFileName');
+  const fileHint = document.getElementById('origFileHint');
+  const previewBtn = document.getElementById('origPreviewBtn');
+  const startBtn = document.getElementById('origStartBtn');
+  const statusTitle = document.getElementById('origStatusTitle');
+  const statusMeta = document.getElementById('origStatusMeta');
+  const modePills = Array.from(document.querySelectorAll('.orig-pill[data-mode]'));
+  const speedPills = Array.from(document.querySelectorAll('.orig-pill[data-speed]'));
+  const dispPills = Array.from(document.querySelectorAll('.orig-pill[data-disp]'));
+
+  if(!importBtn || !modal || !closeBtn || !fileInput || !chooseBtn || !previewBtn || !startBtn) {
+    console.warn('[orig-menu] required elements missing');
+    return;
+  }
+
+  let origState = {
+    file: null,
+    mode: 'TAP',
+    speed: 'NORMAL',
+    parsed: null,
+    runtime: null,
+    parseError: '',
+    display: 'BOTH'
+  };
+
+  function toText(v){ return v == null ? '' : String(v).trim(); }
+  function toInt(v){
+    if(v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function getImportedSpeedBase(speed){
+    if(speed === 'SLOW') return 1.35;  // もう1段階ゆっくり
+    if(speed === 'FAST') return 5.05;  // はやい
+    return 3.35;                       // ふつうは据え置き
+  }
+  function getSongSpeedIdForChoice(speed){
+    if(speed === 'SLOW') return 'SLOW';
+    if(speed === 'FAST') return 'FAST';
+    return 'NORMAL';
+  }
+
+  function getStatusSummary(parsed){
+    if(!parsed) return ['未読込', 'Bar数 / Step数 / NAV情報 は、読込後に表示します。'];
+    const navBits = [];
+    if(parsed.nav && parsed.nav.total > 0){
+      navBits.push('NAV ' + parsed.nav.total + '件');
+      if(parsed.nav.byType && parsed.nav.byType.length){
+        navBits.push(parsed.nav.byType.join(' / '));
+      }
+    }else{
+      navBits.push('NAV なし');
+    }
+    return [
+      (parsed.title || 'タイトル未設定') + ' / ' + parsed.sourceKind,
+      'BPM ' + (parsed.bpm||120) + ' / Grid ' + (parsed.grid||16) + ' / Bar ' + parsed.bars + ' / Step ' + parsed.steps + ' / ' + navBits.join(' / ')
+    ];
+  }
+
+  function syncButtons(){
+    const hasFile = !!origState.file;
+    const ready = !!origState.runtime && !origState.parseError;
+    previewBtn.disabled = !hasFile;
+    startBtn.disabled = !hasFile;
+    fileName.textContent = origState.file ? origState.file.name : 'まだ読み込んでいません';
+    if(origState.parseError){
+      fileHint.textContent = '読込エラー: ' + origState.parseError + '（ボタンで再試行できます）';
+      statusTitle.textContent = '読込失敗';
+      statusMeta.textContent = '形式を確認してください。必要ならボタン押下時に再解析します。';
+      statusTitle.classList.remove('dim');
+      statusMeta.classList.remove('dim');
       return;
     }
-    titleEl.textContent = `「${importedScore.title}」`;
-    statusEl.textContent = `読み込みOK：${importedScore.sourceName}`;
-    metaEl.textContent = `Bar数: ${importedScore.barsCount || 0} / 生成ステップ: ${importedScore.songData.length}`;
-    const navBits = [];
-    const nav = importedScore.nav || [];
-    if(nav.some(e=>String(e.type||'').toUpperCase()==='SEGNO')) navBits.push('Segno');
-    if(nav.some(e=>String(e.type||'').toUpperCase()==='TO_CODA')) navBits.push('To Coda');
-    if(nav.some(e=>String(e.type||'').toUpperCase()==='CODA')) navBits.push('Coda');
-    if(nav.some(e=>String(e.type||'').toUpperCase().startsWith('DS'))) navBits.push('D.S.');
-    if(nav.some(e=>String(e.type||'').toUpperCase()==='SIMILE_PREV_BAR')) navBits.push('Simile');
-    if(nav.some(e=>String(e.type||'').toUpperCase()==='VIDE_PREV_BAR')) navBits.push('Vidé');
-    navEl.textContent = navBits.length ? `順序制御: ${navBits.join(' / ')}` : '順序制御: なし';
-    listenBtn.disabled = false;
-    startBtn.disabled = false;
+    fileHint.textContent = !origState.file
+      ? 'Excel / JSON は、このメニュー内で選びます。'
+      : (ready
+          ? '読込成功。1シート形式を解析しました。お手本/れんしゅうを開始できます。'
+          : 'ファイル選択済み。押下時に再解析します。');
+    const [line1, line2] = getStatusSummary(origState.parsed);
+    statusTitle.textContent = line1;
+    statusMeta.textContent = line2;
+    statusTitle.classList.toggle('dim', !origState.parsed);
+    statusMeta.classList.toggle('dim', !origState.parsed);
   }
-  function openPicker(){
-    stopSamplePlayback();
-    if(fileInput){ fileInput.value = ''; fileInput.click(); }
+
+  function setMode(mode){
+    origState.mode = mode;
+    modePills.forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
   }
-  async function handleFile(ev){
-    const file = ev.target && ev.target.files && ev.target.files[0];
-    if(!file) return;
-    statusEl.textContent = '読み込み中…';
-    listenBtn.disabled = true;
-    startBtn.disabled = true;
+
+  function setSpeed(speed){
+    origState.speed = speed;
+    speedPills.forEach(el => el.classList.toggle('active', el.dataset.speed === speed));
+  }
+
+  function setDisplay(display){
+    origState.display = display;
+    dispPills.forEach(el => el.classList.toggle('active', el.dataset.disp === display));
+  }
+
+  function openModal(){
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    syncButtons();
+  }
+
+  function closeModal(){
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  window.__openOriginalScoreMenu = function(){
+    openModal();
+  };
+  window.__closeOriginalScoreMenu = function(){
+    closeModal();
+  };
+
+  function parseCellFretFinger(v){
+    const s = toText(v);
+    if(!s) return { fret:null, fingerTxt:'' };
+    if(s === '0') return { fret:0, fingerTxt:'0' };
+    const m = s.match(/^(\d+)(.*)$/);
+    if(!m) return { fret:null, fingerTxt:'' };
+    const fret = Number(m[1]);
+    return { fret: Number.isFinite(fret) ? fret : null, fingerTxt: toText(m[2]) };
+  }
+
+  function parseNavTextToEvents(text, atBar){
+    const s = toText(text);
+    if(!s) return [];
+    const events = [];
+    let m;
+    if(/NAV:\s*DS\b/i.test(s)) events.push({ type:'DS', atBar, targetBar:null, passRule:'ONCE', text:'' });
+    if(/NAV:\s*SEGNO\b/i.test(s)) events.push({ type:'SEGNO', atBar, targetBar:null, passRule:'', text:'' });
+    if(/NAV:\s*TO_CODA\b/i.test(s)) events.push({ type:'TO_CODA', atBar, targetBar:null, passRule:'AFTER_DS', text:'' });
+    if(/NAV:\s*CODA\b/i.test(s)) events.push({ type:'CODA', atBar, targetBar:null, passRule:'', text:'' });
+    m = s.match(/NAV:\s*SIMILE\s*->\s*BAR\s*(\d+)/i);
+    if(m) events.push({ type:'SIMILE_PREV_BAR', atBar, targetBar:Number(m[1]), passRule:'', text:'' });
+    m = s.match(/NAV:\s*VIDE\s*->\s*BAR\s*(\d+)/i);
+    if(m) events.push({ type:'VIDE_PREV_BAR', atBar, targetBar:Number(m[1]), passRule:'', text:'' });
+    return events;
+  }
+
+  function parseNavSheet(ws){
+    if(!ws) return { total:0, events:[], byType:[] };
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    const events = [];
+    for(let r=1; r<rows.length; r++){
+      const row = rows[r] || [];
+      const type = toText(row[0]);
+      const atBar = toInt(row[1]);
+      const targetBar = toInt(row[2]);
+      const passRule = toText(row[3]);
+      const text2 = toText(row[4]);
+      if(!type && !atBar && !targetBar && !passRule && !text2) continue;
+      events.push({ type, atBar, targetBar, passRule, text: text2 });
+    }
+    const counter = {};
+    events.forEach(e => { counter[e.type] = (counter[e.type] || 0) + 1; });
+    const byType = Object.keys(counter).sort().map(k => k + ':' + counter[k]);
+    return { total: events.length, events, byType };
+  }
+
+  function parseTabSummary(ws){
+    if(!ws) throw new Error('TABシートが見つかりません');
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    const title = toText((rows[0] || [])[0]) || 'オリジナル譜面';
+    const row2 = rows[1] || [];
+    const row2txt = row2.map(v => toText(v)).join(' ');
+    const bpmM = row2txt.match(/BPM\s*:?\s*(\d+)/i);
+    const gridM = row2txt.match(/Grid\s*:?\s*(\d+)/i);
+    let bars = 0;
+    let steps = 0;
+    for(let r=0; r<rows.length; r++){
+      const a = toText((rows[r] || [])[0]);
+      if(/^Bar\s+\d+/i.test(a)){
+        bars += 1;
+        const chordRow = rows[r+1] || [];
+        const strumRow = rows[r+2] || [];
+        const aRow = rows[r+3] || [];
+        const eRow = rows[r+4] || [];
+        const cRow = rows[r+5] || [];
+        const gRow = rows[r+6] || [];
+        for(let i=0; i<16; i++){
+          const col = 1 + i;
+          const hasStrum = toText(strumRow[col]) !== '';
+          const hasAnyFret = [aRow[col], eRow[col], cRow[col], gRow[col]].some(v => parseCellFretFinger(v).fret !== null);
+          const hasChord = toText(chordRow[col]) !== '';
+          if(hasStrum || hasAnyFret || hasChord) steps += 1;
+        }
+      }
+    }
+    return { title, bars, steps, bpm: bpmM ? Number(bpmM[1]) : 120, grid: gridM ? Number(gridM[1]) : 16 };
+  }
+
+  function cloneEventForBar(ev, bar){
+    return {
+      bar,
+      i: ev.i,
+      chordName: ev.chordName,
+      strum: ev.strum,
+      pick: Object.assign({}, ev.pick || {}),
+      pickTexts: Object.assign({}, ev.pickTexts || {}),
+      chord: ev.chord,
+      freqs: Array.isArray(ev.freqs) ? ev.freqs.slice() : [],
+      lyrics: ev.lyrics || ''
+    };
+  }
+
+  function buildRuntimeFromWorkbook(wb){
+    const tabWs = wb.Sheets['TAB'];
+    const navWs = wb.Sheets['NAV'];
+    if(!tabWs) throw new Error('TABシートが見つかりません');
+
+    const summary = parseTabSummary(tabWs);
+    const rows = XLSX.utils.sheet_to_json(tabWs, { header:1, defval:'' });
+    let nav = parseNavSheet(navWs);
+    const rawBars = {};
+    let carryChord = '';
+
+    function chordObjSafe(name, pick, pickTexts){
+      const useName = name || carryChord || 'C';
+      try{ return importedChordObjForPick(useName, pick || {}, pickTexts || {}); }
+      catch(e){ return importedChordObjForPick('C', pick || {}, pickTexts || {}); }
+    }
+
+    for(let r=0; r<rows.length; r++){
+      const a0 = toText((rows[r] || [])[0]);
+      const m = a0.match(/^Bar\s+(\d+)/i);
+      if(!m) continue;
+      const barNum = Number(m[1]);
+      const chordRow = rows[r+1] || [];
+      const strumRow = rows[r+2] || [];
+      const aRow = rows[r+3] || [];
+      const eRow = rows[r+4] || [];
+      const cRow = rows[r+5] || [];
+      const gRow = rows[r+6] || [];
+      const navRow = rows[r+7] || [];
+      const events = [];
+      let barChord = carryChord;
+
+      if((!navWs || !nav || nav.total === 0) && navRow){
+        const inlineText = Array.from({length:16}, (_,ix)=> toText(navRow[1+ix])).filter(Boolean).join(' ');
+        if(inlineText){
+          const more = parseNavTextToEvents(inlineText, barNum);
+          if(more.length) nav.events.push(...more);
+        }
+      }
+
+      for(let i=0; i<16; i++){
+        const col = 1 + i;
+        const chordCell = toText(chordRow[col]);
+        if(chordCell) barChord = chordCell;
+        const strum = toText(strumRow[col]);
+        const pick = {};
+        const pickTexts = {};
+        const av = parseCellFretFinger(aRow[col]); if(av.fret !== null){ pick.A = av.fret; if(av.fingerTxt) pickTexts.A = av.fingerTxt; }
+        const ev = parseCellFretFinger(eRow[col]); if(ev.fret !== null){ pick.E = ev.fret; if(ev.fingerTxt) pickTexts.E = ev.fingerTxt; }
+        const cv = parseCellFretFinger(cRow[col]); if(cv.fret !== null){ pick.C = cv.fret; if(cv.fingerTxt) pickTexts.C = cv.fingerTxt; }
+        const gv = parseCellFretFinger(gRow[col]); if(gv.fret !== null){ pick.G = gv.fret; if(gv.fingerTxt) pickTexts.G = gv.fingerTxt; }
+
+        const hasPick = Object.keys(pick).length > 0;
+        // chordCell は「コード名更新」には使うが、音イベント化はしない。
+        // 実際に鳴らすのは Strum または fret 情報がある位置だけ。
+        if(!strum && !hasPick) continue;
+        const chordName = barChord || carryChord || 'C';
+        const chord = chordObjSafe(chordName, hasPick ? pick : {}, pickTexts);
+        events.push({
+          bar: barNum,
+          i,
+          chordName,
+          strum,
+          pick,
+          pickTexts,
+          chord,
+          freqs: importedPickToFreqs(pick),
+          lyrics: ''
+        });
+      }
+      rawBars[barNum] = events;
+      if(barChord) carryChord = barChord;
+    }
+
+    nav.total = (nav.events || []).length;
+    const counter = {};
+    (nav.events || []).forEach(e => { counter[e.type] = (counter[e.type] || 0) + 1; });
+    nav.byType = Object.keys(counter).sort().map(k => k + ':' + counter[k]);
+
+    (nav.events || []).forEach(ev => {
+      if((ev.type === 'SIMILE_PREV_BAR' || ev.type === 'VIDE_PREV_BAR') && ev.atBar && ev.targetBar){
+        const current = rawBars[ev.atBar] || [];
+        const target = rawBars[ev.targetBar] || [];
+        const currentHasPlayable = current.some(x => Array.isArray(x.freqs) && x.freqs.length > 0);
+        const currentHasFretInfo = current.some(x => x.pick && Object.keys(x.pick).length > 0);
+        if((current.length === 0 || (!currentHasPlayable && !currentHasFretInfo)) && target.length > 0){
+          rawBars[ev.atBar] = target.map(x => cloneEventForBar(x, ev.atBar));
+        }
+      }
+    });
+
+    const eventsByBar = {};
+    (nav.events || []).forEach(ev => {
+      const b = ev.atBar;
+      if(!b) return;
+      (eventsByBar[b] = eventsByBar[b] || []).push(ev);
+    });
+    const segnoBar = (nav.events || []).find(ev => ev.type === 'SEGNO')?.atBar || (nav.events || []).find(ev => ev.type === 'DS')?.targetBar || null;
+    const codaBar = (nav.events || []).find(ev => ev.type === 'CODA')?.atBar || null;
+
+    const maxBar = Math.max(1, summary.bars || 1);
+    const order = [];
+    let bar = 1;
+    let dsUsed = false;
+    let afterDS = false;
+    let guard = 0;
+    while(bar >= 1 && bar <= maxBar && guard < 500){
+      guard++;
+      order.push(bar);
+      const evs = eventsByBar[bar] || [];
+      const toCoda = evs.find(ev => ev.type === 'TO_CODA');
+      const ds = evs.find(ev => ev.type === 'DS' || ev.type === 'DS_AL_CODA' || ev.type === 'DS_AL_FINE');
+      if(afterDS && toCoda && codaBar){
+        bar = codaBar;
+        afterDS = false;
+        continue;
+      }
+      if(!dsUsed && ds){
+        const jumpTo = ds.targetBar || segnoBar;
+        if(jumpTo){
+          dsUsed = true;
+          afterDS = true;
+          bar = jumpTo;
+          continue;
+        }
+      }
+      bar += 1;
+    }
+
+    const songData = [];
+    const beatMs = 60000 / Math.max(20, summary.bpm || 120);
+    const stepMs = beatMs * 4 / Math.max(1, summary.grid || 16);
+    const barMs = stepMs * 16;
+    order.forEach((b, barOrderIdx) => {
+      const list = (rawBars[b] || []).slice().sort((a, z) => {
+        const ai = Number.isFinite(a && a.i) ? a.i : 0;
+        const zi = Number.isFinite(z && z.i) ? z.i : 0;
+        return ai - zi;
+      });
+      const barBaseMs = barOrderIdx * barMs;
+      list.forEach(ev => {
+        const e2 = cloneEventForBar(ev, b);
+        const iPos = Number.isFinite(ev && ev.i) ? ev.i : 0;
+        e2.atMs = barBaseMs + iPos * stepMs;
+        songData.push(e2);
+      });
+    });
+
+    return {
+      sourceKind: 'Excel',
+      title: summary.title,
+      bars: summary.bars,
+      steps: summary.steps,
+      bpm: summary.bpm,
+      grid: summary.grid,
+      nav,
+      order,
+      rawBars,
+      songData
+    };
+  }
+
+
+  async function parseFile(file){
+    const lower = (file && file.name ? file.name : '').toLowerCase();
+    if(lower.endsWith('.json')){
+      let obj;
+      try{
+        obj = JSON.parse(await file.text());
+      }catch(e){
+        throw new Error('JSONを読めませんでした');
+      }
+      const title = obj.title || obj.meta?.title || 'オリジナル譜面';
+      const songData = Array.isArray(obj.songData) ? obj.songData : [];
+      return {
+        sourceKind: 'JSON',
+        title,
+        bars: Array.isArray(obj.bars) ? obj.bars.length : 0,
+        steps: songData.length,
+        bpm: Number(obj.bpm || obj.meta?.bpm || 120) || 120,
+        grid: Number(obj.grid || obj.meta?.grid || 16) || 16,
+        nav: { total:0, events:[], byType:[] },
+        order: [],
+        rawBars: {},
+        songData
+      };
+    }
+    if(!window.XLSX){
+      throw new Error('Excel読込ライブラリがありません');
+    }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    return buildRuntimeFromWorkbook(wb);
+  }
+
+  function launchImportedPreview(){
+    if(!origState.runtime) return;
     try{
-      importedScore = await parseImportedFile(file);
-      window.CUSTOM_SONG_SPEED_ID = getSpeed();
-      updateModal();
-      showModal();
+      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, origState.runtime, {
+        speedBase: getImportedSpeedBase(origState.speed),
+        selectedMode: 'TAP',
+        selectedSpeed: origState.speed,
+        displayMode: origState.display,
+        returnToOriginalMenu: true
+      });
+      window.CUSTOM_PREVIEW_ONLY = true;
+      window.CUSTOM_IMPORTED_FIRST_PRIMED = false;
+      window.CUSTOM_IMPORTED_FIRST_PRIME_KEY = '';
+      entryKind = 'tap'; // お手本は常に聞くだけ
+      applyUiMode('NORMAL');
+      closeModal();
+      try{ updateImportedPanel(); }catch(e){}
+      try{ ensureTapAudio && ensureTapAudio(); }catch(e){}
+      try{ primeImportedFirstNote(); }catch(e){}
+      prepGame('song');
     }catch(err){
-      console.error(err);
-      importedScore = null;
-      updateModal();
-      alert('読み込みに失敗しました：' + (err && err.message ? err.message : err));
+      console.error('[orig-menu] preview launch failed', err);
+      alert('お手本起動に失敗しました');
     }
   }
-  function freqsFromEvent(ev){
-    try{ return getFreqsFromTarget({ chord: ev.chord }); }catch(e){ return null; }
+
+  function launchImportedPractice(){
+    if(!origState.runtime) return;
+    try{
+      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, origState.runtime, {
+        speedBase: getImportedSpeedBase(origState.speed),
+        selectedMode: origState.mode,
+        selectedSpeed: origState.speed,
+        displayMode: origState.display,
+        returnToOriginalMenu: false
+      });
+      window.CUSTOM_PREVIEW_ONLY = false;
+      if(origState.mode === 'TAP'){
+        entryKind = 'tap';
+      }else{
+        entryKind = 'uke';
+      }
+      applyUiMode(origState.mode === 'TAP' ? 'NORMAL' : 'WAIT');
+      closeModal();
+      try{ updateImportedPanel(); }catch(e){}
+      prepGame('song');
+    }catch(err){
+      console.error('[orig-menu] practice launch failed', err);
+      alert('練習起動に失敗しました');
+    }
   }
-  function playImportedSample(){
-    if(!importedScore || !Array.isArray(importedScore.songData) || !importedScore.songData.length) return;
-    if(samplePlaying){ stopSamplePlayback(); return; }
-    try{ ensureTapAudio(); }catch(e){}
-    samplePlaying = true;
-    listenBtn.textContent = '■ お手本をとめる';
-    const slotMs = getCustomSongSlotMs();
-    let t = 0;
-    importedScore.songData.forEach((ev)=>{
-      const delay = t;
-      sampleTimers.push(setTimeout(()=>{
-        if(!samplePlaying) return;
-        if(!ev || ev.rest || !ev.chord) return;
-        const freqs = freqsFromEvent(ev);
-        if(freqs && freqs.length){
-          try{ playFreqs(freqs, freqs.length >= 3 ? 0.22 : 0.18); }catch(e){ console.error(e); }
-        }
-      }, delay));
-      t += slotMs;
+
+  importBtn.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    openModal();
+  });
+
+  closeBtn.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    closeModal();
+  });
+
+  modal.addEventListener('click', function(e){
+    if(e.target === modal) closeModal();
+  });
+
+
+  const fileDrop = document.querySelector('.orig-file-drop');
+  if(fileDrop){
+    ['dragenter','dragover'].forEach(evt => fileDrop.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation(); fileDrop.classList.add('dragover');
+    }));
+    ['dragleave','dragend','drop'].forEach(evt => fileDrop.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation(); fileDrop.classList.remove('dragover');
+    }));
+    fileDrop.addEventListener('drop', function(e){
+      const dt = e.dataTransfer;
+      if(dt && dt.files && dt.files[0]){
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
     });
-    sampleTimers.push(setTimeout(()=>{ stopSamplePlayback(); }, t + 600));
   }
-  function startImportedPractice(){
-    if(!importedScore || !Array.isArray(importedScore.songData) || !importedScore.songData.length) return;
-    stopSamplePlayback();
-    window.CUSTOM_SONG_DATA = importedScore.songData;
-    window.CUSTOM_SONG_TITLE = importedScore.title;
-    window.CUSTOM_SONG_NAV = importedScore.nav || [];
-    window.CUSTOM_SONG_SOURCE_NAME = importedScore.sourceName || importedScore.title;
-    hideModal();
-    prepGame('song');
+
+  chooseBtn.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    fileInput.click();
+  });
+
+  async function ensureRuntimeParsed(){
+    if(origState.runtime) return true;
+    if(!origState.file) return false;
+    origState.parseError = '';
+    syncButtons();
+    try{
+      const runtime = await parseFile(origState.file);
+      origState.runtime = runtime;
+      origState.parsed = runtime;
+      window.ORIGINAL_SCORE_LAST_PARSED = runtime;
+      syncButtons();
+      return true;
+    }catch(err){
+      console.error('[orig-menu] parse failed on demand', err);
+      origState.parseError = err && err.message ? err.message : '読込に失敗しました';
+      syncButtons();
+      return false;
+    }
   }
-  if(importBtn) importBtn.addEventListener('click', openPicker);
-  if(fileInput) fileInput.addEventListener('change', handleFile);
-  if(closeBtn) closeBtn.addEventListener('click', ()=>{ stopSamplePlayback(); hideModal(); });
-  if(listenBtn) listenBtn.addEventListener('click', playImportedSample);
-  if(startBtn) startBtn.addEventListener('click', startImportedPractice);
-  if(recordBtn) recordBtn.addEventListener('click', ()=>{ const sb = document.getElementById('sampleBtn'); if(sb) sb.click(); });
-  speedPills.forEach(el=>el.addEventListener('click', ()=>setSpeed(String(el.dataset.ospeed||'NORMAL').toUpperCase())));
-  setSpeed('NORMAL');
-  updateModal();
-})();
+
+  fileInput.addEventListener('change', async function(){
+    origState.file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    origState.parsed = null;
+    origState.runtime = null;
+    origState.parseError = '';
+    syncButtons();
+    if(!origState.file) return;
+    try{
+      const runtime = await parseFile(origState.file);
+      origState.runtime = runtime;
+      origState.parsed = runtime;
+      window.ORIGINAL_SCORE_LAST_PARSED = runtime;
+    }catch(err){
+      console.error('[orig-menu] parse failed', err);
+      origState.parseError = err && err.message ? err.message : '読込に失敗しました';
+    }
+    syncButtons();
+  });
+
+  modePills.forEach(el => {
+    el.addEventListener('click', function(e){ e.preventDefault(); setMode(el.dataset.mode); });
+  });
+  speedPills.forEach(el => {
+    el.addEventListener('click', function(e){ e.preventDefault(); setSpeed(el.dataset.speed); });
+  });
+  dispPills.forEach(el => {
+    el.addEventListener('click', function(e){ e.preventDefault(); setDisplay(el.dataset.disp); });
+  });
+
+  previewBtn.addEventListener('click', async function(){
+    if(!origState.file){
+      alert('先にファイルをえらんでください');
+      return;
+    }
+    const ok = await ensureRuntimeParsed();
+    if(!ok || !origState.runtime){
+      alert('ファイルを解析できませんでした');
+      return;
+    }
+    launchImportedPreview();
+  });
+
+  startBtn.addEventListener('click', async function(){
+    if(!origState.file){
+      alert('先にファイルをえらんでください');
+      return;
+    }
+    const ok = await ensureRuntimeParsed();
+    if(!ok || !origState.runtime){
+      alert('ファイルを解析できませんでした');
+      return;
+    }
+    launchImportedPractice();
+  });
+
+  setMode(origState.mode);
+  setSpeed(origState.speed);
+  setDisplay(origState.display);
+  syncButtons();
+  closeModal();
+});
 </script>
-<div class="modal-overlay" id="task-modal" style="display:none;">
-  <div class="modal-content">
-    <button class="modal-close" id="taskModalClose" type="button">×</button>
-    <h2 style="color:#111;">🎼 オリジナル譜面</h2>
-    <p id="task-song-name">ファイルをえらんでね</p>
-    <div class="sound-select-box">
-      <p id="task-import-status">Excel（TAB/NAV）またはJSONをよみこみます</p>
-      <p id="task-import-meta" style="margin:4px 0 0; font-size:13px; opacity:.85;">速度：下のボタンで変更できます</p>
-      <p id="task-nav-meta" style="margin:4px 0 0; font-size:13px; opacity:.85;"></p>
-      <div class="mode-pills" id="task-speed-pills" style="justify-content:center; gap:6px; margin:8px 0 10px;">
-        <div class="mode-pill" data-ospeed="SLOW">ゆっくり</div>
-        <div class="mode-pill active" data-ospeed="NORMAL">ふつう</div>
-        <div class="mode-pill" data-ospeed="FAST">はやい</div>
-      </div>
-      <div class="mode-pills" style="justify-content:center; gap:6px; margin:0 0 10px;">
-        <button class="action-btn btn-secondary" id="taskPickFileBtn" type="button" onclick="document.getElementById('origScoreFile').click()">📂 ファイルをえらぶ</button>
-      </div>
-      <button class="action-btn record-uke" id="taskRecordBtn" type="button">🎙️ じぶんのウクレレを とうろく</button>
+
+<input id="origScoreFile" type="file"
+  accept=".xlsx,.xls,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json"
+  style="display:none" />
+
+<div class="modal-overlay" id="task-modal" aria-hidden="true">
+  <div class="orig-modal" role="dialog" aria-modal="true" aria-labelledby="origTitle">
+    <button class="modal-close" id="taskModalClose" type="button" aria-label="とじる">×</button>
+
+    <div class="orig-head">
+      <h2 class="orig-title" id="origTitle">オリジナル譜面</h2>
+      <p class="orig-subtitle">ボタンを押しただけでは読み込みません。<br>この中でファイル・モード・速度をえらびます。</p>
     </div>
-    <button class="action-btn play-sample" id="taskListenBtn" type="button">▶️ お手本をきく</button>
-    <button class="action-btn start-game" id="taskStartBtn" type="button">🎮 れんしゅうスタート！</button>
+
+    <div class="orig-card file-card orig-file-drop">
+      <h3>① ファイルをえらぶ</h3>
+      <button class="orig-file-btn" id="origChooseFileBtn" type="button">📁 ファイルをえらぶ</button>
+      <div class="orig-file-meta">
+        <div class="orig-file-name" id="origFileName">まだ読み込んでいません</div>
+        <div class="orig-file-hint" id="origFileHint">Excel / JSON は、このメニュー内で選びます。</div>
+      </div>
+      <div class="orig-status" id="origStatusBox">
+        <div class="orig-status-line dim" id="origStatusTitle">未読込</div>
+        <div class="orig-status-line dim" id="origStatusMeta">Bar数 / Step数 / NAV情報 は、読込後に表示します。</div>
+      </div>
+    </div>
+
+    <div class="orig-grid">
+      <div class="orig-card">
+        <div class="orig-group">
+          <p class="orig-label">② モード</p>
+          <div class="orig-pills">
+            <button class="orig-pill" type="button" data-mode="TAP">🎮 タップ</button>
+            <button class="orig-pill" type="button" data-mode="UKE">🎸 ウクレレ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="orig-card">
+        <div class="orig-group">
+          <p class="orig-label">③ 速度</p>
+          <div class="orig-pills">
+            <button class="orig-pill" type="button" data-speed="SLOW">ゆっくり</button>
+            <button class="orig-pill active" type="button" data-speed="NORMAL">ふつう</button>
+            <button class="orig-pill" type="button" data-speed="FAST">はやい</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="orig-card orig-display-card">
+      <div class="orig-group">
+        <p class="orig-label">④ 表示</p>
+        <div class="orig-pills orig-pills-2">
+          <button class="orig-pill" type="button" data-disp="FINGER">指</button>
+          <button class="orig-pill active" type="button" data-disp="BOTH">両方</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="orig-actions">
+      <button class="orig-action preview" id="origPreviewBtn" type="button" disabled>▶ お手本をきく（聞くだけ）</button>
+      <button class="orig-action start" id="origStartBtn" type="button" disabled>🎮 れんしゅうスタート</button>
+    </div>
+
+    <p class="orig-note">この版はメニュー整理までです。</p>
   </div>
 </div>
-<input id="origScoreFile" type="file" accept=".xlsx,.xls,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" style="display:none" />
 
 </body>
 </html>

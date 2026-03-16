@@ -1299,37 +1299,110 @@ body.is-uke .vol-inline{ display:none !important; }
 
 
 
-    @media (orientation: landscape) and (max-height: 460px){
-      .modal-overlay{ padding: 4px; align-items: center; }
+    @media (orientation: landscape) and (max-height: 520px){
+      .modal-overlay{
+        padding: 4px;
+        align-items: center;
+      }
       .orig-modal{
-        width: min(97vw, 760px);
-        max-width: 760px;
+        width: min(98vw, 920px);
+        max-width: 920px;
         max-height: 95dvh;
         overflow: hidden;
         padding: 8px 8px 6px;
         gap: 4px;
         border-radius: 14px;
+        display: grid;
+        grid-template-columns: 1.32fr 1fr;
+        grid-template-areas:
+          "head head"
+          "file settings"
+          "file display"
+          "actions actions";
+        align-items: start;
       }
-      .orig-head{ padding: 0 24px 0 2px; }
-      .orig-title{ font-size: 16px; margin: 0 0 1px; line-height:1.0; }
+      .orig-head{ grid-area: head; padding: 0 24px 0 2px; }
+      .orig-title{ font-size: 16px; margin: 0 0 1px; line-height: 1.0; }
       .orig-subtitle{ font-size: 9px; line-height: 1.0; }
       .modal-close{ width: 24px; height: 24px; font-size: 14px; top: 4px; right: 4px; border-width:2px; }
-      .orig-card{ padding: 5px 6px; border-radius: 10px; border-width:2px; }
-      .orig-card h3{ margin:0 0 3px; font-size: 11px; }
-      .orig-file-btn{ padding: 6px 6px; font-size: 11px; border-radius: 8px; border-width:2px; }
-      .orig-file-meta{ margin-top:4px; padding:4px 5px; min-height: 24px; border-width:1px; }
-      .orig-file-name{ font-size: 10px; line-height:1.0; }
-      .orig-file-hint{ font-size: 8px; line-height:1.0; }
-      .orig-status{ margin-top:4px; padding:4px 5px; gap:1px; border-width:1px; border-radius:7px; }
-      .orig-status-line{ font-size: 8px; line-height:1.0; }
-      .orig-grid{ grid-template-columns: 1fr 1fr; gap: 4px; }
+
+      .file-card{
+        grid-area: file;
+        padding: 5px 6px;
+        border-radius: 10px;
+        border-width: 2px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "title title"
+          "btn btn"
+          "meta status";
+        gap: 4px;
+        align-items: start;
+      }
+      .file-card h3{ grid-area: title; margin: 0 0 1px; font-size: 11px; }
+      .orig-file-btn{ grid-area: btn; padding: 6px 6px; font-size: 11px; border-radius: 8px; border-width:2px; }
+      .orig-file-meta{
+        grid-area: meta;
+        margin-top: 0;
+        padding: 4px 5px;
+        min-height: 24px;
+        border-width:1px;
+        border-radius: 7px;
+      }
+      .orig-status{
+        grid-area: status;
+        margin-top: 0;
+        padding: 4px 5px;
+        gap: 1px;
+        border-width:1px;
+        border-radius: 7px;
+      }
+      .orig-file-name{ font-size: 10px; line-height: 1.0; }
+      .orig-file-hint{ font-size: 8px; line-height: 1.0; }
+      .orig-status-line{ font-size: 8px; line-height: 1.0; }
+
+      .orig-grid{
+        grid-area: settings;
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+      .orig-display-card{
+        grid-area: display;
+      }
+      .orig-card{
+        padding: 5px 6px;
+        border-radius: 10px;
+        border-width: 2px;
+      }
+      .orig-card h3{ margin: 0 0 3px; font-size: 11px; }
       .orig-label{ font-size: 10px; }
       .orig-pills{ gap: 4px; }
-      .orig-pill{ padding: 5px 3px; font-size: 10px; min-width: 0; border-width:2px; }
-      .orig-display-card .orig-pills{ flex-wrap: nowrap; }
-      .orig-actions{ grid-template-columns: 1fr 1fr; gap: 4px; }
-      .orig-action{ padding: 7px 4px; font-size: 11px; border-radius: 8px; border-width:2px; }
-      .orig-note{ font-size: 8px; line-height:1.0; margin:0; }
+      .orig-pill{
+        padding: 5px 3px;
+        font-size: 10px;
+        min-width: 0;
+        border-width: 2px;
+      }
+      .orig-display-card .orig-pills{
+        flex-wrap: nowrap;
+      }
+
+      .orig-actions{
+        grid-area: actions;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding-top: 0;
+      }
+      .orig-action{
+        padding: 7px 4px;
+        font-size: 11px;
+        border-radius: 8px;
+        border-width: 2px;
+      }
+      .orig-note{
+        display: none;
+      }
     }
 
 

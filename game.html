@@ -1935,7 +1935,7 @@ body.menuOpen #back-btn{ display:none !important; }
       <!-- ウクレレのおと: ボタン右側余白に収納（右スペース） -->
       <div class="menu-extra" onclick="event.stopPropagation();">
         <div class="mode-pills" style="justify-content:flex-end; flex-wrap:nowrap; gap:6px;">
-          <div class="mode-pill sound-pill" id="ukeSoundPill" onclick="toggleUkeSound(this)" aria-pressed="false">ウクレレのおと</div>
+          <div class="mode-pill sound-pill" id="ukeSoundPill" aria-pressed="false">ウクレレのおと</div>
         </div>
 
         <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
@@ -2429,8 +2429,8 @@ let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
 const OUTPUT_BOOST = 3.0; // iPhone内蔵SP向け：全体の基本音量を底上げ（v15）
-const TAP_GAIN_LIMIT = 3.9;
-const TAP_POST_GAIN = 1.42;
+const TAP_GAIN_LIMIT = 5.6;
+const TAP_POST_GAIN = 1.90;
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 1.0;
 let tapAudioCtx = null;
@@ -3357,47 +3357,46 @@ window.applyUkeSoundUi = function(){
     const pill = document.getElementById('ukeSoundPill');
     if(!pill) return;
     const us = window.UKE_SAMPLE;
-    const on = !!(us && us.mode === 'SAMPLE' && us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G);
+    const hasRecorded = !!(us && (us.hasRecorded || (us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G)));
+    const on = !!(us && us.mode === 'SAMPLE' && hasRecorded);
     pill.classList.toggle('active', on);
     pill.setAttribute('aria-pressed', on ? 'true' : 'false');
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
 window.__ukeSoundToggleTs = 0;
-window.toggleUkeSound = function(){
+window.toggleUkeSound = function(ev){
+  try{ if(ev && typeof ev.preventDefault === 'function') ev.preventDefault(); }catch(_){ }
   try{ ensureTapAudio(); }catch(e){}
   const nowTs = Date.now();
-  if((nowTs - (window.__ukeSoundToggleTs||0)) < 550) return;
+  if((nowTs - (window.__ukeSoundToggleTs||0)) < 550) return false;
   window.__ukeSoundToggleTs = nowTs;
   const us = window.UKE_SAMPLE;
-  if(!us){ return; }
-  const hasRecorded = !!(us && us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G);
-  const isOn = !!(us.mode === 'SAMPLE' && hasRecorded);
-  if(isOn){
-    us.mode = 'OSC';
-    if(window.applyUkeSoundUi) window.applyUkeSoundUi();
-    return;
-  }
+  if(!us){ return false; }
+  const hasRecorded = !!(us.hasRecorded || (us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G));
   if(hasRecorded){
-    us.mode = 'SAMPLE';
     us.ready = true;
+    us.mode = (us.mode === 'SAMPLE') ? 'OSC' : 'SAMPLE';
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
-    return;
+    return false;
   }
   const sb = document.getElementById('sampleBtn');
   if(sb){ try{ sb.click(); }catch(e){} }
   if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+  return false;
 };
 window.bindUkeSoundToggleUI = function(){
   const pill = document.getElementById('ukeSoundPill');
   if(!pill || pill.__ukeBound) return;
   pill.__ukeBound = true;
-  const onTap = (ev)=>{
-    try{ if(ev && typeof ev.preventDefault === 'function') ev.preventDefault(); }catch(_){ }
-    window.toggleUkeSound();
-  };
-  pill.addEventListener('touchend', onTap, {passive:false});
-  pill.addEventListener('pointerup', onTap, {passive:false});
+  pill.addEventListener('click', window.toggleUkeSound, {passive:false});
+  pill.addEventListener('keydown', (ev)=>{
+    if(!ev) return;
+    if(ev.key === 'Enter' || ev.key === ' '){
+      try{ ev.preventDefault(); }catch(_){ }
+      window.toggleUkeSound(ev);
+    }
+  });
 };
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
@@ -4475,7 +4474,7 @@ window.addEventListener('pageshow', ()=>{
   window.applyTapVolumeToGain = function(){
     try{
       const v = getTapVolume01();
-      const g = Math.pow(v, 1.18); 
+      const g = 0.34 + 0.78 * Math.pow(v, 0.82);
       if(typeof tapMaster !== 'undefined' && tapMaster && typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
         tapMaster.gain.setTargetAtTime(Math.min(TAP_GAIN_LIMIT, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.012);
       }
@@ -4743,6 +4742,7 @@ window.addEventListener('pageshow', ()=>{
     ready: false,
     buffers: { A:null, E:null, C:null, G:null },
     gain: { A:1, E:1, C:1, G:1 },
+    hasRecorded: false,
     baseFreq: { A:440.00, E:329.63, C:261.63, G:392.00 }
   };
 
@@ -5699,6 +5699,7 @@ candidates[key] = b;
         window.UKE_SAMPLE.mode = 'OSC';
         if(window.UKE_SAMPLE.buffers && window.UKE_SAMPLE.buffers.A && window.UKE_SAMPLE.buffers.E && window.UKE_SAMPLE.buffers.C && window.UKE_SAMPLE.buffers.G){
           window.UKE_SAMPLE.ready = true;
+          window.UKE_SAMPLE.hasRecorded = true;
         }
       }
       endFlow(true);
@@ -5709,6 +5710,7 @@ candidates[key] = b;
       window.UKE_SAMPLE.buffers = { A:candidates.A, E:candidates.E, C:candidates.C, G:candidates.G };
       window.UKE_SAMPLE.gain = { A:(candGain.A||1), E:(candGain.E||1), C:(candGain.C||1), G:(candGain.G||1) };
       window.UKE_SAMPLE.ready = !!(candidates.A && candidates.E && candidates.C && candidates.G);
+      window.UKE_SAMPLE.hasRecorded = window.UKE_SAMPLE.ready;
       window.UKE_SAMPLE.mode = window.UKE_SAMPLE.ready ? 'SAMPLE' : 'OSC';
       endFlow(true);
     });

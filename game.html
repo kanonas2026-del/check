@@ -4539,9 +4539,16 @@ window.addEventListener('pageshow', ()=>{
 
   // --- SUSTAIN MANAGEMENT (v80) ---
   const activeVoices = []; // {osc, gain, startTime}
+  let __holdVoiceReleaseUntil = 0;
+
+  function markProgrammaticPlayback(ms){
+    try{ __holdVoiceReleaseUntil = Math.max(__holdVoiceReleaseUntil, performance.now() + Math.max(0, Number(ms)||0)); }catch(_){ }
+  }
 
   function stopAllVoices(){
     if(!tapAudioCtx) return;
+    const nowPerf = (()=>{ try{ return performance.now(); }catch(_){ return 0; } })();
+    if(nowPerf < __holdVoiceReleaseUntil) return;
     const now = tapAudioCtx.currentTime;
     // release nicely to avoid destruction sound
     activeVoices.forEach(v => {
@@ -4585,6 +4592,12 @@ window.addEventListener('pageshow', ()=>{
   window.playFreqs = function(freqs, dur){
     try{
       ensureTapAudio();
+      if(!tapAudioCtx || !tapMaster) return;
+      if(tapAudioCtx.state && tapAudioCtx.state !== 'running'){
+        Promise.resolve(tapAudioCtx.resume()).then(()=>{ try{ window.playFreqs(freqs, dur); }catch(_){ } }).catch(()=>{ });
+        return;
+      }
+      markProgrammaticPlayback(2600);
       stopAllVoices();
 
       // v0.4: サンプリング音源モード（準備できていればこちらで再生）
@@ -4782,6 +4795,11 @@ window.addEventListener('pageshow', ()=>{
     try{
       ensureTapAudio();
       if(!tapAudioCtx || !tapMaster) return false;
+      if(tapAudioCtx.state && tapAudioCtx.state !== 'running'){
+        Promise.resolve(tapAudioCtx.resume()).then(()=>{ try{ window.playSampleFreqs(freqs, dur); }catch(_){ } }).catch(()=>{ });
+        return true;
+      }
+      markProgrammaticPlayback(2600);
       const S = window.UKE_SAMPLE;
       if(!S || !S.ready) return false;
 
@@ -5517,6 +5535,12 @@ candidates[key] = b;
 
       try{
         ensureTapAudio();
+        if(!tapAudioCtx || !tapMaster) return;
+        if(tapAudioCtx.state && tapAudioCtx.state !== 'running'){
+          Promise.resolve(tapAudioCtx.resume()).then(()=>{ try{ playArpeggio(); }catch(_){ } }).catch(()=>{ });
+          return;
+        }
+        markProgrammaticPlayback(5600);
         stopAllVoices();
         const now = tapAudioCtx.currentTime;
         // 低い方→高い方へ（G→C→E→A）
@@ -5554,6 +5578,12 @@ candidates[key] = b;
     const playSingleString = (k)=>{
       try{
         ensureTapAudio();
+        if(!tapAudioCtx || !tapMaster) return;
+        if(tapAudioCtx.state && tapAudioCtx.state !== 'running'){
+          Promise.resolve(tapAudioCtx.resume()).then(()=>{ try{ playSingleString(k); }catch(_){ } }).catch(()=>{ });
+          return;
+        }
+        markProgrammaticPlayback(2600);
         stopAllVoices();
         const b = candidates[k];
         if(!b) return;

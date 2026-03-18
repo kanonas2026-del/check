@@ -2428,9 +2428,9 @@ let gameState = 'MENU';
 let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
-const OUTPUT_BOOST = 2.6; // iPhone内蔵SP向け：全体の基本音量をさらに底上げ
-const TAP_GAIN_LIMIT = 3.4;
-const TAP_POST_GAIN = 1.28;
+const OUTPUT_BOOST = 3.0; // iPhone内蔵SP向け：全体の基本音量を底上げ（v15）
+const TAP_GAIN_LIMIT = 3.9;
+const TAP_POST_GAIN = 1.42;
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
 let tapVol = 1.0;
 let tapAudioCtx = null;
@@ -4809,7 +4809,7 @@ window.addEventListener('pageshow', ()=>{
       const N = Math.max(1, freqs.length);
 
       // 実録はピークが強いので、さらに少しだけ余裕を持たせる
-      const baseGain = 0.44 / Math.sqrt(N);
+      const baseGain = 0.62 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
@@ -4854,7 +4854,7 @@ window.addEventListener('pageshow', ()=>{
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, startTime);
         const mult = (gMap && gMap[k]) ? gMap[k] : 1.0;
-        const peak = Math.min(0.56, baseGain * mult);
+        const peak = Math.min(0.76, baseGain * mult);
         g.gain.linearRampToValueAtTime(peak, startTime + 0.024);
         g.gain.linearRampToValueAtTime(peak * 0.94, startTime + 0.120);
 
@@ -5366,7 +5366,7 @@ window.addEventListener('pageshow', ()=>{
         // normalize with more headroom
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-        const g = (mx > 0.0005) ? Math.min(1.00, (0.44 / mx)) : 1.0;
+        const g = (mx > 0.0005) ? Math.min(1.28, (0.68 / mx)) : 1.0;
 
         // 目標は「約2秒で100→0へ、きれいに単調減衰」
         // 入力の長さには引っ張られず、出音はほぼ一定の長さにそろえる。
@@ -5440,7 +5440,7 @@ window.addEventListener('pageshow', ()=>{
         const blendLen = Math.max(96, Math.floor(sr * 0.020));
         const blendStart = Math.max(0, attackLen - blendLen);
         const tailSec = 1.98;
-        const tailAmp0 = Math.min(0.060, Math.max(0.010, endPk * 0.88, endRms * 1.70));
+        const tailAmp0 = Math.min(0.080, Math.max(0.014, endPk * 0.98, endRms * 1.95));
         for(let i=blendStart;i<outLen;i++){
           const tt = Math.max(0, (i - blendStart) / sr);
           const x = Math.min(1, tt / tailSec);
@@ -5476,8 +5476,8 @@ window.addEventListener('pageshow', ()=>{
           const av = Math.abs(ch[i]);
           if(av > outPk) outPk = av;
         }
-        if(outPk > 0.60){
-          const trim = 0.60 / Math.max(1e-6, outPk);
+        if(outPk > 0.78){
+          const trim = 0.78 / Math.max(1e-6, outPk);
           for(let i=0;i<ch.length;i++) ch[i] *= trim;
         }
 
@@ -5557,7 +5557,7 @@ candidates[key] = b;
           const t = now + i*gap;
           g.gain.setValueAtTime(0.0001, t);
           const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-          const peak = Math.min(0.48, 0.42 * mult);
+          const peak = Math.min(0.66, 0.58 * mult);
           g.gain.linearRampToValueAtTime(peak, t + 0.020);
           g.gain.linearRampToValueAtTime(peak * 0.92, t + 0.082);
           g.gain.setValueAtTime(peak * 0.92, t + 0.24);
@@ -5594,7 +5594,7 @@ candidates[key] = b;
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, now);
         const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-        const peak = Math.min(0.50, 0.44 * mult);
+        const peak = Math.min(0.70, 0.62 * mult);
         g.gain.linearRampToValueAtTime(peak, now + 0.020);
         g.gain.linearRampToValueAtTime(peak * 0.92, now + 0.082);
         g.gain.setValueAtTime(peak * 0.92, now + 0.24);

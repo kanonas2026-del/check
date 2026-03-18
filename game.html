@@ -1941,7 +1941,7 @@ body.menuOpen #back-btn{ display:none !important; }
         <!-- legacy tap vol UI (kept for compatibility; hidden by existing CSS) -->
         <div class="tap-vol-wrap" id="tap-vol-wrap">
           <div class="tap-vol-label">🔊 タップ音の大きさ</div>
-          <input id="tapVol" type="hidden" min="0" max="100" value="35" />
+          <input id="tapVol" type="hidden" min="0" max="100" value="100" />
         </div>
       </div>
     </button>
@@ -1964,7 +1964,7 @@ body.menuOpen #back-btn{ display:none !important; }
     </div>
     <div class="vol-inline global-vol-inline" onclick="event.stopPropagation();">
       <div class="vol-label">🔊 タップ音</div>
-      <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="0.85">
+      <input id="tapVolume" type="range" min="0" max="1" step="0.01" value="1">
     </div>
   </div>
   <div id="mode-desc" class="mode-desc">サポート：とまって まつよ（はじめてにおすすめ）</div>
@@ -2428,27 +2428,30 @@ let gameState = 'MENU';
 let playMode = 'WAIT';
 
 // ===== TAP SOUND (hit SE) =====
-const OUTPUT_BOOST = 1.5; // iPhone内蔵SP向け：全体の基本音量を底上げ
+const OUTPUT_BOOST = 2.6; // iPhone内蔵SP向け：全体の基本音量をさらに底上げ
+const TAP_GAIN_LIMIT = 3.4;
+const TAP_POST_GAIN = 1.28;
 const TAP_VOL_KEY = 'uk_tap_vol_v1';
-let tapVol = 0.85;
+let tapVol = 1.0;
 let tapAudioCtx = null;
 let tapMaster = null;
 let tapCompressor = null; // コンプレッサー追加
+let tapPostGain = null;
 
 function loadTapVol(){
   try{
     const raw = localStorage.getItem(TAP_VOL_KEY);
-    // 初回（または旧既定値のまま）の場合は聞き取りやすい音量へ自動調整
+    // 初回（または旧既定値のまま）の場合は最大寄りへ自動調整
     if(raw === null || raw === ''){
-      tapVol = 0.85;
+      tapVol = 1.0;
       try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       return;
     }
     const v = Number(raw);
     if(!Number.isNaN(v) && v>=0 && v<=1){
-      if(Math.abs(v - 0.35) < 1e-6 || Math.abs(v - 0.65) < 1e-6){
-        // 旧バージョンの既定値(0.35/0.65)を自動で引き上げ
-        tapVol = 0.85;
+      if(v < 0.999 && (Math.abs(v - 0.35) < 1e-6 || Math.abs(v - 0.65) < 1e-6 || Math.abs(v - 0.85) < 1e-6)){
+        // 旧バージョンの既定値(0.35/0.65/0.85)を最大へ引き上げ
+        tapVol = 1.0;
         try{ localStorage.setItem(TAP_VOL_KEY, String(tapVol)); }catch(_){ }
       }else{
         tapVol = v;
@@ -2470,21 +2473,26 @@ function ensureTapAudio(){
       tapCompressor = tapAudioCtx.createDynamicsCompressor();
       
       // コンプレッサー設定（音割れ防止）
-      tapCompressor.threshold.setValueAtTime(-18, tapAudioCtx.currentTime);
-      tapCompressor.knee.setValueAtTime(30, tapAudioCtx.currentTime);
-      tapCompressor.ratio.setValueAtTime(12, tapAudioCtx.currentTime);
-      tapCompressor.attack.setValueAtTime(0.003, tapAudioCtx.currentTime);
-      tapCompressor.release.setValueAtTime(0.25, tapAudioCtx.currentTime);
+      tapCompressor.threshold.setValueAtTime(-24, tapAudioCtx.currentTime);
+      tapCompressor.knee.setValueAtTime(24, tapAudioCtx.currentTime);
+      tapCompressor.ratio.setValueAtTime(14, tapAudioCtx.currentTime);
+      tapCompressor.attack.setValueAtTime(0.0025, tapAudioCtx.currentTime);
+      tapCompressor.release.setValueAtTime(0.18, tapAudioCtx.currentTime);
 
-      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+      tapPostGain = tapAudioCtx.createGain();
+      tapPostGain.gain.value = TAP_POST_GAIN;
+
+      tapMaster.gain.value = Math.min(TAP_GAIN_LIMIT, tapVol * OUTPUT_BOOST);
       
-      // 接続: Master -> Compressor -> Destination
+      // 接続: Master -> Compressor -> PostGain -> Destination
       tapMaster.connect(tapCompressor);
-      tapCompressor.connect(tapAudioCtx.destination);
+      tapCompressor.connect(tapPostGain);
+      tapPostGain.connect(tapAudioCtx.destination);
       
       applyTapVolumeToGain();
     } else {
-      tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+      tapMaster.gain.value = Math.min(TAP_GAIN_LIMIT, tapVol * OUTPUT_BOOST);
+      if(tapPostGain) tapPostGain.gain.value = TAP_POST_GAIN;
     }
   }catch(e){}
 }
@@ -2571,7 +2579,7 @@ function bindTapVolUI(){
   enhanceRangeSlider(el);
   const apply = ()=>{
     tapVol = Math.max(0, Math.min(1, Number(el.value)/100));
-    if(tapMaster) tapMaster.gain.value = Math.min(2.0, tapVol * OUTPUT_BOOST);
+    if(tapMaster) tapMaster.gain.value = Math.min(TAP_GAIN_LIMIT, tapVol * OUTPUT_BOOST);
     saveTapVol();
     // user gesture => allow audio on iOS
     ensureTapAudio();
@@ -3349,32 +3357,47 @@ window.applyUkeSoundUi = function(){
     const pill = document.getElementById('ukeSoundPill');
     if(!pill) return;
     const us = window.UKE_SAMPLE;
-    const on = !!(us && us.mode === 'SAMPLE' && us.ready);
+    const on = !!(us && us.mode === 'SAMPLE' && us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G);
     pill.classList.toggle('active', on);
     pill.setAttribute('aria-pressed', on ? 'true' : 'false');
     pill.title = on ? '録音したウクレレの音' : 'アプリの音';
   }catch(e){}
 };
+window.__ukeSoundToggleTs = 0;
 window.toggleUkeSound = function(){
   try{ ensureTapAudio(); }catch(e){}
+  const nowTs = Date.now();
+  if((nowTs - (window.__ukeSoundToggleTs||0)) < 550) return;
+  window.__ukeSoundToggleTs = nowTs;
   const us = window.UKE_SAMPLE;
   if(!us){ return; }
-  const isOn = (us.mode === 'SAMPLE' && us.ready);
+  const hasRecorded = !!(us && us.buffers && us.buffers.A && us.buffers.E && us.buffers.C && us.buffers.G);
+  const isOn = !!(us.mode === 'SAMPLE' && hasRecorded);
   if(isOn){
     us.mode = 'OSC';
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-  // ONにしたい
-  if(us.ready){
+  if(hasRecorded){
     us.mode = 'SAMPLE';
+    us.ready = true;
     if(window.applyUkeSoundUi) window.applyUkeSoundUi();
     return;
   }
-  // まだ録音がない → 取り込みフローへ
   const sb = document.getElementById('sampleBtn');
-  if(sb){ sb.click(); }
+  if(sb){ try{ sb.click(); }catch(e){} }
   if(window.applyUkeSoundUi) window.applyUkeSoundUi();
+};
+window.bindUkeSoundToggleUI = function(){
+  const pill = document.getElementById('ukeSoundPill');
+  if(!pill || pill.__ukeBound) return;
+  pill.__ukeBound = true;
+  const onTap = (ev)=>{
+    try{ if(ev && typeof ev.preventDefault === 'function') ev.preventDefault(); }catch(_){ }
+    window.toggleUkeSound();
+  };
+  pill.addEventListener('touchend', onTap, {passive:false});
+  pill.addEventListener('pointerup', onTap, {passive:false});
 };
 
 // URLパラメータ mode=TAP/NORMAL/WAIT を反映
@@ -4452,9 +4475,9 @@ window.addEventListener('pageshow', ()=>{
   window.applyTapVolumeToGain = function(){
     try{
       const v = getTapVolume01();
-      const g = Math.pow(v, 2.2); 
+      const g = Math.pow(v, 1.18); 
       if(typeof tapMaster !== 'undefined' && tapMaster && typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
-        tapMaster.gain.setTargetAtTime(Math.min(2.0, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.015);
+        tapMaster.gain.setTargetAtTime(Math.min(TAP_GAIN_LIMIT, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.012);
       }
     }catch(e){}
   };
@@ -4577,7 +4600,7 @@ window.addEventListener('pageshow', ()=>{
 
       // Volume Scaling to prevent clipping before compressor
       // 弦の数が多いほどゲインを下げる
-      const baseGain = 0.4 / Math.sqrt(N);
+      const baseGain = 0.78 / Math.sqrt(N);
       // Warm Tone Filter (Simulate wood body resonance around 400Hz)
       freqs.forEach((f0, i) => {
         const bodyFilter = tapAudioCtx.createBiquadFilter();
@@ -4601,7 +4624,7 @@ window.addEventListener('pageshow', ()=>{
             noiseFilter.type = 'highpass';
             noiseFilter.frequency.value = 3000; // Crisp high click
             const noiseGain = tapAudioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.010 * baseGain, startTime);
+            noiseGain.gain.setValueAtTime(0.016 * baseGain, startTime);
             noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.02);
             noiseGain.gain.linearRampToValueAtTime(0, startTime + 0.03); // ★確実な無音化
             noiseSrc.connect(noiseFilter);
@@ -4674,8 +4697,8 @@ window.addEventListener('pageshow', ()=>{
         
         const voiceGain = tapAudioCtx.createGain();
         // ★修正: マスターフェードアウトでプツッと切れるクリップノイズを防止
-        voiceGain.gain.setValueAtTime(baseGain, startTime);
-        voiceGain.gain.setValueAtTime(baseGain, startTime + 1.8);
+        voiceGain.gain.setValueAtTime(baseGain * 1.12, startTime);
+        voiceGain.gain.setValueAtTime(baseGain * 1.05, startTime + 1.8);
         voiceGain.gain.exponentialRampToValueAtTime(0.001, startTime + 2.2);
         voiceGain.gain.linearRampToValueAtTime(0, startTime + 2.3);
         
@@ -4713,27 +4736,42 @@ window.addEventListener('pageshow', ()=>{
   function connectWarmSampleChain(src, when, outNode){
     const hp = tapAudioCtx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.setValueAtTime(85, when);
+    hp.frequency.setValueAtTime(78, when);
 
+    // B寄り：こもらせず、でもペイン感は出しすぎない自然寄りの再生EQ
     const body = tapAudioCtx.createBiquadFilter();
     body.type = 'peaking';
-    body.frequency.setValueAtTime(320, when);
-    body.Q.setValueAtTime(0.85, when);
-    body.gain.setValueAtTime(2.2, when);
+    body.frequency.setValueAtTime(210, when);
+    body.Q.setValueAtTime(0.84, when);
+    body.gain.setValueAtTime(0.02, when);
+
+    const boxCut = tapAudioCtx.createBiquadFilter();
+    boxCut.type = 'peaking';
+    boxCut.frequency.setValueAtTime(560, when);
+    boxCut.Q.setValueAtTime(0.92, when);
+    boxCut.gain.setValueAtTime(-0.90, when);
+
+    const presence = tapAudioCtx.createBiquadFilter();
+    presence.type = 'peaking';
+    presence.frequency.setValueAtTime(2550, when);
+    presence.Q.setValueAtTime(0.90, when);
+    presence.gain.setValueAtTime(0.58, when);
 
     const soften = tapAudioCtx.createBiquadFilter();
     soften.type = 'peaking';
-    soften.frequency.setValueAtTime(2400, when);
-    soften.Q.setValueAtTime(0.9, when);
-    soften.gain.setValueAtTime(-2.8, when);
+    soften.frequency.setValueAtTime(4700, when);
+    soften.Q.setValueAtTime(0.96, when);
+    soften.gain.setValueAtTime(-0.08, when);
 
     const lp = tapAudioCtx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(4300, when);
+    lp.frequency.setValueAtTime(11800, when);
 
     src.connect(hp);
     hp.connect(body);
-    body.connect(soften);
+    body.connect(boxCut);
+    boxCut.connect(presence);
+    presence.connect(soften);
     soften.connect(lp);
     lp.connect(outNode);
     return lp;
@@ -4752,8 +4790,8 @@ window.addEventListener('pageshow', ()=>{
       const now = tapAudioCtx.currentTime;
       const N = Math.max(1, freqs.length);
 
-      // 実録はピークが強いので、かなり余裕を持たせて丸く鳴らす
-      const baseGain = 0.42 / Math.sqrt(N);
+      // 実録はピークが強いので、さらに少しだけ余裕を持たせる
+      const baseGain = 0.44 / Math.sqrt(N);
       let played = 0;
 
       const gMap = (S.gain || {A:1,E:1,C:1,G:1});
@@ -4798,22 +4836,23 @@ window.addEventListener('pageshow', ()=>{
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, startTime);
         const mult = (gMap && gMap[k]) ? gMap[k] : 1.0;
-        const peak = Math.min(0.78, baseGain * mult);
-        g.gain.linearRampToValueAtTime(peak, startTime + 0.018);
-        g.gain.linearRampToValueAtTime(peak * 0.86, startTime + 0.085);
+        const peak = Math.min(0.56, baseGain * mult);
+        g.gain.linearRampToValueAtTime(peak, startTime + 0.024);
+        g.gain.linearRampToValueAtTime(peak * 0.94, startTime + 0.120);
 
-        // dur は指定が来る場合だけ少し反映（通常は固定の余韻）
-        const tail = Math.max(2.8, Math.min(3.8, ((Number(dur)||0) * 3.2) || 3.1));
-        g.gain.setValueAtTime(peak * 0.80, startTime + Math.max(0.52, tail - 1.35));
-        g.gain.exponentialRampToValueAtTime(0.001, startTime + tail);
-        g.gain.linearRampToValueAtTime(0, startTime + tail + 0.16);
+        // 約2秒で単調減衰。録音長には引っ張られない。
+        const tail = 2.02;
+        g.gain.setValueAtTime(peak * 0.93, startTime + 0.24);
+        g.gain.exponentialRampToValueAtTime(0.0012, startTime + tail);
+        g.gain.linearRampToValueAtTime(0, startTime + tail + 0.14);
 
         const finalFilter = connectWarmSampleChain(src, startTime, g);
         g.connect(tapMaster);
 
         src.start(startTime);
         // 長時間ぶら下げない（安全停止）
-        const stopTime = startTime + Math.min(5.2, Math.max(tail + 0.55, (buf.duration / rate) + 0.30));
+        const playableDur = (buf && rate > 0.001) ? (buf.duration / rate) : 0;
+        const stopTime = startTime + Math.max(tail + 0.18, playableDur + 0.08, 2.24);
         src.stop(stopTime);
 
         played++;
@@ -4960,13 +4999,13 @@ window.addEventListener('pageshow', ()=>{
       preRing = null; preLen = 0; preWrite = 0;
     };
 
-    const autocorrelate = (buf, sampleRate)=>{
+    const autocorrelate = (buf, sampleRate, rmsFloor=minRms)=>{
       const SIZE = buf.length;
       // RMS check
       let rms = 0;
       for(let i=0;i<SIZE;i++){ const v=buf[i]; rms += v*v; }
       rms = Math.sqrt(rms / SIZE);
-      if(rms < minRms) return -1;
+      if(rms < rmsFloor) return -1;
 
       const minFreq = 180;
       const maxFreq = 600;
@@ -5115,24 +5154,25 @@ window.addEventListener('pageshow', ()=>{
             if(a>peak) peak=a;
           }
           const rms = Math.sqrt(s/bufTD.length);
+          const detectMinRms = (takeKey==='A') ? Math.max(0.00075, minRms * 0.58) : minRms;
 
           // 強すぎ（クリップ/ペチン音）を避ける：大きすぎる場合はOKにしない
-          const tooLoud = (peak > 0.94) || (rms > Math.max(0.22, minRms * 18));
+          const tooLoud = (peak > (takeKey==='A' ? 0.97 : 0.94)) || (rms > Math.max((takeKey==='A' ? 0.26 : 0.22), detectMinRms * (takeKey==='A' ? 22 : 18)));
           if(tooLoud){
             stableCount = 0;
             lastHz = 0;
             setHint('強すぎるよ…少し小さめで弾いてね');
-          }else if(rms < minRms){
+          }else if(rms < detectMinRms){
             stableCount = 0;
             lastHz = 0;
             // うるさくなりすぎないよう、毎回は文言を変えない
             setHint('もう一度、はっきり弾いてね');
           }else{
-            const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate);
+            const hz = autocorrelate(bufTD, tapAudioCtx.sampleRate, detectMinRms);
             if(hz > 0){
               const cents = 1200 * Math.log2(Math.max(1e-6, hz / t.freq));
-              const okPitch = Math.abs(cents) < (takeKey==='A' ? 75 : 55);
-              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < 18);
+              const okPitch = Math.abs(cents) < (takeKey==='A' ? 88 : 55);
+              const okStable = (!lastHz) ? true : (Math.abs(1200*Math.log2(Math.max(1e-6, hz/lastHz))) < (takeKey==='A' ? 28 : 18));
 
               if(okPitch && okStable){
                 stableCount++;
@@ -5144,7 +5184,7 @@ window.addEventListener('pageshow', ()=>{
                 setHint('ちょっとだけ合わせてね（近いよ）');
               }
 
-              if(stableCount >= (takeKey==='A' ? 5 : 6) && !recActive){
+              if(stableCount >= (takeKey==='A' ? 3 : 6) && !recActive){
                 triggerRecord();
               }
             }else{
@@ -5215,7 +5255,7 @@ window.addEventListener('pageshow', ()=>{
 
         // ★クリア化：開始点を少しだけ調整（取り込み音は維持しつつ、ペチン/指ノイズの確率を下げる）
         const sr = tapAudioCtx.sampleRate;
-        const skipSec = (peakAbs > 0.70) ? 0.028 : 0.018; // 強めほど少しだけ後ろへ
+        const skipSec = (peakAbs > 0.72) ? 0.018 : 0.010; // 強めでも飛ばしすぎず、1弦の伸びを残す
         const skip = Math.floor(sr * skipSec);
         if((recBuf.length - st) > (skip + Math.floor(sr * 0.55))){ st += skip; }
 
@@ -5236,7 +5276,7 @@ window.addEventListener('pageshow', ()=>{
         }catch(e){}
 
 
-        // normalize + denoise + transient tame（録音の個性は残しつつ、角だけ丸める）
+        // normalize + denoise + transient tame（こもらせず、割れとノイズを抑える）
         const proc = new Float32Array(data.length);
 
         // DC offset remove
@@ -5246,90 +5286,181 @@ window.addEventListener('pageshow', ()=>{
 
         const dt = 1 / sr;
 
-        // 1-pole highpass to remove low rumble (≈85Hz)
-        const fc = 85;
+        // 1-pole highpass to remove low rumble (≈82Hz)
+        const fc = 82;
         const rc = 1 / (2 * Math.PI * fc);
         const a = rc / (rc + dt);
         let y1 = 0, x1 = 0;
 
-        // 2-stage lowpass to make the sample mellower (≈4.6kHz then 3.6kHz)
-        const lfc1 = 4600;
+        // gentler lowpass: keep clarity, avoid muffling
+        const lfc1 = 11800;
         const lrc1 = 1 / (2 * Math.PI * lfc1);
         const la1 = dt / (lrc1 + dt);
         let ly1 = 0;
 
-        const lfc2 = 3600;
+        const lfc2 = 9800;
         const lrc2 = 1 / (2 * Math.PI * lfc2);
         const la2 = dt / (lrc2 + dt);
         let ly2 = 0;
 
-        // soft noise gate threshold (avoid boosting room noise)
-        const gate = Math.max(0.0016, (noiseRms||0) * 2.2, (minRms||0) * 0.28);
+        // soft gate: only shave late low-level room noise, do not choke the body
+        const gate = Math.max(0.00055, (noiseRms||0) * 1.12, (minRms||0) * 0.10);
 
-        // transient follower: tame the very first "ペチン" without killing uke character
+        // transient follower: tame the first "ペチン" without dulling the string
         let env = 0;
         const envAtk = Math.exp(-1 / (sr * 0.0012));
-        const envRel = Math.exp(-1 / (sr * 0.050));
-        const transientWin = Math.min(data.length, Math.floor(sr * 0.085));
-        const transientCeil = Math.max(0.12, Math.min(0.34, peakAbs * 0.58));
+        const envRel = Math.exp(-1 / (sr * 0.055));
+        const transientWin = Math.min(data.length, Math.floor(sr * 0.040));
+        const transientCeil = Math.max(0.14, Math.min(0.34, peakAbs * 0.54));
 
         for(let i=0;i<data.length;i++){
           let x = (data[i] - mean);
           let y = a * (y1 + x - x1);
           x1 = x; y1 = y;
 
-          // two-pass lowpass (gentle, mellow)
+          // clearer two-pass lowpass
           ly1 = ly1 + la1 * (y - ly1);
           y = ly1;
           ly2 = ly2 + la2 * (y - ly2);
           y = ly2;
 
           const ay = Math.abs(y);
-          if(ay < gate){
-            const m = ay / gate;
-            y *= (m * m);
+          if(i > Math.floor(sr * 0.10) && ay < gate){
+            const m = ay / Math.max(1e-7, gate);
+            y *= (0.45 + 0.55 * m * m);
           }
 
-          // envelope follower for transient control
           const aenv = Math.abs(y);
           if(aenv > env) env = envAtk * env + (1 - envAtk) * aenv;
           else env = envRel * env + (1 - envRel) * aenv;
 
           if(i < transientWin && env > transientCeil){
             const tame = transientCeil / Math.max(1e-6, env);
-            y *= (0.55 + 0.45 * tame);
+            y *= (0.54 + 0.46 * tame);
           }
 
-          // gentle soft clip: round sharp peaks only
-          y = Math.tanh(y * 1.38) / Math.tanh(1.38);
+          // stronger soft saturation to remove hard clipping feel
+          y = Math.tanh(y * 1.12) / Math.tanh(1.12);
+
           proc[i] = y;
         }
 
-        // headroom-heavy normalize (leave room for chords and later gain matching)
+        // normalize with more headroom
         let mx = 0;
         for(let i=0;i<proc.length;i++){ const a0 = Math.abs(proc[i]); if(a0>mx) mx=a0; }
-        const g = (mx > 0.0005) ? Math.min(1.12, (0.82 / mx)) : 1.0;
+        const g = (mx > 0.0005) ? Math.min(1.00, (0.44 / mx)) : 1.0;
 
-        // copy into AudioBuffer (tapAudioCtx)
-        const b = tapAudioCtx.createBuffer(1, proc.length, sr);
+        // 目標は「約2秒で100→0へ、きれいに単調減衰」
+        // 入力の長さには引っ張られず、出音はほぼ一定の長さにそろえる。
+        const fixedDurSec = 2.18;
+        const outLen = Math.floor(sr * fixedDurSec);
+        const b = tapAudioCtx.createBuffer(1, outLen, sr);
         const ch = b.getChannelData(0);
-        for(let i=0;i<proc.length;i++){ ch[i] = proc[i] * g; }
 
-        // common envelope to unify the 1〜4弦 feel while keeping the recorded tone
-        const fi = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.020));
-        for(let i=0;i<fi;i++){ ch[i] *= (i / Math.max(1, fi)); }
+        // real recorded body: keep only the front body where the uke character is clear
+        const attackLen = Math.min(proc.length, Math.floor(sr * 0.26));
+        for(let i=0;i<attackLen;i++){ ch[i] = proc[i] * g; }
 
-        const attackTame = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.090));
-        for(let i=0;i<attackTame;i++){
-          const t = i / Math.max(1, attackTame - 1);
-          const env2 = 1.0 - 0.12 * Math.exp(-t * 4.0);
-          ch[i] *= env2;
+        // measure the end level from the recorded body
+        const tailProbeStart = Math.max(0, attackLen - Math.floor(sr * 0.028));
+        let endRms = 0;
+        let endPk = 0;
+        for(let i=tailProbeStart;i<attackLen;i++){
+          const v = ch[i];
+          endRms += v*v;
+          const av = Math.abs(v);
+          if(av > endPk) endPk = av;
+        }
+        endRms = Math.sqrt(endRms / Math.max(1, attackLen - tailProbeStart));
+        endPk = Math.max(endPk, 0.0035);
+
+        // capture a short stable table from the recording, then convert it to harmonic tail.
+        // これで「音色は元音に寄せつつ、包絡は単調減衰」にする。
+        const baseHz = ((ORDER.find(o => o.key === key) || {}).freq) || 440.0;
+        const period = Math.max(16, Math.min(Math.floor(sr * 0.02), Math.round(sr / Math.max(80, baseHz))));
+        const stableStart = Math.max(0, Math.min(proc.length - (period * 4) - 1, Math.floor(sr * 0.042)));
+        const cycleCount = Math.max(2, Math.min(6, Math.floor((proc.length - stableStart) / Math.max(1, period))));
+        const table = new Float32Array(period);
+        for(let p=0; p<period; p++){
+          let s = 0, c = 0;
+          for(let k0=0; k0<cycleCount; k0++){
+            const idx0 = stableStart + k0 * period + p;
+            if(idx0 >= 0 && idx0 < proc.length){ s += proc[idx0] * g; c++; }
+          }
+          table[p] = c ? (s / c) : 0;
         }
 
-        const fo = Math.min(ch.length, Math.floor(tapAudioCtx.sampleRate * 0.120));
+        const harmonics = [];
+        let harmNorm = 0;
+        for(let h=1; h<=4; h++){
+          let re = 0, im = 0;
+          for(let p=0; p<period; p++){
+            const ang = 2 * Math.PI * h * p / period;
+            re += table[p] * Math.cos(ang);
+            im += table[p] * Math.sin(ang);
+          }
+          let ampH = (2 * Math.sqrt(re*re + im*im)) / Math.max(1, period);
+          if(h === 1) ampH *= 1.00;
+          if(h === 2) ampH *= 0.72;
+          if(h === 3) ampH *= 0.58;
+          if(h === 4) ampH *= 0.46;
+          const phaseH = Math.atan2(im, re);
+          harmonics.push({h, amp: ampH, phase: phaseH});
+          harmNorm += ampH;
+        }
+        if(harmNorm < 0.0001){
+          harmonics.length = 0;
+          harmonics.push({h:1, amp:1.00, phase:0});
+          harmonics.push({h:2, amp:0.28, phase:0.18});
+          harmonics.push({h:3, amp:0.10, phase:0.37});
+          harmonics.push({h:4, amp:0.04, phase:0.55});
+          harmNorm = 1.42;
+        }
+        const invNorm = 1 / Math.max(0.0001, harmNorm);
+        for(const hh of harmonics) hh.amp *= invNorm;
+
+        const blendLen = Math.max(96, Math.floor(sr * 0.020));
+        const blendStart = Math.max(0, attackLen - blendLen);
+        const tailSec = 1.98;
+        const tailAmp0 = Math.min(0.060, Math.max(0.010, endPk * 0.88, endRms * 1.70));
+        for(let i=blendStart;i<outLen;i++){
+          const tt = Math.max(0, (i - blendStart) / sr);
+          const x = Math.min(1, tt / tailSec);
+          const env = Math.pow(Math.max(0, 1 - x), 1.42);
+          let synth = 0;
+          for(const hh of harmonics){
+            synth += hh.amp * Math.cos((2 * Math.PI * baseHz * hh.h * tt) - hh.phase);
+          }
+          const synthV = synth * tailAmp0 * env;
+
+          if(i < attackLen){
+            const m = (i - blendStart) / Math.max(1, attackLen - blendStart);
+            ch[i] = (ch[i] * (1 - m)) + (synthV * m);
+          }else{
+            ch[i] = synthV;
+          }
+        }
+
+        // fade in very front a touch to avoid click, then fade the end long enough so it never snaps shut
+        const fi = Math.min(ch.length, Math.floor(sr * 0.006));
+        for(let i=0;i<fi;i++){ ch[i] *= (i / Math.max(1, fi)); }
+
+        const fo = Math.min(ch.length, Math.floor(sr * 0.180));
         for(let i=0;i<fo;i++){
           const p = (fo - i) / Math.max(1, fo);
-          ch[ch.length-1-i] *= p;
+          ch[ch.length-1-i] *= p * p;
+        }
+
+        // final safety headroom
+        let outPk = 0;
+        for(let i=0;i<ch.length;i++){
+          ch[i] = Math.tanh(ch[i] * 0.96) / Math.tanh(0.96);
+          const av = Math.abs(ch[i]);
+          if(av > outPk) outPk = av;
+        }
+        if(outPk > 0.60){
+          const trim = 0.60 / Math.max(1e-6, outPk);
+          for(let i=0;i<ch.length;i++) ch[i] *= trim;
         }
 
         // compute rms for leveling
@@ -5402,17 +5533,18 @@ candidates[key] = b;
           const t = now + i*gap;
           g.gain.setValueAtTime(0.0001, t);
           const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-          const peak = Math.min(0.88, 0.62 * mult);
-          g.gain.linearRampToValueAtTime(peak, t + 0.018);
-          g.gain.linearRampToValueAtTime(peak * 0.86, t + 0.090);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 2.95);
-          g.gain.linearRampToValueAtTime(0, t + 3.10);
+          const peak = Math.min(0.48, 0.42 * mult);
+          g.gain.linearRampToValueAtTime(peak, t + 0.020);
+          g.gain.linearRampToValueAtTime(peak * 0.92, t + 0.082);
+          g.gain.setValueAtTime(peak * 0.92, t + 0.24);
+          g.gain.exponentialRampToValueAtTime(0.0010, t + 2.02);
+          g.gain.linearRampToValueAtTime(0, t + 2.16);
 
           const finalFilter = connectWarmSampleChain(src, t, g);
           g.connect(tapMaster);
 
           src.start(t);
-          src.stop(t + 3.20);
+          src.stop(t + 2.24);
 
           activeVoices.push({ osc: src, gain: g, startTime: t, filter: finalFilter });
         });
@@ -5432,14 +5564,16 @@ candidates[key] = b;
         const g = tapAudioCtx.createGain();
         g.gain.setValueAtTime(0.0001, now);
         const mult = (candGain && candGain[k]) ? candGain[k] : 1.0;
-        const peak = Math.min(0.92, 0.68 * mult);
-        g.gain.linearRampToValueAtTime(peak, now + 0.018);
-        g.gain.linearRampToValueAtTime(peak * 0.84, now + 0.095);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 4.10);
+        const peak = Math.min(0.50, 0.44 * mult);
+        g.gain.linearRampToValueAtTime(peak, now + 0.020);
+        g.gain.linearRampToValueAtTime(peak * 0.92, now + 0.082);
+        g.gain.setValueAtTime(peak * 0.92, now + 0.24);
+        g.gain.exponentialRampToValueAtTime(0.0010, now + 2.02);
+        g.gain.linearRampToValueAtTime(0, now + 2.16);
         const finalFilter = connectWarmSampleChain(src, now, g);
         g.connect(tapMaster);
         src.start(now);
-        try{ src.stop(now + 4.30); }catch(e){}
+        try{ src.stop(now + 2.24); }catch(e){}
         activeVoices.push({ osc: src, gain: g, startTime: now, filter: finalFilter });
       }catch(e){}
     };
@@ -5530,10 +5664,13 @@ candidates[key] = b;
     });
 
     bUseOsc.addEventListener('click', ()=>{
-      // discard and return to oscillator
-      window.UKE_SAMPLE.mode = 'OSC';
-      window.UKE_SAMPLE.ready = false;
-      window.UKE_SAMPLE.buffers = {A:null,E:null,C:null,G:null};
+      // keep recorded buffers; switch playback to oscillator only
+      if(window.UKE_SAMPLE){
+        window.UKE_SAMPLE.mode = 'OSC';
+        if(window.UKE_SAMPLE.buffers && window.UKE_SAMPLE.buffers.A && window.UKE_SAMPLE.buffers.E && window.UKE_SAMPLE.buffers.C && window.UKE_SAMPLE.buffers.G){
+          window.UKE_SAMPLE.ready = true;
+        }
+      }
       endFlow(true);
     });
 
@@ -5758,6 +5895,7 @@ candidates[key] = b;
     try{ hookSlider(); }catch(e){}
     try{ bindSongSpeedUI(); }catch(e){}
     try{ window.bindSamplingUI && window.bindSamplingUI(); }catch(e){}
+    try{ window.bindUkeSoundToggleUI && window.bindUkeSoundToggleUI(); }catch(e){}
     try{ window.applyUkeSoundUi && window.applyUkeSoundUi(); }catch(e){}
   };
   if(document.readyState === 'loading'){

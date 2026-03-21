@@ -3133,6 +3133,30 @@ function getImportedTravelMsFromChord(chord){
     return 0;
   }
 }
+function getImportedTimedGroupBaseX(group, elapsedMs){
+  try{
+    if(!group) return canvas.width + 120;
+    const ev = group._songEvent || null;
+    const atMs = Number(ev && ev.atMs);
+    const leadMs = Math.max(1, Number(group._timedLeadMs || getImportedPreviewLeadMs()));
+    const spawnX = Number(group._timedSpawnX != null ? group._timedSpawnX : (canvas.width + 120));
+    const hitX = Number(group._timedHitX != null ? group._timedHitX : NUT_X);
+    if(!Number.isFinite(atMs)) return group.x;
+    const spawnAt = atMs - leadMs;
+    const progress = (elapsedMs - spawnAt) / leadMs;
+    return spawnX + (hitX - spawnX) * progress;
+  }catch(e){
+    return group && Number.isFinite(group.x) ? group.x : (canvas.width + 120);
+  }
+}
+function syncImportedTimedGroupPosition(group, elapsedMs){
+  try{
+    if(!group) return;
+    group.x = getImportedTimedGroupBaseX(group, elapsedMs);
+    if(!group.entered && group.x < (canvas.width + 60)) group.entered = true;
+    if(!group.ticked && group.x <= NUT_X) group.ticked = true;
+  }catch(e){}
+}
 function stopCustomGuidePlayback(){
   try{
     (window.CUSTOM_GUIDE_TIMERS || []).forEach(id => clearTimeout(id));
@@ -3681,14 +3705,22 @@ function gameLoop(time){
 
       while(songIndex < __songData.length){
         const d = __songData[songIndex];
-        const dueAt = Math.max(0, Number((d && d.atMs) || 0) - __leadMs);
+        const chordObj = d && d.chord ? d.chord : ((d && d.lib && d.key && d.lib[d.key]) ? d.lib[d.key] : null);
+        const __spawnLeadMs = Math.max(1, __leadMs);
+        const dueAt = Math.max(0, Number((d && d.atMs) || 0) - __spawnLeadMs);
         if(__elapsed + 8 < dueAt) break;
 
-        const chordObj = d && d.chord ? d.chord : ((d && d.lib && d.key && d.lib[d.key]) ? d.lib[d.key] : null);
         if(chordObj){
           const __g = new ChordGroup(chordObj, d && d.lyrics ? d.lyrics : '');
           __g._songEvent = d || null;
           __g._previewPlayed = false;
+          __g._spawnLeadMs = __spawnLeadMs;
+          __g._timedImported = true;
+          __g._timedLeadMs = __spawnLeadMs;
+          __g._timedSpawnAtMs = dueAt;
+          __g._timedSpawnX = canvas.width + 120;
+          __g._timedHitX = NUT_X;
+          __g.x = __g._timedSpawnX;
           groups.push(__g);
         }
         songIndex++;
@@ -3756,12 +3788,40 @@ function gameLoop(time){
     document.getElementById('chordHud').style.display='none';
   }
 
+  const __elapsedTimedPreview = (window.CUSTOM_SONG_TIMED && isSongMode)
+    ? Math.max(0, performance.now() - (window.CUSTOM_SONG_START_AT || performance.now()))
+    : 0;
+
   for(let i=groups.length-1; i>=0; i--){
     const __prevX = groups[i].x;
-    groups[i].update();
+    const __timedPreviewGroup = !!(
+      window.CUSTOM_PREVIEW_ONLY &&
+      isSongMode &&
+      window.CUSTOM_SONG_TIMED &&
+      groups[i] &&
+      groups[i]._timedImported
+    );
+    if(__timedPreviewGroup){
+      syncImportedTimedGroupPosition(groups[i], __elapsedTimedPreview);
+    }else{
+      groups[i].update();
+    }
     if(window.CUSTOM_PREVIEW_ONLY && isSongMode && groups[i].active && !groups[i]._previewPlayed){
       try{
-        if(__prevX > NUT_X && groups[i].x <= NUT_X){
+        const __ev = groups[i]._songEvent || null;
+        const __hasTimedAt = Number.isFinite(Number(__ev && __ev.atMs));
+        if(window.CUSTOM_SONG_TIMED && __hasTimedAt){
+          const __elapsedPlay = Math.max(0, performance.now() - (window.CUSTOM_SONG_START_AT || performance.now()));
+          if(__elapsedPlay + 8 >= Number(__ev.atMs || 0)){
+            const __freqs = Array.isArray(__ev && __ev.freqs) ? __ev.freqs : [];
+            if(__freqs.length && typeof window.playFreqs === 'function'){
+              window.playFreqs(__freqs, 0.9);
+            }
+            groups[i]._previewPlayed = true;
+            // preview-onlyでも表示は残し、音だけを絶対時刻(atMs)で鳴らす。
+            // これで先頭数小節が leadMs の影響で同時発音→相互停止されるのを防ぐ。
+          }
+        } else if(__prevX > NUT_X && groups[i].x <= NUT_X){
           const __freqs = Array.isArray(groups[i]._songEvent && groups[i]._songEvent.freqs) ? groups[i]._songEvent.freqs : [];
           if(__freqs.length && typeof window.playFreqs === 'function'){
             window.playFreqs(__freqs, 0.9);
@@ -6230,7 +6290,7 @@ document.addEventListener('DOMContentLoaded', function(){
     parsed: null,
     runtime: null,
     parseError: '',
-    display: 'BOTH'
+    display: 'FINGER'
   };
 
   function toText(v){ return v == null ? '' : String(v).trim(); }
@@ -6249,6 +6309,28 @@ document.addEventListener('DOMContentLoaded', function(){
     if(speed === 'SLOW') return 'SLOW';
     if(speed === 'FAST') return 'FAST';
     return 'NORMAL';
+  }
+
+  function getImportedTimingScale(speed){
+    const sp = String(speed || 'NORMAL').toUpperCase();
+    if(sp === 'SLOW') return 2.0;
+    if(sp === 'FAST') return 0.5;
+    return 1.0;
+  }
+
+  function buildRuntimeForSelectedSpeed(runtime, speed){
+    if(!runtime || !Array.isArray(runtime.songData)) return runtime;
+    const scale = getImportedTimingScale(speed);
+    if(!(scale > 0) || scale === 1) return runtime;
+    const cloned = Object.assign({}, runtime);
+    cloned.songData = runtime.songData.map(ev => {
+      const e2 = Object.assign({}, ev);
+      const at = Number(ev && ev.atMs);
+      if(Number.isFinite(at)) e2.atMs = Math.round(at * scale);
+      return e2;
+    });
+    cloned._timingScale = scale;
+    return cloned;
   }
 
   function getStatusSummary(parsed){
@@ -6620,7 +6702,8 @@ document.addEventListener('DOMContentLoaded', function(){
   function launchImportedPreview(){
     if(!origState.runtime) return;
     try{
-      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, origState.runtime, {
+      const runtimeForPlay = buildRuntimeForSelectedSpeed(origState.runtime, origState.speed);
+      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, runtimeForPlay, {
         speedBase: getImportedSpeedBase(origState.speed),
         selectedMode: 'TAP',
         selectedSpeed: origState.speed,
@@ -6646,7 +6729,8 @@ document.addEventListener('DOMContentLoaded', function(){
   function launchImportedPractice(){
     if(!origState.runtime) return;
     try{
-      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, origState.runtime, {
+      const runtimeForPlay = buildRuntimeForSelectedSpeed(origState.runtime, origState.speed);
+      window.CUSTOM_IMPORTED_ACTIVE = Object.assign({}, runtimeForPlay, {
         speedBase: getImportedSpeedBase(origState.speed),
         selectedMode: origState.mode,
         selectedSpeed: origState.speed,
@@ -6845,8 +6929,8 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="orig-group">
         <p class="orig-label">④ 表示</p>
         <div class="orig-pills orig-pills-2">
-          <button class="orig-pill" type="button" data-disp="FINGER">指</button>
-          <button class="orig-pill active" type="button" data-disp="BOTH">両方</button>
+          <button class="orig-pill active" type="button" data-disp="FINGER">指</button>
+          <button class="orig-pill" type="button" data-disp="BOTH">両方</button>
         </div>
       </div>
     </div>

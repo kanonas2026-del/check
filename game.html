@@ -2451,6 +2451,29 @@ function saveTapVol(){
   tapVol = FIXED_APP_VOLUME;
 }
 
+function getDeviceOutputCompensation(){
+  try{
+    const touch = (navigator.maxTouchPoints || 0) > 0;
+    if(!touch) return 1.0;
+
+    const vv = window.visualViewport;
+    const vw = Number(vv && vv.width) || window.innerWidth || 0;
+    const vh = Number(vv && vv.height) || window.innerHeight || 0;
+
+    // portrait / landscape どちらでも端末クラスが取れるよう short/long を使う
+    const shortEdge = Math.min(vw, vh);
+    const longEdge  = Math.max(vw, vh);
+
+    // 小さめiPhone / 小さめAndroidだけ少し持ち上げる
+    // 通常サイズ以上は 1.0 のまま
+    if(shortEdge <= 375 && longEdge <= 812) return 1.28;
+    if(shortEdge <= 390 && longEdge <= 844) return 1.16;
+    return 1.0;
+  }catch(e){
+    return 1.0;
+  }
+}
+
 function ensureTapAudio(){
   try{
     if(!tapAudioCtx) tapAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -2469,7 +2492,7 @@ function ensureTapAudio(){
       tapCompressor.release.setValueAtTime(0.18, tapAudioCtx.currentTime);
 
       tapPostGain = tapAudioCtx.createGain();
-      tapPostGain.gain.value = TAP_POST_GAIN;
+      tapPostGain.gain.value = TAP_POST_GAIN * getDeviceOutputCompensation();
 
       tapLimiter = tapAudioCtx.createDynamicsCompressor();
       tapLimiter.threshold.setValueAtTime(-14, tapAudioCtx.currentTime);
@@ -2493,7 +2516,7 @@ function ensureTapAudio(){
       applyTapVolumeToGain();
     } else {
       tapMaster.gain.value = Math.min(TAP_GAIN_LIMIT, tapVol * OUTPUT_BOOST);
-      if(tapPostGain) tapPostGain.gain.value = TAP_POST_GAIN;
+      if(tapPostGain) tapPostGain.gain.value = TAP_POST_GAIN * getDeviceOutputCompensation();
       if(tapFinalGain) tapFinalGain.gain.value = 0.90;
     }
   }catch(e){}
@@ -4518,6 +4541,9 @@ window.addEventListener('pageshow', ()=>{
       const g = 0.34 + 0.78 * Math.pow(v, 0.82);
       if(typeof tapMaster !== 'undefined' && tapMaster && typeof tapAudioCtx !== 'undefined' && tapAudioCtx){
         tapMaster.gain.setTargetAtTime(Math.min(TAP_GAIN_LIMIT, g * OUTPUT_BOOST), tapAudioCtx.currentTime, 0.012);
+        if(typeof tapPostGain !== 'undefined' && tapPostGain){
+          tapPostGain.gain.setTargetAtTime(TAP_POST_GAIN * getDeviceOutputCompensation(), tapAudioCtx.currentTime, 0.020);
+        }
       }
     }catch(e){}
   };
